@@ -1,0 +1,28 @@
+[package]
+name = "treesnake"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "treesnake"
+path = "./src/bin/treesnake.rs"
+
+[dependencies]
+tiny_http = { version = "0.11", features = ["ssl-rustls"] }
+parking_lot = { version = "0.12", features = ["deadlock_detection", "hardware-lock-elision"] }
+crossbeam-channel = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rand = "0.8"
+clap = { version = "3.2", features = ["derive"] }
+ctrlc =  { version = "3.2", features = ["termination"] }
+log = "0.4"
+env_logger = "0.9"
+libc = "0.2"
+
+[dev-dependencies]
+ureq = "2.4"
+approx = "0.5"
+
+[profile.release]
+lto = true

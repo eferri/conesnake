@@ -1,0 +1,85 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'treesnake'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=treesnake",
+                    "--",
+                    "--test-threads=1"
+                ],
+                "filter": {
+                    "name": "treesnake",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'treesnake'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=treesnake",
+                    "--package=treesnake"
+                ],
+                "filter": {
+                    "name": "treesnake",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--port",
+                "8081"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'treesnake'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=treesnake",
+                    "--package=treesnake"
+                ],
+                "filter": {
+                    "name": "treesnake",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'server_test'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=server_test",
+                    "--package=treesnake"
+                ],
+                "filter": {
+                    "name": "server_test",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

@@ -1,0 +1,9 @@
+[submodule "submodules/rules"]
+	path = submodules/rules
+	url = git@github.com:eferri/rules.git
+[submodule "submodules/board"]
+	path = submodules/board
+	url = git@github.com:BattlesnakeOfficial/board.git
+[submodule "submodules/snork/snork"]
+	path = submodules/snork/snork
+	url = git@github.com:wrenger/snork.git

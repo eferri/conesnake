@@ -1,0 +1,13 @@
+.cargo
+target*
+
+certs
+
+*.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.devcontainer/devcontainer.json
+
+.env
+*.tar
+*.tar.gz

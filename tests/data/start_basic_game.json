@@ -1,0 +1,105 @@
+{
+    "game": {
+        "id": "game-1",
+        "ruleset": {
+            "name": "solo",
+            "version": "v.1.2.3",
+            "settings": {
+                "foodSpawnChance": 25,
+                "minimumFood": 1,
+                "hazardDamagePerTurn": 14,
+                "map": "hz_spiral",
+                "royale": {
+                    "shrinkEveryNTurns": 5
+                },
+                "squad": {
+                    "allowBodyCollisions": true,
+                    "sharedElimination": true,
+                    "sharedHealth": true,
+                    "sharedLength": true
+                }
+            }
+        },
+        "map": "standard",
+        "timeout": 200,
+        "source": "league"
+    },
+    "turn": 0,
+    "board": {
+        "height": 4,
+        "width": 4,
+        "food": [
+            {
+                "x": 3,
+                "y": 2
+            }
+        ],
+        "hazards": [],
+        "snakes": [
+            {
+                "id": "snake-1",
+                "name": "My Snake",
+                "health": 100,
+                "body": [
+                    {
+                        "x": 3,
+                        "y": 0
+                    },
+                    {
+                        "x": 3,
+                        "y": 0
+                    },
+                    {
+                        "x": 3,
+                        "y": 0
+                    }
+                ],
+                "latency": "190",
+                "head": {
+                    "x": 3,
+                    "y": 0
+                },
+                "length": 3,
+                "shout": "why are we shouting??",
+                "squad": "1",
+                "customizations": {
+                    "color": "#26CF04",
+                    "head": "smile",
+                    "tail": "bolt"
+                }
+            }
+        ]
+    },
+    "you": {
+        "id": "snake-1",
+        "name": "My Snake",
+        "health": 100,
+        "body": [
+            {
+                "x": 3,
+                "y": 0
+            },
+            {
+                "x": 3,
+                "y": 0
+            },
+            {
+                "x": 3,
+                "y": 0
+            }
+        ],
+        "latency": "190",
+        "head": {
+            "x": 3,
+            "y": 0
+        },
+        "length": 3,
+        "shout": "why are we shouting??",
+        "squad": "1",
+        "customizations": {
+            "color": "#26CF04",
+            "head": "smile",
+            "tail": "bolt"
+        }
+    }
+}

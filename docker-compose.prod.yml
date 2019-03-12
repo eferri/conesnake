@@ -1,0 +1,39 @@
+services:
+  snake:
+    restart: always
+    build:
+      target: prod
+    environment:
+      - RUST_BACKTRACE=1
+      - TARGET=release
+    volumes:
+      - ./certs:/app/certs
+    ports:
+      - '59382:59382'
+    entrypoint: |
+      ./entrypoint_prod.sh \
+      --port 59382 \
+      --max-boards 500000 \
+      --max-width 19 \
+      --max-height 21 \
+      --max-snakes 5 \
+      --fallback-latency 50 \
+      --latency-safety 10 \
+      --certificate /app/certs/fullchain.pem \
+      --private-key /app/certs/key.pem
+
+  acme:
+    image: neilpang/acme.sh:3.0.4
+    environment:
+      - CERT_ACCOUNT
+      - CERT_DOMAIN
+    volumes:
+      - ./certs:/certs
+    ports:
+      - '59383:59383'
+    command: >
+      --register-account -m ${CERT_ACCOUNT}
+      --issue --standalone --httpport 59383
+      -d ${CERT_DOMAIN}
+      --fullchain-file /certs/fullchain.pem
+      --key-file /certs/key.pem

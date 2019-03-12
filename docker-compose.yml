@@ -1,0 +1,63 @@
+services:
+  snake:
+    image: snake_dev:latest
+    build:
+      target: dev
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    environment:
+      - RUST_BACKTRACE
+      - TARGET
+    volumes:
+      - .:/app
+    ports:
+      - 8080:8080
+    command: |
+      ./entrypoint.sh --max-boards 10000 \
+      --max-width 19 --max-height 21
+
+  player:
+    build:
+      context: gpu
+      target: dev
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    volumes:
+      - ./gpu:/app
+
+  rules:
+    image: snake_dev:latest
+    ports:
+      - 4000:4000
+    command: |
+      entrypoint_rules.sh \
+        --board \
+        --board-address :4000 \
+        --timeout 200 \
+        --width 19 --height 21 \
+        --gametype wrapped \
+        --map arcade_maze \
+        --foodSpawnChance 10 \
+        --hazardDamagePerTurn 100 \
+        --name treesnake --url http://snake:8080
+
+  board:
+    build:
+      context: submodules/board
+      target: build
+    ports:
+      - 127.0.0.1:3000:3000
+    command: [ "npm", "run", "start" ]
+
+  snork:
+    build:
+      context: submodules/snork
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    ports:
+      - 8082:8082
+    command: |
+      cargo run --release -- --host 0.0.0.0:8082

@@ -1,0 +1,44 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+
+      - name: Environment
+        run: |
+          echo "UID=$(id -u)" >> $GITHUB_ENV
+          echo "GID=$(id -g)" >> $GITHUB_ENV
+          echo "RUST_BACKTRACE=1" >> $GITHUB_ENV
+
+      - name: Cache
+        uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            ./target-snake
+            ./.cargo
+          key: cache-${{ hashFiles('Dockerfile', 'Cargo.lock') }}
+          restore-keys: |
+            cache-
+
+      - name: Build docker image
+        run: docker compose build snake
+
+      - name: Compile
+        run: docker compose run --rm snake cargo build --tests
+
+      - name: Lint
+        run: docker compose run --rm snake cargo clippy
+
+      - name: Test
+        run: docker compose run --rm snake cargo test -- --nocapture
