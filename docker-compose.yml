@@ -11,11 +11,9 @@ services:
       - TARGET
     volumes:
       - .:/app
-    ports:
-      - 8080:8080
     command: |
-      ./entrypoint.sh --max-boards 10000 \
-      --max-width 19 --max-height 21
+      ./entrypoint.sh --max-boards 400000 \
+      --max-width 11 --max-height 11
 
   player:
     build:
@@ -25,7 +23,7 @@ services:
         UID: ${UID}
         GID: ${GID}
     volumes:
-      - ./gpu:/app
+      - .:/app
 
   rules:
     image: snake_dev:latest
@@ -36,12 +34,18 @@ services:
         --board \
         --board-address :4000 \
         --timeout 200 \
-        --width 19 --height 21 \
-        --gametype wrapped \
-        --map arcade_maze \
+        --width 11 --height 11 \
+        --gametype standard \
+        --map standard \
         --foodSpawnChance 10 \
         --hazardDamagePerTurn 100 \
-        --name treesnake --url http://snake:8080
+        --name treesnake --url http://snake:8080 \
+        --name snork --url http://snork:8082 \
+        --name snork_2 --url http://snork_2:8083 \
+    depends_on:
+      - snake
+      - snork
+      - snork_2
 
   board:
     build:
@@ -57,7 +61,14 @@ services:
       args:
         UID: ${UID}
         GID: ${GID}
-    ports:
-      - 8082:8082
     command: |
       cargo run --release -- --host 0.0.0.0:8082
+
+  snork_2:
+    build:
+      context: submodules/snork
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    command: |
+      cargo run --release -- --host 0.0.0.0:8083

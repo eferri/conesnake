@@ -96,22 +96,21 @@ impl Game {
         self.prev_boards.last().unwrap()
     }
 
-    pub fn score(&self, board: &Board, snake_idx: usize, depth: i64, max_depth: i64) -> f64 {
-        let depth_score = 0.3 * depth as f64 / max_depth as f64;
-
-        if !board.snakes[snake_idx].alive {
-            depth_score
-        } else if board.num_snakes() == 1 {
-            depth_score + 0.7
+    pub fn max_turn(&self, board: &Board) -> i32 {
+        if let Map::ArcadeMaze = self.api.map {
+            (213 - 3) * 100
         } else {
-            let mut num_eliminated = 0;
-            for snake in board.snakes.iter() {
-                if !snake.alive {
-                    num_eliminated += 1;
-                }
-            }
+            (board.len() - 3) * 100
+        }
+    }
 
-            depth_score + 0.7 * (num_eliminated as f64 / (board.num_snakes() - 1) as f64)
+    pub fn score(&self, board: &Board, snake_idx: usize) -> f64 {
+        if self.is_solo {
+            board.turn as f64 / self.max_turn(board) as f64
+        } else if board.snakes[snake_idx].alive {
+            1.0
+        } else {
+            0.0
         }
     }
 

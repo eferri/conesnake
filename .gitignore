@@ -1,13 +1,15 @@
 .cargo
 target*
+build*
 
 certs
 
 *.json
-!.vscode/settings.json
-!.vscode/launch.json
+!.vscode/*.json
 !.devcontainer/devcontainer.json
 
 .env
 *.tar
 *.tar.gz
+*.svg
+*.log

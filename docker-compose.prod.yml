@@ -13,12 +13,13 @@ services:
     entrypoint: |
       ./entrypoint_prod.sh \
       --port 59382 \
-      --max-boards 500000 \
+      --max-boards 375000 \
       --max-width 19 \
       --max-height 21 \
       --max-snakes 5 \
+      --num-requests 4 \
       --fallback-latency 50 \
-      --latency-safety 10 \
+      --latency-safety 100 \
       --certificate /app/certs/fullchain.pem \
       --private-key /app/certs/key.pem
 

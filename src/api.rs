@@ -77,7 +77,7 @@ pub struct BoardApi {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BattleState {
     pub game: GameApi,
-    pub turn: i64,
+    pub turn: i32,
     pub board: BoardApi,
     pub you: SnakeApi,
 }

@@ -10,14 +10,14 @@ use crate::search::SearchContext;
 use crate::util::Error;
 
 use log::{error, info, warn};
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use serde_json;
 use tiny_http::{Method, Request, Response, StatusCode};
 
 use std::{
     fs,
     io::Cursor,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicI64, Ordering},
     sync::Arc,
     sync::Barrier,
     time::Duration,
@@ -27,39 +27,55 @@ use std::{
 pub struct Server {
     num_req_workers: usize,
     req_pool: ThreadPool,
-
     state: Arc<ServerState>,
-    context: Arc<SearchContext>,
 }
 
 struct ServerState {
-    pub config: Config,
-    pub game_id: RwLock<Option<String>>,
-    pub done_flag: AtomicBool,
-    pub ready_flag: AtomicBool,
-    pub done_barrier: Barrier,
+    config: Config,
+    done_flag: AtomicBool,
+    ready_flag: AtomicBool,
+    done_barrier: Barrier,
+    game_slots: Vec<ServerGame>,
+}
+
+struct ServerGame {
+    game_id: Mutex<Option<String>>,
+    ticks: AtomicI64,
+    context: Arc<SearchContext>,
 }
 
 type StrResponse = Response<Cursor<Vec<u8>>>;
 
 impl Server {
+    const TICK_MS: u64 = 100;
+
     pub fn new(config: Config) -> Self {
-        let num_threads = config.num_threads;
+        // Extra threads to reject requests when all game slots full
+        let num_req_threads = config.num_requests + 2;
+
+        let mut slots = Vec::with_capacity(config.num_requests);
+        for _ in 0..config.num_requests {
+            slots.push(ServerGame {
+                game_id: Mutex::new(None),
+                ticks: AtomicI64::new(0),
+                context: Arc::new(SearchContext::new(config.clone())),
+            })
+        }
+
         Server {
-            num_req_workers: num_threads,
-            req_pool: ThreadPool::new(num_threads),
+            num_req_workers: num_req_threads,
+            req_pool: ThreadPool::new(num_req_threads),
 
             state: Arc::new(ServerState {
-                config: config.clone(),
-                game_id: RwLock::new(None),
+                config,
                 done_flag: AtomicBool::new(false),
                 ready_flag: AtomicBool::new(false),
-                done_barrier: Barrier::new(num_threads + 1),
+                done_barrier: Barrier::new(num_req_threads + 1),
+                game_slots: slots,
             }),
-
-            context: Arc::new(SearchContext::new(config)),
         }
     }
+
     pub fn stop_server(&self) {
         info!("Snake server exiting");
         self.state.done_flag.store(true, Ordering::Release);
@@ -82,7 +98,9 @@ impl Server {
             self.state.config.max_snakes
         );
 
-        self.context.allocate();
+        for slot in &self.state.game_slots {
+            slot.context.allocate();
+        }
 
         info!("Allocation complete");
 
@@ -105,7 +123,7 @@ impl Server {
         for _ in 0..self.num_req_workers {
             let server = server.clone();
             let state = self.state.clone();
-            let ctx = self.context.clone();
+            let num_workers = self.num_req_workers;
 
             self.req_pool.execute(move || {
                 loop {
@@ -114,33 +132,51 @@ impl Server {
                     }
 
                     // Blocks until the next request is received
-                    let request_opt = match server.recv_timeout(Duration::from_millis(100)) {
+                    let request_opt = match server.recv_timeout(Duration::from_millis(Self::TICK_MS)) {
                         Ok(rq) => rq,
                         Err(e) => {
                             error!("HTTP recv error: {}", e);
                             continue;
                         }
                     };
-                    let start_time = Instant::now();
 
-                    let mut request = match request_opt {
-                        Some(req) => req,
-                        None => {
-                            continue;
+                    if request_opt.is_none() {
+                        // Timeout games after ~10 seconds without hearing from that ID
+                        for slot in &state.game_slots {
+                            let mut game_id_guard = slot.game_id.lock();
+                            if game_id_guard.is_none() {
+                                continue;
+                            }
+
+                            let ticks = slot.ticks.fetch_add(1, Ordering::AcqRel);
+                            if ticks > (100 * num_workers as i64) {
+                                info!("TIMEOUT! Killing game ID {}", game_id_guard.as_ref().unwrap());
+                                let mut game_guard = slot.context.game.write();
+                                *game_id_guard = None;
+                                *game_guard = None;
+                                slot.ticks.store(0, Ordering::Release);
+                            }
                         }
-                    };
+                        continue;
+                    }
+
+                    info!(" --- start");
+
+                    let mut request = request_opt.unwrap();
+
+                    let start_time = Instant::now();
 
                     let method = request.method().clone();
                     let url = request.url()[1..].to_owned();
 
-                    let response = get_response(state.clone(), ctx.clone(), &mut request, start_time);
+                    let response = get_response(state.clone(), &mut request, start_time);
 
                     let code = response.status_code().0;
 
                     request.respond(response).unwrap();
 
                     let dur = (start_time.elapsed().as_micros() as f64) / 1000.0;
-                    let msg = format!("{} {} code {} duration {}ms", method, url, code, dur);
+                    let msg = format!(" --- end {} {} code {} duration {}ms\n\n", method, url, code, dur);
 
                     if code < 400 {
                         info!("{}", msg);
@@ -161,12 +197,7 @@ impl Drop for Server {
     }
 }
 
-fn get_response(
-    state: Arc<ServerState>,
-    ctx: Arc<SearchContext>,
-    request: &mut Request,
-    start_time: Instant,
-) -> StrResponse {
+fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Instant) -> StrResponse {
     match request.method() {
         Method::Get => match request.url() {
             "/" => StrResponse::from_string(
@@ -192,13 +223,22 @@ fn get_response(
                 return StrResponse::from_string("{}").with_status_code(StatusCode(400));
             }
             let game_state = parsed_req.unwrap();
-
             let latency = game_state.you.latency.clone();
+            let timeout = game_state.game.timeout;
 
-            info!("Server reported latency: {}", latency);
+            info!("Server reported latency: {} - timeout: {}", latency, timeout);
             if let Ok(l) = str::parse::<i32>(&latency) {
-                if l >= 500 {
-                    error!("Excessive latency {}", l);
+                if l >= timeout {
+                    error!("Excessive reported latency: {}", l);
+                }
+            }
+
+            let mut slot_idx = None;
+            for (idx, slot) in state.game_slots.iter().enumerate() {
+                let game_id_guard = slot.game_id.lock();
+                if game_id_guard.is_some() && *game_id_guard.as_ref().unwrap() == game_state.game.id {
+                    slot_idx = Some(idx);
+                    slot.ticks.store(0, Ordering::Release);
                 }
             }
 
@@ -233,15 +273,16 @@ fn get_response(
                         return StrResponse::from_string("{}").with_status_code(StatusCode(409));
                     }
 
-                    let has_game = { state.game_id.read().is_some() };
-                    if has_game {
-                        warn!("Incorrect game ID");
-                        return StrResponse::from_string("{}").with_status_code(StatusCode(409));
-                    } else {
-                        let mut game_id_guard = state.game_id.write();
-                        let mut game_guard = ctx.game.write();
+                    // Find empty game slot
+                    let mut slot_found = false;
+                    for (idx, slot) in state.game_slots.iter().enumerate() {
+                        let mut id_guard = slot.game_id.lock();
+                        if id_guard.is_some() {
+                            continue;
+                        }
 
-                        *game_id_guard = Some(game_state.game.id.clone());
+                        let mut game_guard = slot.context.game.write();
+                        let game_id = game_state.game.id.clone();
 
                         let is_solo = game_state.board.snakes.len() == 1;
 
@@ -253,25 +294,36 @@ fn get_response(
                         ) {
                             Ok(game) => Some(game),
                             Err(e) => {
-                                error!("Error parsing game {}", e);
-                                None
+                                error!("Error parsing game {} {}", game_id, e);
+                                return StrResponse::from_string("{}").with_status_code(StatusCode(400));
                             }
                         };
+
+                        info!("Game ID {} Slot {}", game_id, idx);
+
+                        *id_guard = Some(game_id);
+                        slot_found = true;
+                        break;
                     }
 
-                    StrResponse::from_string("{}")
+                    if !slot_found {
+                        warn!("No game slot found");
+                        StrResponse::from_string("{}").with_status_code(StatusCode(400))
+                    } else {
+                        StrResponse::from_string("{}")
+                    }
                 }
                 "/move" => {
-                    let correct_game = {
-                        let game_id_guard = state.game_id.read();
-                        game_id_guard.is_some() && game_id_guard.as_ref().unwrap() == &game_state.game.id
-                    };
-                    if !correct_game {
-                        warn!("Incorrect game ID");
-                        return StrResponse::from_string("{}").with_status_code(StatusCode(409));
+                    if slot_idx.is_none() {
+                        warn!("Game ID {} not found", game_state.game.id);
+                        return StrResponse::from_string("{}").with_status_code(StatusCode(400));
                     }
 
-                    info!("turn: {}", game_state.turn);
+                    let slot = slot_idx.unwrap();
+
+                    let ctx = state.game_slots[slot].context.clone();
+
+                    info!("Slot {} turn: {}", slot, game_state.turn);
 
                     let parsed_board = Board::from_req(
                         game_state,
@@ -285,7 +337,7 @@ fn get_response(
                             (util::rand_move(), 400)
                         }
                         Ok(board) => {
-                            info!("board:\n{}", board);
+                            info!("Slot {} board:\n{}", slot, board);
                             {
                                 let mut game_guard = ctx.game.write();
                                 game_guard.as_mut().unwrap().add_board(board);
@@ -297,30 +349,20 @@ fn get_response(
                                 latency.parse().expect("Error parsing server-reported latency")
                             };
 
-                            (search::best_move(ctx, start_time, measured_latency).best_move, 200)
+                            (
+                                search::best_move(ctx, start_time, measured_latency, slot).best_move,
+                                200,
+                            )
                         }
                     };
 
                     let resp_str = serde_json::to_string(&MoveResp { mv }).unwrap();
                     StrResponse::from_string(resp_str).with_status_code(code)
                 }
-                "/end" => {
-                    let correct_game = {
-                        let game_guard = ctx.game.read();
-                        game_guard.is_some() && game_guard.as_ref().unwrap().api.id == game_state.game.id
-                    };
-                    if !correct_game {
-                        warn!("Incorrect game ID");
-                        return StrResponse::from_string("{}").with_status_code(StatusCode(409));
-                    } else {
-                        *ctx.game.write() = None;
-                        *state.game_id.write() = None;
-                    }
-                    StrResponse::from_string("{}")
-                }
-                _ => StrResponse::from_string("").with_status_code(StatusCode(404)),
+                "/end" => StrResponse::from_string("{}").with_status_code(StatusCode(200)),
+                _ => StrResponse::from_string("{}").with_status_code(StatusCode(404)),
             }
         }
-        _ => StrResponse::from_string("").with_status_code(StatusCode(404)),
+        _ => StrResponse::from_string("{}").with_status_code(StatusCode(404)),
     }
 }

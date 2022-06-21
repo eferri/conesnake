@@ -3,15 +3,18 @@ use crate::config::Config;
 use crate::game::{Game, Map, Rules};
 use crate::search::SearchContext;
 
+const TEST_TEMPERATURE: f64 = 1.1;
+
 pub fn test_context() -> SearchContext {
     let context = SearchContext::new(Config {
         port: "".to_owned(),
         num_threads: 1,
-        max_boards: 10000,
+        num_requests: 1,
+        max_boards: 1000,
         max_width: 19,
         max_height: 21,
         max_snakes: 6,
-        max_depth: 250,
+        temperature: TEST_TEMPERATURE,
         fallback_latency: 10,
         latency_safety: 5,
         certificate: None,
@@ -23,23 +26,32 @@ pub fn test_context() -> SearchContext {
     context
 }
 
-pub fn small_context() -> SearchContext {
+pub fn release_context() -> SearchContext {
     let context = SearchContext::new(Config {
         port: "".to_owned(),
-        num_threads: 1,
-        max_boards: 100,
-        max_width: 3,
-        max_height: 3,
-        max_snakes: 1,
-        max_depth: 100,
-        fallback_latency: 10,
-        latency_safety: 5,
+        num_threads: 24,
+        num_requests: 1,
+        max_boards: 375000,
+        max_width: 19,
+        max_height: 21,
+        max_snakes: 5,
+        temperature: TEST_TEMPERATURE,
+        fallback_latency: 50,
+        latency_safety: 100,
         certificate: None,
         private_key: None,
         always_sleep: false,
     });
+
     context.allocate();
     context
+}
+
+pub fn get_context() -> SearchContext {
+    #[cfg(debug_assertions)]
+    return test_context();
+    #[cfg(not(debug_assertions))]
+    return release_context();
 }
 
 pub fn test_game() -> Game {

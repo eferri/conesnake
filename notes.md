@@ -1,8 +1,7 @@
 # Todo:
 
-- See what food spawn chance server is using
-- Figure out why CI is failing
-- Merge new gen_board loops
+- Encode snake died_on
+
 - Test food spawning
 
 - Benchmark with reference snakes

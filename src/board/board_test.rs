@@ -17,6 +17,7 @@ pub fn basic_str_test() {
     board.snakes[0].alive = true;
 
     board.set_at(Coord::new(10, 7), BoardSquare::Food);
+    board.num_food += 1;
 
     board.set_at(board.our_head(), BoardSquare::SnakeHead(0, 0));
     board.set_at(Coord::new(3, 4), BoardSquare::SnakeBody(0, Move::Down));
@@ -52,6 +53,7 @@ pub fn multiple_snake_str_test() {
     board.snakes[1].alive = true;
 
     board.set_at(Coord::new(10, 7), BoardSquare::Food);
+    board.num_food += 1;
 
     board.set_at(board.our_head(), BoardSquare::SnakeHead(0, 0));
     board.set_at(Coord::new(3, 4), BoardSquare::SnakeBody(0, Move::Down));
@@ -83,6 +85,7 @@ pub fn stacked_str_test() {
     board.snakes[0].alive = true;
 
     board.set_at(Coord::new(10, 7), BoardSquare::Food);
+    board.num_food += 1;
 
     board.set_at(board.our_head(), BoardSquare::SnakeHead(0, 2));
 

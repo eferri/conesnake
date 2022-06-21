@@ -41,4 +41,8 @@ jobs:
         run: docker compose run --rm snake cargo clippy
 
       - name: Test
-        run: docker compose run --rm snake cargo test -- --nocapture
+        run: |
+          docker compose run --rm snake cargo test -- \
+            --nocapture \
+            --test-threads=1 \
+            --color=always

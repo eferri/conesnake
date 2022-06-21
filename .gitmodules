@@ -7,3 +7,6 @@
 [submodule "submodules/snork/snork"]
 	path = submodules/snork/snork
 	url = git@github.com:wrenger/snork.git
+[submodule "submodules/json"]
+	path = submodules/json
+	url = git@github.com:nlohmann/json.git

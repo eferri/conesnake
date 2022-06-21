@@ -20,7 +20,7 @@ fn main() {
     let after_bytes = mem_usage();
 
     let node_size = after_bytes - start_bytes;
-    let space_size = node_size as i64 * args.max_boards as i64;
+    let space_size = node_size as i64 * args.max_boards as i64 * args.num_requests as i64;
 
     info!("Args:\n{:#?}", args);
 

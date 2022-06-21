@@ -9,7 +9,10 @@ pub struct Config {
     #[clap(long, default_value_t = 4)]
     pub num_threads: usize,
 
-    #[clap(long, default_value_t = 2000)]
+    #[clap(long, default_value_t = 1)]
+    pub num_requests: usize,
+
+    #[clap(long, default_value_t = 10000)]
     pub max_boards: usize,
 
     #[clap(long, default_value_t = 11)]
@@ -21,8 +24,8 @@ pub struct Config {
     #[clap(long, default_value_t = 5)]
     pub max_snakes: i32,
 
-    #[clap(long, default_value_t = 250)]
-    pub max_depth: i64,
+    #[clap(long, default_value_t = 1.1)]
+    pub temperature: f64,
 
     #[clap(long, default_value_t = 10)]
     pub fallback_latency: i32,

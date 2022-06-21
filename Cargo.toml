@@ -23,6 +23,14 @@ libc = "0.2"
 [dev-dependencies]
 ureq = "2.4"
 approx = "0.5"
+pprof = { version = "0.9", features = ["flamegraph"] }
+
+[features]
+profile = []
 
 [profile.release]
 lto = true
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true

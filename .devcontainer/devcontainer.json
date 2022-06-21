@@ -14,7 +14,9 @@
         "shardulm94.trailing-spaces",
         "bungcip.better-toml",
         "vadimcn.vscode-lldb",
-        "streetsidesoftware.code-spell-checker"
+        "streetsidesoftware.code-spell-checker",
+        "twxs.cmake",
+        "ms-vscode.cpptools"
     ],
     "appPort": 8081,
     "runArgs": [
