@@ -2,6 +2,7 @@ FROM ubuntu:jammy as dev
 
 ARG UID=1000
 ARG GID=1000
+ARG ARCH=amd64
 
 WORKDIR /app
 
@@ -14,10 +15,12 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     ca-certificates \
     lldb \
     gcc \
+    g++ \
+    graphviz \
     && rm -rf /var/lib/apt/lists/*
 
 # Install golang
-RUN curl -sSfL https://go.dev/dl/go1.18.3.linux-amd64.tar.gz > go.tar.gz \
+RUN curl -sSfL https://go.dev/dl/go1.18.3.linux-${ARCH}.tar.gz > go.tar.gz \
     && tar -C /usr/local -xf go.tar.gz
 
 RUN addgroup --gid ${GID} rust \
@@ -44,7 +47,8 @@ RUN go install github.com/ramya-rao-a/go-outline@latest \
     && go install github.com/haya14busa/goplay/cmd/goplay@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \
     && go install honnef.co/go/tools/cmd/staticcheck@latest \
-    && go install golang.org/x/tools/gopls@latest
+    && go install golang.org/x/tools/gopls@latest \
+    && go install github.com/google/pprof@latest
 
 # Cache rules dependencies
 COPY submodules/rules/go.mod submodules/rules/go.sum ./

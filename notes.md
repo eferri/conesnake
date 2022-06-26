@@ -1,8 +1,6 @@
 # Todo:
-
-- Encode snake died_on
-
 - Test food spawning
+    - Need deterministic random generation between both repos
 
 - Benchmark with reference snakes
     - Compare different algorithms
@@ -11,7 +9,6 @@
 - Propagate thread pool panic instead of crash
 
 - Tracing
-- Profiling
 
 - Extra tests
     - Top level search tests

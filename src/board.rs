@@ -28,7 +28,6 @@ pub struct Snake {
     pub len: i32,
     pub health: i32,
     pub alive: bool,
-    pub died_turn: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -226,7 +225,6 @@ impl Board {
             len: api_snake.body.len() as i32,
             health: api_snake.health,
             alive: api_snake.health > 0,
-            died_turn: 0,
         };
         self.add_snake(snake);
 
@@ -505,7 +503,6 @@ impl Board {
             if !on_board {
                 self.snakes[idx as usize].health = 0;
                 self.snakes[idx as usize].alive = false;
-                self.snakes[idx as usize].died_turn = self.turn;
                 continue;
             }
 
@@ -527,7 +524,6 @@ impl Board {
             }
             if snake.health == 0 {
                 snake.alive = false;
-                self.snakes[idx as usize].died_turn = self.turn;
             }
             // Adjust tail if snake ate a food
             if self.snakes[idx].health == 100 {
@@ -618,7 +614,6 @@ impl Board {
             }
             if self.snakes[idx].health == 0 {
                 self.snakes[idx].alive = false;
-                self.snakes[idx as usize].died_turn = self.turn;
             }
         }
     }
@@ -627,9 +622,7 @@ impl Board {
         // Remove dead snakes from board
         for snake in &mut self.snakes {
             if !snake.alive {
-                let died_turn = snake.died_turn;
                 *snake = Default::default();
-                snake.died_turn = died_turn;
             }
         }
 

@@ -104,9 +104,11 @@ impl Game {
         }
     }
 
-    pub fn score(&self, board: &Board, snake_idx: usize) -> f64 {
+    pub fn score(&self, board: &Board, snake_idx: usize, depth: i32) -> f64 {
         if self.is_solo {
-            board.turn as f64 / self.max_turn(board) as f64
+            let max_depth = 250.0;
+            let depth = (depth as f64).min(max_depth);
+            depth / (max_depth)
         } else if board.snakes[snake_idx].alive {
             1.0
         } else {
@@ -121,7 +123,7 @@ impl Game {
     pub fn search_cutoff(&self) -> i32 {
         match (self.api.ruleset.name, self.is_solo) {
             (_, true) => 0,
-            (Rules::Solo, false) => 0,
+            (Rules::Solo, _) => 0,
             (Rules::Standard, false) => 1,
             _ => 1,
         }

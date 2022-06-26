@@ -2,16 +2,20 @@ use crate::search;
 
 use crate::board::Board;
 use crate::game::Map;
-use crate::log;
+use crate::log::log_test_init;
 
 use crate::tests::common::{get_context, solo_game, test_game, wrapped_game};
 use crate::util::Move;
 
 use approx::assert_relative_eq;
+use log::info;
 
 #[cfg(feature = "profile")]
-#[cfg(not(debug_assertions))]
+use pprof::protos::Message;
+#[cfg(feature = "profile")]
 use std::fs::File;
+#[cfg(feature = "profile")]
+use std::io::Write;
 
 use std::sync::{atomic::Ordering, Arc};
 use std::time::Instant;
@@ -185,10 +189,10 @@ fn expand_node_test() {
         ),
     ];
 
-    let scratch_guard = ctx.thread_scratch.read();
-    let mut state = scratch_guard[0].write();
-    let space_guard = ctx.node_space.read();
-    let mut root_state_guard = space_guard[0].state.write();
+    let scratch_guard = ctx.thread_scratch.read().unwrap();
+    let mut state = scratch_guard[0].write().unwrap();
+    let space_guard = ctx.node_space.read().unwrap();
+    let mut root_state_guard = space_guard[0].state.write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str(start_board, &game).unwrap();
@@ -218,13 +222,8 @@ fn expand_node_test() {
 
             assert_eq!(root_state_guard.children[idx].index, idx + 1);
 
-            // TODO: encode this in board string or remove
-            for snake in &mut space_guard[idx + 1].state.write().board.snakes {
-                snake.died_turn = 0;
-            }
-
             assert_eq!(
-                space_guard[idx + 1].state.read().board,
+                space_guard[idx + 1].state.read().unwrap().board,
                 Board::from_str(board, &game).unwrap()
             );
         }
@@ -259,15 +258,15 @@ fn playout_test() {
     let ctx = get_context();
     let game = test_game();
 
-    let scratch_space_guard = ctx.thread_scratch.write();
-    let mut scratch_guard = scratch_space_guard[0].write();
+    let scratch_space_guard = ctx.thread_scratch.write().unwrap();
+    let mut scratch_guard = scratch_space_guard[0].write().unwrap();
 
     let start_board = Board::from_str(PLAYOUT_TRAPPED, &game).unwrap();
 
     scratch_guard.play_scores.clear();
     scratch_guard.board = start_board;
 
-    search::playout_game(&ctx, &mut scratch_guard, &game);
+    search::playout_game(&ctx, &mut scratch_guard, &game, 0);
 
     assert!(scratch_guard.play_scores.len() == 2);
     check_scores(&scratch_guard.play_scores, &[1.0, 0.0]);
@@ -276,7 +275,7 @@ fn playout_test() {
     scratch_guard.play_scores.clear();
     scratch_guard.board = start_board;
 
-    search::playout_game(&ctx, &mut scratch_guard, &game);
+    search::playout_game(&ctx, &mut scratch_guard, &game, 0);
 
     assert!(scratch_guard.play_scores.len() == 2);
     check_scores(&scratch_guard.play_scores, &[1.0, 0.0]);
@@ -291,7 +290,7 @@ const SEARCH_SMALL: &str = "
 
 #[test]
 fn small_search_test() {
-    log::log_test_init();
+    log_test_init();
     let ctx = get_context();
 
     let mut game = solo_game();
@@ -299,7 +298,7 @@ fn small_search_test() {
     game.add_board(Board::from_str(SEARCH_SMALL, &game).unwrap());
 
     {
-        let mut guard = ctx.game.write();
+        let mut guard = ctx.game.write().unwrap();
         *guard = Some(game);
     }
 
@@ -325,13 +324,13 @@ const SEARCH_HEAD_ON: &str = "
 
 #[test]
 fn head_on_search_test() {
-    log::log_test_init();
+    log_test_init();
     let ctx = get_context();
     let mut game = test_game();
 
     game.add_board(Board::from_str(SEARCH_HEAD_ON, &game).unwrap());
     {
-        let mut guard = ctx.game.write();
+        let mut guard = ctx.game.write().unwrap();
         *guard = Some(game);
     }
 
@@ -367,7 +366,7 @@ const ARCADE_MAZE_BOARD: &str = "
 
 #[test]
 fn arcade_maze_search_test() {
-    log::log_test_init();
+    log_test_init();
     let ctx = Arc::new(get_context());
 
     for _ in 0..4 {
@@ -375,7 +374,7 @@ fn arcade_maze_search_test() {
         game.api.map = Map::ArcadeMaze;
         game.add_board(Board::from_str(ARCADE_MAZE_BOARD, &game).unwrap());
         {
-            let mut guard = ctx.game.write();
+            let mut guard = ctx.game.write().unwrap();
             *guard = Some(game);
         }
 
@@ -385,7 +384,6 @@ fn arcade_maze_search_test() {
     }
 }
 
-#[cfg(not(debug_assertions))]
 const ARCADE_MAZE_PROFILE_BOARD: &str = "
     turn: 312 health: 45 health: 32 health: 89 health: 51
     * - * * * * * * * * * * * * * * * - *
@@ -412,9 +410,8 @@ const ARCADE_MAZE_PROFILE_BOARD: &str = "
 ";
 
 #[test]
-#[cfg(not(debug_assertions))]
 fn arcade_maze_profile_test() {
-    log::log_test_init();
+    log_test_init();
 
     let ctx = Arc::new(get_context());
 
@@ -422,13 +419,14 @@ fn arcade_maze_profile_test() {
     game.api.map = Map::ArcadeMaze;
     game.add_board(Board::from_str(ARCADE_MAZE_PROFILE_BOARD, &game).unwrap());
     {
-        let mut guard = ctx.game.write();
+        let mut guard = ctx.game.write().unwrap();
         *guard = Some(game);
     }
 
     #[cfg(feature = "profile")]
     let guard = pprof::ProfilerGuardBuilder::default()
         .frequency(100000)
+        .blocklist(&["libc", "libgcc", "pthread", "vdso"])
         .build()
         .unwrap();
 
@@ -436,13 +434,15 @@ fn arcade_maze_profile_test() {
 
     #[cfg(feature = "profile")]
     if let Ok(report) = guard.report().build() {
-        let file = File::create("flamegraph.svg").unwrap();
-        let mut options = pprof::flamegraph::Options::default();
-        options.image_width = Some(8000);
-        report.flamegraph_with_options(file, &mut options).unwrap();
+        let mut file = File::create("profile.pb").unwrap();
+        let profile = report.pprof().unwrap();
+
+        let mut content = Vec::new();
+        profile.write_to_vec(&mut content).unwrap();
+        file.write_all(&content).unwrap();
     };
 
-    assert!(search_result.best_move == Move::Left);
+    info!("best moves should be Left, move is ${:?}", search_result.best_move);
 
     drop(ctx)
 }

@@ -8,8 +8,8 @@
             "cargo": {
                 "args": [
                     "test",
-                    "--no-run",
                     "--lib",
+                    "--no-run",
                     "--package=treesnake",
                     "--",
                     "--test-threads=1"
@@ -79,6 +79,29 @@
                 }
             },
             "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'profile_test'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--lib",
+                    "--no-run",
+                    "--package=treesnake",
+                    "--profile=release-with-debug",
+                    "--features=profile",
+                ],
+                "filter": {
+                    "name": "treesnake",
+                    "kind": "lib"
+                },
+            },
+            "args": [
+                "arcade_maze_profile_test"
+            ],
             "cwd": "${workspaceFolder}"
         }
     ]

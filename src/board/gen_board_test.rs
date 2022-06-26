@@ -257,7 +257,6 @@ fn gen_board_ref_test() {
             for (i, ref_snake) in ref_board.snakes.iter_mut().enumerate() {
                 if ref_snake.health == 0 {
                     gen_board.snakes[i].health = 0;
-                    gen_board.snakes[i].died_turn = 0;
                     ref_snake.head = Default::default();
                     ref_snake.tail = Default::default();
                     ref_snake.len = 0;

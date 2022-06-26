@@ -7,7 +7,7 @@ set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(submodules/json)
 
 add_executable(gen_board
-    gpu/gen_board.cu
+    gen_board.cu
 )
 
 target_compile_features(gen_board PUBLIC cuda_std_17)

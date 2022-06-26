@@ -10,8 +10,8 @@ use crate::search::SearchContext;
 use crate::util::Error;
 
 use log::{error, info, warn};
-use parking_lot::Mutex;
 use serde_json;
+use std::sync::Mutex;
 use tiny_http::{Method, Request, Response, StatusCode};
 
 use std::{
@@ -36,6 +36,7 @@ struct ServerState {
     ready_flag: AtomicBool,
     done_barrier: Barrier,
     game_slots: Vec<ServerGame>,
+    max_nodes: Mutex<i64>,
 }
 
 struct ServerGame {
@@ -72,6 +73,7 @@ impl Server {
                 ready_flag: AtomicBool::new(false),
                 done_barrier: Barrier::new(num_req_threads + 1),
                 game_slots: slots,
+                max_nodes: Mutex::new(0),
             }),
         }
     }
@@ -143,7 +145,7 @@ impl Server {
                     if request_opt.is_none() {
                         // Timeout games after ~10 seconds without hearing from that ID
                         for slot in &state.game_slots {
-                            let mut game_id_guard = slot.game_id.lock();
+                            let mut game_id_guard = slot.game_id.lock().unwrap();
                             if game_id_guard.is_none() {
                                 continue;
                             }
@@ -151,7 +153,7 @@ impl Server {
                             let ticks = slot.ticks.fetch_add(1, Ordering::AcqRel);
                             if ticks > (100 * num_workers as i64) {
                                 info!("TIMEOUT! Killing game ID {}", game_id_guard.as_ref().unwrap());
-                                let mut game_guard = slot.context.game.write();
+                                let mut game_guard = slot.context.game.write().unwrap();
                                 *game_id_guard = None;
                                 *game_guard = None;
                                 slot.ticks.store(0, Ordering::Release);
@@ -235,7 +237,7 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
 
             let mut slot_idx = None;
             for (idx, slot) in state.game_slots.iter().enumerate() {
-                let game_id_guard = slot.game_id.lock();
+                let game_id_guard = slot.game_id.lock().unwrap();
                 if game_id_guard.is_some() && *game_id_guard.as_ref().unwrap() == game_state.game.id {
                     slot_idx = Some(idx);
                     slot.ticks.store(0, Ordering::Release);
@@ -276,12 +278,12 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
                     // Find empty game slot
                     let mut slot_found = false;
                     for (idx, slot) in state.game_slots.iter().enumerate() {
-                        let mut id_guard = slot.game_id.lock();
+                        let mut id_guard = slot.game_id.lock().unwrap();
                         if id_guard.is_some() {
                             continue;
                         }
 
-                        let mut game_guard = slot.context.game.write();
+                        let mut game_guard = slot.context.game.write().unwrap();
                         let game_id = game_state.game.id.clone();
 
                         let is_solo = game_state.board.snakes.len() == 1;
@@ -339,7 +341,7 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
                         Ok(board) => {
                             info!("Slot {} board:\n{}", slot, board);
                             {
-                                let mut game_guard = ctx.game.write();
+                                let mut game_guard = ctx.game.write().unwrap();
                                 game_guard.as_mut().unwrap().add_board(board);
                             }
 
@@ -349,10 +351,16 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
                                 latency.parse().expect("Error parsing server-reported latency")
                             };
 
-                            (
-                                search::best_move(ctx, start_time, measured_latency, slot).best_move,
-                                200,
-                            )
+                            let search_results = search::best_move(ctx, start_time, measured_latency, slot);
+                            {
+                                let mut max_nodes_guard = state.max_nodes.lock().unwrap();
+                                if search_results.total_nodes > *max_nodes_guard {
+                                    *max_nodes_guard = search_results.total_nodes;
+                                }
+                                info!("max nodes expanded: {}", *max_nodes_guard);
+                            }
+
+                            (search_results.best_move, 200)
                         }
                     };
 

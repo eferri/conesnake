@@ -2,6 +2,7 @@ pub mod api;
 pub mod board;
 pub mod config;
 pub mod game;
+pub mod gpu_move;
 pub mod log;
 pub mod pool;
 pub mod search;

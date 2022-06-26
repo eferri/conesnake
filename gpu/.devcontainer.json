@@ -1,23 +1,21 @@
 {
-    "name": "snake-dev",
-    "context": "..",
-    "dockerFile": "../Dockerfile",
+    "name": "cuda-dev",
+    "context": "../gpu",
+    "dockerFile": "../gpu/Dockerfile",
     "build": {
         "target": "dev"
     },
     "extensions": [
-        "rust-lang.rust-analyzer",
-        "golang.go",
         "ms-azuretools.vscode-docker",
         "shardulm94.trailing-spaces",
-        "bungcip.better-toml",
-        "vadimcn.vscode-lldb",
         "streetsidesoftware.code-spell-checker",
-        "twxs.cmake"
+        "twxs.cmake",
+        "ms-vscode.cpptools",
+        "nvidia.nsight-vscode-edition"
     ],
     "overrideCommand": true,
-    "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
-    "workspaceFolder": "/app",
+    "workspaceMount": "source=${localWorkspaceFolder}/gpu,target=/app/gpu,type=bind,consistency=cached",
+    "workspaceFolder": "/app/gpu",
     "runArgs": [
         "--rm",
         "--env-file",

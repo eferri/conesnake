@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use std::cmp::{Ord, PartialOrd};
 use std::fmt::{Display, Formatter, Result};
+use std::io;
 use std::slice::Iter;
 
 // API structs
@@ -54,6 +55,7 @@ impl Move {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
+    IoError(String),
     SerdeError(String),
     BadBoard(String),
     BadBoardReq(String),
@@ -66,9 +68,16 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::IoError(e.to_string())
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
+            Error::IoError(s) => write!(f, "IoError: {}", s),
             Error::SerdeError(s) => write!(f, "SerdeError: {}", s),
             Error::BadBoard(s) => write!(f, "BadBoard: {}", s),
             Error::BadBoardReq(s) => write!(f, "BadBoardReq: {}", s),

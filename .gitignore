@@ -1,4 +1,5 @@
-.cargo
+.cargo/*
+!.cargo/config.toml
 target*
 build*
 
@@ -6,10 +7,11 @@ certs
 
 *.json
 !.vscode/*.json
-!.devcontainer/devcontainer.json
+!**/*devcontainer.json
 
 .env
 *.tar
 *.tar.gz
 *.svg
 *.log
+*.pb

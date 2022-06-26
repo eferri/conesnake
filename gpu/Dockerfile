@@ -9,18 +9,14 @@ RUN addgroup --gid ${GID} cuda \
     && adduser --gecos "" --uid ${UID} --gid ${GID} --shell=/bin/bash cuda \
     && chown -R cuda:cuda .
 
-# Debugger, other development tools
+# Development tools
 RUN apt-get update && apt-get install --no-install-recommends -y \
     curl \
     make \
     cmake \
+    git \
     ca-certificates \
-    lldb \
-    clang \
     clang-tools \
-    gdb \
-    gcc \
-    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 USER cuda
