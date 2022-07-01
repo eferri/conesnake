@@ -1,16 +1,35 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use num_cpus;
 
-#[derive(Parser, Debug, Clone)]
+pub const DEFAULT_TEMP: f64 = 1.1;
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum Mode {
+    Local,
+    Relay,
+    Worker,
+}
+
+#[derive(Parser, Clone, Debug)]
 #[clap(author, version, about = "treesnake", long_about = None)]
 pub struct Config {
+    #[clap(value_enum, default_value = "local")]
+    pub mode: Mode,
+
+    #[clap(long)]
+    pub worker: Vec<String>,
+
     #[clap(long, default_value = "8080")]
     pub port: String,
 
-    #[clap(long, default_value_t = 4)]
+    #[clap(long, default_value_t = 3)]
+    pub num_runs: i32,
+
+    #[clap(long, default_value_t = num_cpus::get())]
     pub num_threads: usize,
 
-    #[clap(long, default_value_t = 1)]
-    pub num_requests: usize,
+    #[clap(long, default_value_t = 8)]
+    pub num_server_threads: usize,
 
     #[clap(long, default_value_t = 10000)]
     pub max_boards: usize,
@@ -24,7 +43,7 @@ pub struct Config {
     #[clap(long, default_value_t = 5)]
     pub max_snakes: i32,
 
-    #[clap(long, default_value_t = 1.1)]
+    #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
 
     #[clap(long, default_value_t = 10)]
@@ -32,13 +51,4 @@ pub struct Config {
 
     #[clap(long, default_value_t = 5)]
     pub latency_safety: i32,
-
-    #[clap(long)]
-    pub certificate: Option<String>,
-
-    #[clap(long)]
-    pub private_key: Option<String>,
-
-    #[clap(long)]
-    pub always_sleep: bool,
 }

@@ -1,5 +1,6 @@
 use crate::board::BoardSquare;
 
+use deepsize::DeepSizeOf;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +10,7 @@ use std::io;
 use std::slice::Iter;
 
 // API structs
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Serialize, Deserialize, DeepSizeOf)]
 pub struct Coord {
     pub x: i32,
     pub y: i32,
@@ -21,7 +22,7 @@ impl Coord {
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, DeepSizeOf)]
 #[serde(rename_all = "lowercase")]
 pub enum Move {
     Left = 0,
@@ -166,10 +167,4 @@ pub fn rand_move_arr() -> [Move; 4] {
 
 pub fn max_children(max_snakes: i32) -> usize {
     4usize.pow((max_snakes) as u32)
-}
-
-// TODO: replace with mallinfo2, which doesn't wraparound
-// Requires glibc >= 2.33
-pub fn mem_usage() -> usize {
-    unsafe { libc::mallinfo() }.uordblks as usize
 }

@@ -1,4 +1,4 @@
-FROM ubuntu:jammy as dev
+FROM ubuntu:jammy-20220815 as base
 
 ARG UID=1000
 ARG GID=1000
@@ -6,26 +6,55 @@ ARG ARCH=amd64
 
 WORKDIR /app
 
-# Debugger, other development tools
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    curl \
-    git \
-    make \
-    cmake \
-    ca-certificates \
-    lldb \
-    gcc \
-    g++ \
-    graphviz \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install golang
-RUN curl -sSfL https://go.dev/dl/go1.18.3.linux-${ARCH}.tar.gz > go.tar.gz \
-    && tar -C /usr/local -xf go.tar.gz
-
 RUN addgroup --gid ${GID} rust \
     && adduser --gecos "" --uid ${UID} --gid ${GID} --shell=/bin/bash rust \
     && chown -R rust:rust .
+
+
+FROM base as dev
+
+# Debugger, other development tools
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    curl \
+    ssh \
+    ca-certificates \
+    git \
+    make \
+    cmake \
+    lldb \
+    gcc \
+    g++ \
+    unzip \
+    jq \
+    python3 \
+    python3-pip \
+    linux-tools-generic \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install wg-meshconf
+
+# Install golang
+RUN curl -sSfL "https://go.dev/dl/go1.19.1.linux-${ARCH}.tar.gz" > go.tar.gz \
+    && tar -C /usr/local -xf go.tar.gz
+
+# Install helm
+RUN curl -sSfL "https://get.helm.sh/helm-v3.10.0-linux-${ARCH}.tar.gz" -o helm.tar.gz \
+    && tar -xf helm.tar.gz \
+    && cp ./linux-${ARCH}/helm . \
+    && chmod +x helm \
+    && mv helm /usr/local/bin \
+    && rm -rf ./*
+
+# Install kubectl
+RUN curl -sSfL "https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl" -o kubectl \
+    && chmod +x ./kubectl \
+    && cp kubectl /usr/local/bin
+
+# Install terraform
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.3.0/terraform_1.3.0_linux_${ARCH}.zip" -o terraform.zip \
+    && unzip terraform.zip \
+    && chmod +x ./terraform \
+    && mv terraform /usr/local/bin \
+    && rm -rf ./*
 
 # Install rust
 USER rust
@@ -34,7 +63,7 @@ ENV PATH "/usr/local/go/bin:/home/rust/go/bin:/home/rust/.cargo/bin:${PATH}"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v
+    && ./rustup_init.sh -y -v --default-toolchain=1.64.0
 
 # Rust development tools
 RUN rustup component add rustfmt clippy
@@ -47,8 +76,7 @@ RUN go install github.com/ramya-rao-a/go-outline@latest \
     && go install github.com/haya14busa/goplay/cmd/goplay@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \
     && go install honnef.co/go/tools/cmd/staticcheck@latest \
-    && go install golang.org/x/tools/gopls@latest \
-    && go install github.com/google/pprof@latest
+    && go install golang.org/x/tools/gopls@latest
 
 # Cache rules dependencies
 COPY submodules/rules/go.mod submodules/rules/go.sum ./
@@ -56,7 +84,7 @@ RUN go mod download && rm -f go.mod go.sum
 
 # Build, install rules test program
 COPY --chown=rust submodules/rules/ .
-COPY --chown=rust entrypoint_rules.sh /home/rust/go/bin
+COPY --chown=rust scripts/entrypoint_rules.sh /home/rust/go/bin
 RUN go build -o battlesnake ./cli/battlesnake/main.go \
     && mv battlesnake /home/rust/go/bin \
     && rm -rf ./*
@@ -64,21 +92,29 @@ RUN go build -o battlesnake ./cli/battlesnake/main.go \
 ENV CARGO_TARGET_DIR target-snake
 ENV CARGO_HOME .cargo
 
-FROM dev as build
 
-ENV CARGO_HOME=
+FROM base as prod
 
-COPY Cargo.toml Cargo.lock ./
-RUN cargo fetch
+COPY target-snake/release/treesnake .
 
-COPY . .
-RUN cargo build --release
+ENTRYPOINT [ "/app/treesnake" ]
 
-FROM ubuntu:jammy as prod
 
-WORKDIR /app
+FROM base as job
 
-COPY --from=build /app/target-snake/release/treesnake .
-COPY --from=build /app/entrypoint_prod.sh .
+ARG ARCH="x86_64"
 
-ENTRYPOINT [ "entrypoint_prod.sh" ]
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    curl \
+    dnsutils \
+    ca-certificates \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" > ./awscliv2.zip \
+    && unzip awscliv2.zip \
+    && ./aws/install
+
+COPY scripts/ip_change.sh .
+
+USER rust

@@ -5,9 +5,14 @@ build*
 
 certs
 
-*.json
-!.vscode/*.json
-!**/*devcontainer.json
+**/manifest.yaml
+
+
+**/values.secrets.yaml
+**/*.key
+**/vars.tf
+**/*.tfstate*
+**/.terraform
 
 .env
 *.tar
@@ -15,3 +20,4 @@ certs
 *.svg
 *.log
 *.pb
+*.gpg

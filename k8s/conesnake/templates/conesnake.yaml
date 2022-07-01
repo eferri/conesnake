@@ -1,0 +1,126 @@
+{{- define "conesnake_common" -}}
+imagePullPolicy: Always
+envFrom:
+- secretRef:
+    name: "{{ .Release.Name }}-conesnake-secrets"
+env:
+- name: RUST_BACKTRACE
+  value: "1"
+ports:
+- containerPort: 8080
+  name: listen-port
+startupProbe:
+  httpGet:
+    path: /
+    port: listen-port
+  failureThreshold: 15
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /
+    port: listen-port
+  failureThreshold: 1
+  periodSeconds: 5
+livenessProbe:
+  httpGet:
+    path: /
+    port: 8080
+  failureThreshold: 1
+  periodSeconds: 5
+{{- end -}}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-relay"
+  labels:
+    {{- include "common_labels" . | nindent 4 }}
+    node: relay
+spec:
+  selector:
+    matchLabels:
+      {{- include "common_labels" . | nindent 6 }}
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "common_labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: "{{ .Release.Name }}-sa-get-pods"
+      nodeSelector:
+        mode: relay
+      imagePullSecrets:
+      - name: regcred
+      terminationGracePeriodSeconds: 2
+      containers:
+      - name: "{{ .Release.Name }}-relay"
+        {{- include "conesnake_common" . | nindent 8 }}
+        image: {{ include "amd64_image" . }}
+        resources:
+          requests:
+            memory: {{ .Values.relay_mem }}
+        args:
+        - "--port=8080"
+        - "--max-width={{ .Values.max_width }}"
+        - "--max-height={{ .Values.max_height }}"
+        - "--max-snakes={{ .Values.max_snakes }}"
+        - "--max-boards=0"
+        - "--fallback-latency={{ .Values.relay_global.fallback_latency }}"
+        - "--latency-safety={{ .Values.relay_global.latency_safety }}"
+        {{- range $index, $worker := .Values.workers }}
+        - "--worker={{ $worker.service_ip }}"
+        {{- end }}
+        - "relay"
+
+{{ range $index, $worker := .Values.workers }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ $.Release.Name }}-worker-{{ $index }}"
+  labels:
+    {{- include "common_labels" $ | nindent 4 }}
+    node: worker-0
+spec:
+  selector:
+    matchLabels:
+      {{- include "common_labels" $ | nindent 6 }}
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "common_labels" $ | nindent 8 }}
+    spec:
+      serviceAccountName: "{{ $.Release.Name }}-sa-get-pods"
+      nodeName: "{{ $worker.hostname }}"
+      imagePullSecrets:
+      - name: regcred
+      terminationGracePeriodSeconds: 2
+      containers:
+      - name: "{{ $.Release.Name }}-worker"
+        {{- include "conesnake_common" $ | nindent 8 }}
+        image: {{ include "amd64_image" $ }}
+        resources:
+          requests:
+            memory: {{ $.Values.worker_mem }}
+        args:
+        - "--port=8080"
+        - "--max-width={{ $.Values.max_width }}"
+        - "--max-height={{ $.Values.max_height }}"
+        - "--max-snakes={{ $.Values.max_snakes }}"
+        - "--max-boards={{ $.Values.worker_boards }}"
+        - "--fallback-latency={{ $.Values.worker_global.fallback_latency }}"
+        - "--latency-safety={{ $.Values.worker_global.latency_safety }}"
+        - "worker"
+{{ end }}

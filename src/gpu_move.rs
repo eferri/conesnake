@@ -27,8 +27,8 @@ struct ChanPair<T> {
 struct GpuMoveState {
     req: ChanPair<BoardMoveState>,
     resp: Vec<ChanPair<Board>>,
-    req_file: Mutex<File>,
-    resp_file: Mutex<File>,
+    _req_file: Mutex<File>,
+    _resp_file: Mutex<File>,
 }
 
 impl GpuMove {
@@ -56,8 +56,8 @@ impl GpuMove {
                 recv: req_r,
             },
             resp,
-            req_file,
-            resp_file,
+            _req_file: req_file,
+            _resp_file: resp_file,
         });
 
         let thread_state = state.clone();

@@ -1,0 +1,42 @@
+variable "remote_ip" {
+  type = string
+  default = ""
+}
+
+variable "ssh_public_key" {
+  type = string
+  default = ""
+}
+
+variable "domain" {
+  type    = string
+  default = ""
+}
+
+variable "notification_email" {
+  type    = string
+  default = ""
+}
+
+variable "region" {
+  type    = string
+  default = ""
+}
+
+variable "workers" {
+  type = list(object({
+    host = string,
+    external_ip = string
+    internal_ip = string
+    port = string
+  }))
+
+  default = [
+    {
+      host = "",
+      external_ip = "",
+      internal_ip = "",
+      port = "",
+    }
+  ]
+}

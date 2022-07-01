@@ -1,6 +1,7 @@
+---
 services:
   snake:
-    image: snake_dev:latest
+    image: conesnake:latest-dev
     build:
       target: dev
       args:
@@ -10,14 +11,40 @@ services:
       - RUST_BACKTRACE
       - TARGET
     volumes:
-      - .:/app
+      - ".:/app"
     ports:
-      - 8080:8080
+      - "8080:8080"
     command: |
-      ./entrypoint.sh \
-        --max-boards 500000 \
-        --max-width 11 \
-        --max-height 11
+      scripts/entrypoint.sh \
+        --num-threads ${NUM_THREADS:-4} \
+        --max-boards ${MAX_BOARDS:-10000} \
+        --max-width ${MAX_WIDTH:-11} \
+        --max-height ${MAX_HEIGHT:-11} \
+        --worker worker
+        relay
+
+  worker:
+    image: conesnake:latest-dev
+    build:
+      target: dev
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    environment:
+      - RUST_BACKTRACE
+      - TARGET
+    volumes:
+      - ".:/app"
+    ports:
+      - "8081:8081"
+    command: |
+      scripts/entrypoint.sh \
+        --port 8081 \
+        --num-threads ${NUM_THREADS:-4} \
+        --max-boards ${MAX_BOARDS:-10000} \
+        --max-width ${MAX_WIDTH:-11} \
+        --max-height ${MAX_HEIGHT:-11} \
+        worker
 
   gpu:
     build:
@@ -27,23 +54,26 @@ services:
         UID: ${UID}
         GID: ${GID}
     volumes:
-      - .:/app
+      - ".:/app"
 
   rules:
-    image: snake_dev:latest
+    image: conesnake:latest-dev
     network_mode: host
+    volumes:
+      - ".:/app"
     command: |
-      entrypoint_rules.sh \
+      scripts/entrypoint_rules.sh \
         --browser \
         --board-url http://localhost:3000 \
-        --timeout 200 \
-        --width 6 --height 6 \
+        --timeout 250 \
+        --width 5 --height 5 \
         --gametype standard \
         --map standard \
         --foodSpawnChance 10 \
         --hazardDamagePerTurn 100 \
-        --name treesnake --url http://localhost:8080
+        --name treesnake --url http://localhost:${LISTEN_PORT:-8080}
     depends_on:
+      - worker
       - snake
 
   board:
@@ -51,8 +81,9 @@ services:
       context: submodules/board
       target: build
     ports:
-      - 3000:3000
-    command: [ "npm", "run", "start" ]
+      - "3000:3000"
+    command: |
+      npm run start
 
   snork:
     build:

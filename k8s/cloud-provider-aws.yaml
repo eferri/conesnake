@@ -1,0 +1,28 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+spec:
+  chart: aws-load-balancer-controller
+  repo: https://aws.github.io/eks-charts
+  version: 1.4.4
+  targetNamespace: kube-system
+  bootstrap: true
+  valuesContent: |-
+    clusterName: "conesnake"
+    defaultTags:
+      deployment: "conesnake"
+    replicaCount: 1
+    image:
+      repository: amazon/aws-alb-ingress-controller
+      tag: v2.4.4
+      pullPolicy: IfNotPresent
+    nodeSelector:
+      mode: server
+    tolerations:
+    - key: "CriticalAddonsOnly"
+      operator: "Equal"
+      value: "true"
+      effect: "NoExecute"
+    webhookBindPort: 59205

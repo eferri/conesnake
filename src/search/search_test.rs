@@ -3,19 +3,13 @@ use crate::search;
 use crate::board::Board;
 use crate::game::Map;
 use crate::log::log_test_init;
+use crate::pool::ThreadPool;
 
 use crate::tests::common::{get_context, solo_game, test_game, wrapped_game};
 use crate::util::Move;
 
 use approx::assert_relative_eq;
 use log::info;
-
-#[cfg(feature = "profile")]
-use pprof::protos::Message;
-#[cfg(feature = "profile")]
-use std::fs::File;
-#[cfg(feature = "profile")]
-use std::io::Write;
 
 use std::sync::{atomic::Ordering, Arc};
 use std::time::Instant;
@@ -292,6 +286,7 @@ const SEARCH_SMALL: &str = "
 fn small_search_test() {
     log_test_init();
     let ctx = get_context();
+    let pool = ThreadPool::new(ctx.config.num_threads);
 
     let mut game = solo_game();
 
@@ -302,7 +297,7 @@ fn small_search_test() {
         *guard = Some(game);
     }
 
-    let search_result = search::best_move(Arc::new(ctx), Instant::now(), 0, 0);
+    let search_result = search::best_move(Arc::new(ctx), &pool, Instant::now(), 0);
 
     assert_eq!(search_result.best_move, Move::Right);
     assert_eq!(search_result.max_depth, 2);
@@ -326,6 +321,7 @@ const SEARCH_HEAD_ON: &str = "
 fn head_on_search_test() {
     log_test_init();
     let ctx = get_context();
+    let pool = ThreadPool::new(ctx.config.num_threads);
     let mut game = test_game();
 
     game.add_board(Board::from_str(SEARCH_HEAD_ON, &game).unwrap());
@@ -334,7 +330,7 @@ fn head_on_search_test() {
         *guard = Some(game);
     }
 
-    let search_result = search::best_move(Arc::new(ctx), Instant::now(), 0, 0);
+    let search_result = search::best_move(Arc::new(ctx), &pool, Instant::now(), 0);
 
     assert_ne!(search_result.best_move, Move::Right);
 }
@@ -368,6 +364,7 @@ const ARCADE_MAZE_BOARD: &str = "
 fn arcade_maze_search_test() {
     log_test_init();
     let ctx = Arc::new(get_context());
+    let pool = ThreadPool::new(ctx.config.num_threads);
 
     for _ in 0..4 {
         let mut game = wrapped_game();
@@ -378,7 +375,7 @@ fn arcade_maze_search_test() {
             *guard = Some(game);
         }
 
-        let search_result = search::best_move(ctx.clone(), Instant::now(), 0, 0);
+        let search_result = search::best_move(ctx.clone(), &pool, Instant::now(), 0);
 
         assert!(search_result.best_move == Move::Down || search_result.best_move == Move::Up);
     }
@@ -414,6 +411,7 @@ fn arcade_maze_profile_test() {
     log_test_init();
 
     let ctx = Arc::new(get_context());
+    let pool = ThreadPool::new(ctx.config.num_threads);
 
     let mut game = wrapped_game();
     game.api.map = Map::ArcadeMaze;
@@ -424,25 +422,11 @@ fn arcade_maze_profile_test() {
     }
 
     #[cfg(feature = "profile")]
-    let guard = pprof::ProfilerGuardBuilder::default()
-        .frequency(100000)
-        .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-        .build()
-        .unwrap();
+    let _prof = -1;
 
-    let search_result = search::best_move(ctx.clone(), Instant::now(), 15, 0);
+    let search_result = search::best_move(ctx.clone(), &pool, Instant::now(), 15);
 
-    #[cfg(feature = "profile")]
-    if let Ok(report) = guard.report().build() {
-        let mut file = File::create("profile.pb").unwrap();
-        let profile = report.pprof().unwrap();
-
-        let mut content = Vec::new();
-        profile.write_to_vec(&mut content).unwrap();
-        file.write_all(&content).unwrap();
-    };
-
-    info!("best moves should be Left, move is ${:?}", search_result.best_move);
+    info!("snake eliminated if move left, move is {:?}", search_result.best_move);
 
     drop(ctx)
 }

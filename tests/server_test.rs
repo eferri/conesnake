@@ -1,7 +1,6 @@
 use treesnake::api;
-
-use treesnake::config::Config;
 use treesnake::server::Server;
+use treesnake::tests::common::get_config;
 use treesnake::util::Move;
 
 use env_logger::Env;
@@ -25,21 +24,10 @@ fn init_test_logging() {
 fn index_test() {
     init_test_logging();
 
-    let server = sync::Arc::new(Server::new(Config {
-        port: "4000".to_owned(),
-        certificate: None,
-        private_key: None,
-        num_threads: 1,
-        num_requests: 1,
-        max_boards: 100000,
-        max_width: 4,
-        max_height: 4,
-        max_snakes: 1,
-        temperature: 0.86,
-        fallback_latency: 10,
-        latency_safety: 5,
-        always_sleep: true,
-    }));
+    let mut config = get_config();
+    config.port = "4000".to_owned();
+
+    let server = sync::Arc::new(Server::new(config));
     server.start_server();
 
     let mut start_board: api::BattleState =

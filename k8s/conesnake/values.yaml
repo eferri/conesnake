@@ -1,0 +1,18 @@
+---
+max_width: 11
+max_height: 11
+max_snakes: 5
+max_games: 2
+
+relay_mem: "256Mi"
+
+worker_mem: "24Gi"
+worker_boards: 700000
+
+relay_global:
+  fallback_latency: 5
+  latency_safety: 5
+
+worker_global:
+  fallback_latency: 50
+  latency_safety: 5

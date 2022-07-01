@@ -1,0 +1,13 @@
+---
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: "{{ .Release.Name }}-tgb"
+  labels:
+    {{- include "common_labels" . | nindent 4 }}
+spec:
+  serviceRef:
+    name: "{{ .Release.Name }}-relays"
+    port: 8080
+  targetType: instance
+  targetGroupARN: "{{ .Values.aws_target_group_arn }}"

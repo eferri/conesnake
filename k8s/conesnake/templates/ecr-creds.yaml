@@ -1,0 +1,82 @@
+{{- define "creds_common" -}}
+serviceAccountName: "{{ .Release.Name }}-sa-ecr-creds"
+nodeSelector:
+  mode: relay
+restartPolicy: Never
+initContainers:
+- name: "{{ .Release.Name }}-ecr-get-token"
+  image: bitnami/aws-cli:2.7.22
+  imagePullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: 100Mi
+      cpu: 100m
+  envFrom:
+  - secretRef:
+      name: "{{ .Release.Name }}-conesnake-secrets"
+  command:
+  - /bin/sh
+  - -c
+  - |
+    set -eu
+    aws ecr get-login-password >> /aws/ecr-token
+    echo "ecr token updated at $(date)"
+  volumeMounts:
+  - mountPath: /aws
+    name: "{{ .Release.Name }}-aws-data"
+containers:
+- name: "{{ .Release.Name }}-ecr-secret-refresh"
+  image: bitnami/kubectl:1.24.3
+  imagePullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: 100Mi
+      cpu: 100m
+  envFrom:
+  - secretRef:
+      name: "{{ .Release.Name }}-conesnake-secrets"
+  command:
+  - /bin/sh
+  - -c
+  - |
+    set -eu
+    ECR_TOKEN="$(cat /aws/ecr-token)"
+    kubectl delete secret --namespace conesnake --ignore-not-found regcred
+    kubectl create secret --namespace conesnake  docker-registry regcred \
+      --docker-server=https://${AWS_ACCOUNT_ID}.dkr.ecr.{{ .Values.aws_default_region }}.amazonaws.com \
+      --docker-username=AWS \
+      --docker-password="${ECR_TOKEN}"
+    echo "regcred secret updated at $(date)"
+  volumeMounts:
+  - mountPath: /aws
+    name: "{{ .Release.Name }}-aws-data"
+volumes:
+- name: "{{ .Release.Name }}-aws-data"
+  emptyDir: {}
+{{- end -}}
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: "{{ .Release.Name }}-ecr-creds-refresh"
+  labels:
+    {{- include "common_labels" . | nindent 4 }}
+spec:
+  schedule: "0 */11 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          {{- include "creds_common" . | nindent 10 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}-ecr-creds-refresh"
+  labels:
+    {{- include "common_labels" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      {{- include "creds_common" . | nindent 6 }}

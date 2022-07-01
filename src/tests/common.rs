@@ -1,48 +1,52 @@
 use crate::api::{GameApi, RoyaleSettings, Ruleset, Settings, SquadSettings};
-use crate::config::Config;
+use crate::config::{Config, Mode, DEFAULT_TEMP};
 use crate::game::{Game, Map, Rules};
 use crate::search::SearchContext;
 
-const TEST_TEMPERATURE: f64 = 1.1;
-
-pub fn test_context() -> SearchContext {
-    let context = SearchContext::new(Config {
+pub fn test_config() -> Config {
+    Config {
+        mode: Mode::Local,
+        worker: vec![],
         port: "".to_owned(),
+        num_runs: 1,
         num_threads: 1,
-        num_requests: 1,
-        max_boards: 1000,
+        num_server_threads: 1,
+        max_boards: 2000,
         max_width: 19,
         max_height: 21,
-        max_snakes: 6,
-        temperature: TEST_TEMPERATURE,
+        max_snakes: 5,
+        temperature: DEFAULT_TEMP,
         fallback_latency: 10,
         latency_safety: 5,
-        certificate: None,
-        private_key: None,
-        always_sleep: false,
-    });
+    }
+}
 
+pub fn release_config() -> Config {
+    Config {
+        mode: Mode::Local,
+        worker: vec![],
+        port: "".to_owned(),
+        num_runs: 3,
+        num_threads: 24,
+        num_server_threads: 8,
+        max_boards: 375000,
+        max_width: 19,
+        max_height: 21,
+        max_snakes: 5,
+        temperature: DEFAULT_TEMP,
+        fallback_latency: 50,
+        latency_safety: 100,
+    }
+}
+
+pub fn test_context() -> SearchContext {
+    let context = SearchContext::new(test_config());
     context.allocate();
     context
 }
 
 pub fn release_context() -> SearchContext {
-    let context = SearchContext::new(Config {
-        port: "".to_owned(),
-        num_threads: 24,
-        num_requests: 1,
-        max_boards: 375000,
-        max_width: 19,
-        max_height: 21,
-        max_snakes: 5,
-        temperature: TEST_TEMPERATURE,
-        fallback_latency: 50,
-        latency_safety: 100,
-        certificate: None,
-        private_key: None,
-        always_sleep: false,
-    });
-
+    let context = SearchContext::new(test_config());
     context.allocate();
     context
 }
@@ -52,6 +56,13 @@ pub fn get_context() -> SearchContext {
     return test_context();
     #[cfg(not(debug_assertions))]
     return release_context();
+}
+
+pub fn get_config() -> Config {
+    #[cfg(debug_assertions)]
+    return test_config();
+    #[cfg(not(debug_assertions))]
+    return release_config();
 }
 
 pub fn test_game() -> Game {
@@ -81,9 +92,6 @@ pub fn test_game() -> Game {
             },
         },
         is_solo: false,
-        fallback_latency: 100,
-        latency_safety: 5,
-        prev_delay: 0.0,
         prev_boards: Vec::new(),
     }
 }

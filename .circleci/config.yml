@@ -1,0 +1,94 @@
+version: 2.1
+orbs:
+  aws-ecr: circleci/aws-ecr@8.1.2
+
+jobs:
+  test:
+    machine:
+      image: "ubuntu-2204:2022.07.1"
+      docker_layer_caching: true
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: submodules
+          command: git submodule update --init --recursive
+      - aws-ecr/ecr-login
+      - run:
+          name: environment
+          command: |
+            echo "UID=$(id -u)" >> .env
+            echo "GID=$(id -g)" >> .env
+            echo "RUST_BACKTRACE=1" >> .env
+      - run:
+          name: docker build
+          command: docker compose build snake
+      - restore_cache:
+          name: restore cache
+          keys:
+            - cache-{{ checksum "Cargo.lock" }}
+            - cache-
+      - run:
+          name: compile
+          command: docker compose run --rm snake cargo build --tests
+      - run:
+          name: lint
+          command: docker compose run --rm snake cargo clippy
+      - save_cache:
+          name: save cache
+          key: cache-{{ checksum "Cargo.lock" }}
+          paths:
+            - ./target-snake
+            - ./.cargo
+      - run:
+          name: test
+          command: make test
+
+  deploy:
+    machine:
+      image: "ubuntu-2204:2022.07.1"
+      docker_layer_caching: true
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: submodules
+          command: git submodule update --init --recursive
+      - aws-ecr/ecr-login
+      - run:
+          name: environment
+          command: |
+            echo "UID=$(id -u)" >> .env
+            echo "GID=$(id -g)" >> .env
+            echo "RUST_BACKTRACE=1" >> .env
+      - run:
+          name: docker build
+          command: docker compose build snake
+      - restore_cache:
+          name: restore cache
+          keys:
+            - cache-{{ checksum "Cargo.lock" }}
+            - cache-
+      - run:
+          name: build and push
+          command: make prod-build
+      - save_cache:
+          name: save cache
+          key: cache-{{ checksum "Cargo.lock" }}
+          paths:
+            - ./target-snake
+            - ./.cargo
+
+workflows:
+  test-deploy:
+    jobs:
+      - test:
+          filters:
+            branches:
+              only:
+                - main
+      - deploy:
+          filters:
+            branches:
+              only:
+                - prod

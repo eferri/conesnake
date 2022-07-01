@@ -1,9 +1,11 @@
 use crate::board::Board;
 use crate::config::Config;
+use crate::delay::Delay;
 use crate::game::Game;
 use crate::pool::ThreadPool;
 use crate::util::{max_children, Coord, Move};
 
+use deepsize::DeepSizeOf;
 use log::{info, warn};
 
 use std::sync::{atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering, Arc, Barrier};
@@ -15,8 +17,8 @@ pub struct SearchContext {
     pub config: Config,
     pub game: RwLock<Option<Game>>,
 
-    search_pool: ThreadPool,
-    node_space: RwLock<Vec<Node>>,
+    search_delay: Mutex<Delay>,
+    node_space: NodeSpace,
     thread_scratch: RwLock<Vec<RwLock<ThreadContext>>>,
 
     // Search state
@@ -50,12 +52,13 @@ pub struct SearchResult {
 }
 
 // Node in search tree
+#[derive(DeepSizeOf)]
 pub struct Node {
     play_lock: Mutex<()>,
     state: RwLock<NodeState>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, DeepSizeOf)]
 pub struct NodeState {
     board: Board,
 
@@ -73,7 +76,7 @@ pub struct NodeState {
     children: Vec<NodePtr>,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, DeepSizeOf)]
 pub struct NodeScoreCache {
     score: f64,
     games: i64,
@@ -81,21 +84,26 @@ pub struct NodeScoreCache {
 }
 
 // Pointer to child nodes, with corresponding moves
-#[derive(Clone)]
+#[derive(Clone, DeepSizeOf)]
 pub struct NodePtr {
     moves: Vec<Move>,
     index: usize,
 }
 
+pub type NodeSpace = RwLock<Vec<Node>>;
+
 impl SearchContext {
     pub fn new(config: Config) -> Self {
         let num_cpu = config.num_threads;
+        let latency_safety = config.latency_safety;
+        let fallback_latency = config.fallback_latency;
         SearchContext {
             config,
+            node_space: RwLock::new(Vec::new()),
+
+            search_delay: Mutex::new(Delay::new(fallback_latency, latency_safety)),
 
             game: RwLock::new(None),
-            search_pool: ThreadPool::new(num_cpu),
-            node_space: RwLock::new(Vec::new()),
             thread_scratch: RwLock::new(Vec::new()),
 
             search_timeout: AtomicBool::new(false),
@@ -108,7 +116,6 @@ impl SearchContext {
 
     pub fn allocate(&self) {
         let mut space_guard = self.node_space.write().unwrap();
-
         space_guard.resize_with(self.config.max_boards, || {
             Node::new(Board::new(
                 0,
@@ -214,14 +221,20 @@ impl NodeState {
     }
 }
 
-pub fn best_move(ctx: Arc<SearchContext>, start_time: Instant, measured_latency: i32, slot: usize) -> SearchResult {
-    let adaptive_search_us = {
-        let mut game_guard = ctx.game.write().unwrap();
-        game_guard.as_mut().unwrap().next_delay_us(measured_latency)
-    };
-
+pub fn best_move(
+    ctx: Arc<SearchContext>,
+    pool: &ThreadPool,
+    start_time: Instant,
+    measured_latency: i32,
+) -> SearchResult {
     let game_guard = ctx.game.read().unwrap();
     let game = game_guard.as_ref().unwrap();
+
+    let adaptive_search_us = ctx
+        .search_delay
+        .lock()
+        .unwrap()
+        .next_delay_us(measured_latency, game.api.timeout);
 
     // Reset search state
     ctx.reset();
@@ -239,23 +252,17 @@ pub fn best_move(ctx: Arc<SearchContext>, start_time: Instant, measured_latency:
 
     for id in 0..ctx.config.num_threads {
         let ctx_cln = ctx.clone();
-        ctx.search_pool.execute(move || search_worker(ctx_cln, id));
+        pool.execute(move || search_worker(ctx_cln, id));
     }
 
     let startup_us = (Instant::now() - start_time).as_micros() as i64;
     let search_us = adaptive_search_us - startup_us;
 
-    if ctx.config.always_sleep {
-        sleep(Duration::from_micros(adaptive_search_us as u64));
-    }
     if search_us > 0 {
         sleep(Duration::from_micros(search_us as u64));
-        info!("Slot {} Startup time {}us, Slept {}us", slot, startup_us, search_us)
+        info!("Startup time {}us, Slept {}us", startup_us, search_us)
     } else {
-        warn!(
-            "Slot {} Search duration negative, no time to search: {}us",
-            slot, search_us
-        );
+        warn!("Search duration negative, no time to search: {}us", search_us);
     }
 
     ctx.search_timeout.store(true, Ordering::Release);
@@ -274,8 +281,7 @@ pub fn best_move(ctx: Arc<SearchContext>, start_time: Instant, measured_latency:
             let raw_score = stats.score / stats.games as f64;
 
             info!(
-                "Slot {} Move {:?} score: {} games: {}",
-                slot,
+                "Move {:?} score: {} games: {}",
                 Move::from_idx(mv_idx),
                 raw_score,
                 stats.games
@@ -306,11 +312,11 @@ pub fn best_move(ctx: Arc<SearchContext>, start_time: Instant, measured_latency:
     let num_playouts = ctx.num_playouts.load(Ordering::Relaxed);
     let num_terminal = num_games - num_playouts;
 
-    info!("Slot {} search max depth: {}", slot, max_depth);
-    info!("Slot {} search total nodes: {}", slot, total_nodes);
-    info!("Slot {} search num games: {}", slot, num_games);
-    info!("Slot {} search num playouts: {}", slot, num_playouts);
-    info!("Slot {} search num terminal: {}", slot, num_terminal);
+    info!("search max depth: {}", max_depth);
+    info!("search total nodes: {}", total_nodes);
+    info!("search num games: {}", num_games);
+    info!("search num playouts: {}", num_playouts);
+    info!("search num terminal: {}", num_terminal);
 
     SearchResult {
         best_move,

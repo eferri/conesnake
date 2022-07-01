@@ -6,6 +6,7 @@
         "target": "dev"
     },
     "extensions": [
+        "tombonnike.vscode-status-bar-format-toggle",
         "ms-azuretools.vscode-docker",
         "shardulm94.trailing-spaces",
         "streetsidesoftware.code-spell-checker",
@@ -19,8 +20,8 @@
     "runArgs": [
         "--rm",
         "--env-file",
-        ".env"
-        // "--network",
-        // "baywatchr-api_default"
+        ".env",
+        "--network",
+        "treesnake_default"
     ]
 }

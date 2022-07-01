@@ -25,14 +25,21 @@
     "lldb.dereferencePointers": true,
     "lldb.consoleMode": "commands",
     // For stepping into standard library code
-    "lldb.launch.sourceMap": {
-        "/rustc/fe5b13d681f25ee6474be29d748c65adcd91f69e": "/home/rust/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/"
-    },
+    "lldb.launch.preRunCommands": [
+        "script lldb.debugger.HandleCommand('settings set target.source-map /rustc/{} \"{}/lib/rustlib/src/rust\"'.format(os.popen('rustc --version --verbose').read().split('commit-hash: ')[1].split('\\n')[0].strip(), os.popen('rustc --print sysroot').readline().strip()))"
+    ],
     "cSpell.words": [
         "Backpropagate",
         "playout"
     ],
     "[dockercompose]": {
         "editor.formatOnSave": false
+    },
+    "yaml.schemas": {
+        "https://json.schemastore.org/github-workflow.json": "file:///home/eferri/Documents/code/treesnake/.github/workflows/deploy.yml",
+        "kubernetes://schema/v1%40serviceaccount": [
+            "file:///app/k8s/ecr-creds.yml",
+            "file:///home/eferri/Documents/code/treesnake/k8s/conesnake/secrets.yaml"
+        ]
     }
 }

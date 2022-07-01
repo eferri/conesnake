@@ -6,18 +6,26 @@
         "target": "dev"
     },
     "extensions": [
-        "rust-lang.rust-analyzer",
-        "golang.go",
-        "ms-azuretools.vscode-docker",
+        "tombonnike.vscode-status-bar-format-toggle",
         "shardulm94.trailing-spaces",
         "bungcip.better-toml",
         "vadimcn.vscode-lldb",
         "streetsidesoftware.code-spell-checker",
-        "twxs.cmake"
+        "rust-lang.rust-analyzer",
+        "golang.go",
+        "ms-vscode.cpptools",
+        "ms-azuretools.vscode-docker",
+        "twxs.cmake",
+        "hashicorp.terraform",
+        "redhat.vscode-yaml",
+        "ms-kubernetes-tools.vscode-kubernetes-tools"
     ],
     "overrideCommand": true,
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
     "workspaceFolder": "/app",
+    "mounts": [
+        "source=${localEnv:HOME}/.kube/config,target=/home/rust/.kube/config,type=bind,consistency=cached"
+    ],
     "runArgs": [
         "--rm",
         "--env-file",

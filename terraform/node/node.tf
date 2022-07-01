@@ -1,0 +1,150 @@
+variable "node_name" {
+  type = string
+}
+
+variable "node_type" {
+  type = string
+}
+
+variable "subnet_id" {
+  type = string
+}
+
+variable "container_node" {
+  type = bool
+}
+
+variable "target_group_arn" {
+  type    = string
+  default = ""
+}
+
+variable "vpc_id" {
+  type = string
+}
+
+variable "instance_profile_name" {
+  type = string
+}
+
+variable "base_security_group_id" {
+  type = string
+}
+
+variable "alb_security_group_id" {
+  type = string
+}
+
+variable "key_pair_name" {
+  type = string
+}
+
+variable "deployment" {
+  type = string
+}
+
+variable "internal_ip" {
+  type = string
+}
+
+
+locals {
+  # Ubuntu 22.04 server us-west-2
+  ubuntu_ami     = "ami-08df94af6199f15b6"
+  startup_script = <<-EOF
+    #!/bin/bash
+    sudo apt-get update
+    sudo apt-get upgrade
+    sudo apt-get install --no-install-recommends -y wireguard
+    sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+    sudo sysctl -p /etc/sysctl.conf
+  EOF
+}
+
+
+resource "aws_eip" "conesnake_primary" {
+  network_interface = aws_network_interface.conesnake.id
+  vpc               = true
+
+  tags = {
+    app = var.deployment
+  }
+}
+
+resource "aws_network_interface" "conesnake" {
+  subnet_id = var.subnet_id
+
+  tags = {
+    app = var.deployment
+  }
+}
+
+resource "aws_network_interface_sg_attachment" "conesnake_base" {
+  security_group_id    = var.base_security_group_id
+  network_interface_id = aws_network_interface.conesnake.id
+}
+
+resource "aws_network_interface_sg_attachment" "conesnake_alb" {
+  count                = var.container_node ? 1 : 0
+  security_group_id    = var.alb_security_group_id
+  network_interface_id = aws_network_interface.conesnake.id
+}
+
+resource "aws_lb_target_group_attachment" "conesnake" {
+  count            = var.container_node ? 1 : 0
+  target_group_arn = var.target_group_arn
+  target_id        = aws_instance.conesnake.id
+}
+
+
+resource "aws_instance" "conesnake" {
+  ami                  = local.ubuntu_ami
+  instance_type        = var.node_type
+  iam_instance_profile = var.instance_profile_name
+  key_name             = var.key_pair_name
+
+  user_data                   = local.startup_script
+  user_data_replace_on_change = true
+
+  disable_api_termination = true
+  monitoring              = true
+
+  network_interface {
+    network_interface_id = aws_network_interface.conesnake.id
+    device_index         = 0
+  }
+
+  root_block_device {
+    volume_size = 10
+    volume_type = "gp2"
+    encrypted   = true
+    tags = {
+      app = var.deployment
+    }
+  }
+
+  credit_specification {
+    cpu_credits = "unlimited"
+  }
+
+  tags = {
+    Name = var.node_name
+    app  = var.deployment
+  }
+}
+
+output "public_ip" {
+  value = aws_eip.conesnake_primary.public_ip
+}
+
+output "private_ip" {
+  value = aws_network_interface.conesnake.private_ip
+}
+
+output "internal_ip" {
+  value = var.internal_ip
+}
+
+output "network_interface_id" {
+  value = aws_network_interface.conesnake.id
+}

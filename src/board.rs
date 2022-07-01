@@ -6,10 +6,11 @@ use crate::util::{Coord, Error, Move};
 use std::fmt;
 use std::{cmp::min, fmt::Write, str};
 
+use deepsize::DeepSizeOf;
 use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
 pub struct Board {
     pub width: i32,
     pub height: i32,
@@ -21,7 +22,7 @@ pub struct Board {
     board_mat: Vec<BoardSquare>,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
 pub struct Snake {
     pub head: Coord,
     pub tail: Coord,
@@ -30,7 +31,7 @@ pub struct Snake {
     pub alive: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
 pub enum BoardSquare {
     Empty,
     SnakeHead(u8, i8),       // index of snake, number of stacked segments

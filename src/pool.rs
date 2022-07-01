@@ -6,6 +6,7 @@ use std::thread;
 use std::thread::JoinHandle;
 
 pub struct ThreadPool {
+    num_threads: usize,
     handles: Vec<JoinHandle<()>>,
     sender: Option<Sender<JobFunc>>,
 }
@@ -25,6 +26,7 @@ impl ThreadPool {
         }
 
         ThreadPool {
+            num_threads,
             handles,
             sender: Some(sender),
         }
@@ -45,8 +47,8 @@ impl ThreadPool {
         }
     }
 
-    pub fn max_count(&self) -> usize {
-        self.handles.len()
+    pub fn num_threads(&self) -> usize {
+        self.num_threads
     }
 }
 
