@@ -5,7 +5,7 @@ use crate::search::SearchContext;
 
 pub fn test_config() -> Config {
     Config {
-        mode: Mode::Local,
+        mode: Mode::Worker,
         worker: vec![],
         port: "".to_owned(),
         num_runs: 1,
@@ -16,14 +16,13 @@ pub fn test_config() -> Config {
         max_height: 21,
         max_snakes: 5,
         temperature: DEFAULT_TEMP,
-        fallback_latency: 10,
         latency_safety: 5,
     }
 }
 
 pub fn release_config() -> Config {
     Config {
-        mode: Mode::Local,
+        mode: Mode::Worker,
         worker: vec![],
         port: "".to_owned(),
         num_runs: 3,
@@ -34,7 +33,6 @@ pub fn release_config() -> Config {
         max_height: 21,
         max_snakes: 5,
         temperature: DEFAULT_TEMP,
-        fallback_latency: 50,
         latency_safety: 100,
     }
 }
@@ -92,7 +90,6 @@ pub fn test_game() -> Game {
             },
         },
         is_solo: false,
-        prev_boards: Vec::new(),
     }
 }
 

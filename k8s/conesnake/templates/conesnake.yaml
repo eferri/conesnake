@@ -17,10 +17,10 @@ startupProbe:
   periodSeconds: 10
 readinessProbe:
   httpGet:
-    path: /
+    path: /ping
     port: listen-port
-  failureThreshold: 1
-  periodSeconds: 5
+  failureThreshold: 2
+  periodSeconds: 9
 livenessProbe:
   httpGet:
     path: /
@@ -36,21 +36,25 @@ metadata:
   name: "{{ .Release.Name }}-relay"
   labels:
     {{- include "common_labels" . | nindent 4 }}
-    node: relay
 spec:
   selector:
     matchLabels:
       {{- include "common_labels" . | nindent 6 }}
-  replicas: 1
+      app: relay
+  replicas: 2
   strategy:
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 0
+      maxUnavailable: 1
     type: RollingUpdate
+  revisionHistoryLimit: 2
   template:
     metadata:
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
       labels:
         {{- include "common_labels" . | nindent 8 }}
+        app: relay
     spec:
       serviceAccountName: "{{ .Release.Name }}-sa-get-pods"
       nodeSelector:
@@ -71,10 +75,9 @@ spec:
         - "--max-height={{ .Values.max_height }}"
         - "--max-snakes={{ .Values.max_snakes }}"
         - "--max-boards=0"
-        - "--fallback-latency={{ .Values.relay_global.fallback_latency }}"
         - "--latency-safety={{ .Values.relay_global.latency_safety }}"
         {{- range $index, $worker := .Values.workers }}
-        - "--worker={{ $worker.service_ip }}"
+        - "--worker=http://{{ $worker.service_ip }}:8080"
         {{- end }}
         - "relay"
 
@@ -86,21 +89,27 @@ metadata:
   name: "{{ $.Release.Name }}-worker-{{ $index }}"
   labels:
     {{- include "common_labels" $ | nindent 4 }}
-    node: worker-0
 spec:
   selector:
     matchLabels:
       {{- include "common_labels" $ | nindent 6 }}
+      app: "worker"
+      node: "worker-{{ $index }}"
   replicas: 2
   strategy:
     rollingUpdate:
       maxSurge: 0
       maxUnavailable: 1
     type: RollingUpdate
+  revisionHistoryLimit: 2
   template:
     metadata:
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
       labels:
         {{- include "common_labels" $ | nindent 8 }}
+        app: "worker"
+        node: "worker-{{ $index }}"
     spec:
       serviceAccountName: "{{ $.Release.Name }}-sa-get-pods"
       nodeName: "{{ $worker.hostname }}"
@@ -120,7 +129,6 @@ spec:
         - "--max-height={{ $.Values.max_height }}"
         - "--max-snakes={{ $.Values.max_snakes }}"
         - "--max-boards={{ $.Values.worker_boards }}"
-        - "--fallback-latency={{ $.Values.worker_global.fallback_latency }}"
         - "--latency-safety={{ $.Values.worker_global.latency_safety }}"
         - "worker"
 {{ end }}

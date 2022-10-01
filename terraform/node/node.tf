@@ -52,12 +52,20 @@ locals {
   # Ubuntu 22.04 server us-west-2
   ubuntu_ami     = "ami-08df94af6199f15b6"
   startup_script = <<-EOF
-    #!/bin/bash
+    #!/bin/sh
     sudo apt-get update
     sudo apt-get upgrade
-    sudo apt-get install --no-install-recommends -y wireguard
+    sudo apt-get install --no-install-recommends -y wireguard ipvsadm
     sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
     sudo sysctl -p /etc/sysctl.conf
+    cat <<EOFSH | sudo tee /etc/modules-load.d/ipvs.conf
+    ip_vs_rr
+    ip_vs_wrr
+    ip_vs_sh
+    ip_vs_lc
+    ip_vs
+    EOFSH
+    sudo systemctl restart systemd-modules-load.service
   EOF
 }
 
@@ -89,13 +97,6 @@ resource "aws_network_interface_sg_attachment" "conesnake_alb" {
   security_group_id    = var.alb_security_group_id
   network_interface_id = aws_network_interface.conesnake.id
 }
-
-resource "aws_lb_target_group_attachment" "conesnake" {
-  count            = var.container_node ? 1 : 0
-  target_group_arn = var.target_group_arn
-  target_id        = aws_instance.conesnake.id
-}
-
 
 resource "aws_instance" "conesnake" {
   ami                  = local.ubuntu_ami
@@ -131,6 +132,10 @@ resource "aws_instance" "conesnake" {
     Name = var.node_name
     app  = var.deployment
   }
+}
+
+output "instance_id" {
+  value = aws_instance.conesnake.id
 }
 
 output "public_ip" {

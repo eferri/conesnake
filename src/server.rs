@@ -1,44 +1,49 @@
 use crate::search;
-use crate::util;
 
-use crate::api::{BattleState, IndexResp, MoveResp};
+use crate::api::{BattleState, IndexResp, MoveResp, PingResp, Scores, WorkerResp};
 use crate::board::Board;
-use crate::config::Config;
+use crate::config::{Config, Mode};
 use crate::game::Game;
 use crate::pool::ThreadPool;
 use crate::search::{Node, SearchContext};
-use crate::util::Error;
+use crate::util::{Error, Move};
 
+use crossbeam_channel::{Receiver, Sender};
 use deepsize::DeepSizeOf;
 use log::{error, info, warn};
-use serde_json;
 use tiny_http::{Method, Request, Response, StatusCode};
 
 use std::{
     io::Cursor,
     sync::atomic::{AtomicBool, AtomicI64, Ordering},
-    sync::{Arc, Barrier, Mutex},
+    sync::{Arc, Barrier},
+    thread::sleep,
     time::{Duration, Instant},
 };
 
 pub struct Server {
     server_pool: ThreadPool,
+    search_pool: Arc<ThreadPool>,
     state: Arc<ServerState>,
 }
 
 struct ServerState {
     config: Config,
-    // initialization / termination
+
+    // resources
+    context: Arc<SearchContext>,
+
+    // synchronization
     done_flag: AtomicBool,
     ready_flag: AtomicBool,
-    done_barrier: Barrier,
+    server_barrier: Barrier,
+    ping_send: Sender<WorkerResp>,
+    ping_recv: Receiver<WorkerResp>,
+    worker_send: Sender<Scores>,
+    worker_recv: Receiver<Scores>,
 
-    // initialization / termination
-    game_id: Mutex<Option<String>>,
-    ticks: AtomicI64,
-    search_pool: ThreadPool,
-    context: Arc<SearchContext>,
-    max_nodes: Mutex<i64>,
+    // game stats
+    max_nodes: AtomicI64,
 }
 
 type StrResponse = Response<Cursor<Vec<u8>>>;
@@ -46,22 +51,32 @@ type StrResponse = Response<Cursor<Vec<u8>>>;
 impl Server {
     const TICK_MS: u64 = 100;
 
-    pub fn new(config: Config) -> Self {
-        let config_clone = config.clone();
+    pub fn new(mut config: Config) -> Self {
+        if config.mode == Mode::Relay {
+            config.num_threads = config.worker.len() * config.num_runs as usize;
+        }
+
+        let (worker_send, worker_recv) = crossbeam_channel::bounded(config.num_threads);
+        let (ping_send, ping_recv) = crossbeam_channel::bounded(config.worker.len());
 
         Server {
             server_pool: ThreadPool::new(config.num_server_threads),
+            search_pool: Arc::new(ThreadPool::new(config.num_threads)),
 
             state: Arc::new(ServerState {
-                config,
+                config: config.clone(),
+
                 done_flag: AtomicBool::new(false),
                 ready_flag: AtomicBool::new(false),
-                done_barrier: Barrier::new(config_clone.num_server_threads + 1),
-                game_id: Mutex::new(None),
-                ticks: AtomicI64::new(0),
-                search_pool: ThreadPool::new(config_clone.num_threads),
-                context: Arc::new(SearchContext::new(config_clone)),
-                max_nodes: Mutex::new(0),
+                server_barrier: Barrier::new(config.num_server_threads + 1),
+                ping_send,
+                ping_recv,
+                worker_send,
+                worker_recv,
+
+                max_nodes: AtomicI64::new(0),
+
+                context: Arc::new(SearchContext::new(config)),
             }),
         }
     }
@@ -76,27 +91,29 @@ impl Server {
     }
 
     pub fn wait_done(&self) {
-        self.state.done_barrier.wait();
+        self.state.server_barrier.wait();
         info!("Exiting treesnake");
     }
 
     pub fn start_server(&self) {
-        let test_node = Node::new(Board::new(
-            0,
-            0,
-            self.state.config.max_width,
-            self.state.config.max_height,
-            self.state.config.max_snakes,
-        ));
+        if self.state.config.max_boards > 0 {
+            let test_node = Node::new(Board::new(
+                0,
+                0,
+                self.state.config.max_width,
+                self.state.config.max_height,
+                self.state.config.max_snakes,
+            ));
 
-        let node_size = test_node.deep_size_of();
-        let num_boards = self.state.config.max_boards;
-        let space_size = node_size as i64 * num_boards as i64;
+            let node_size = test_node.deep_size_of();
+            let num_boards = self.state.config.max_boards;
+            let space_size = node_size as i64 * num_boards as i64;
 
-        info!("Size of Node: {}B", node_size);
+            info!("Size of Node: {}B", node_size);
 
-        info!("Approx. size of search space: {}MiB", space_size >> 20);
-        info!("Approx. size of search space: {}GiB", space_size >> 30);
+            info!("Approx. size of search space: {}MiB", space_size >> 20);
+            info!("Approx. size of search space: {}GiB", space_size >> 30);
+        }
 
         info!(
             "Starting search space allocation max_boards: {}, width: {}, height: {}, max_snakes {}",
@@ -105,7 +122,6 @@ impl Server {
             self.state.config.max_height,
             self.state.config.max_snakes
         );
-
         self.state.context.allocate();
 
         info!("Allocation complete");
@@ -119,7 +135,7 @@ impl Server {
         for _ in 0..self.server_pool.num_threads() {
             let server = server.clone();
             let state = self.state.clone();
-            let num_server_threads = self.server_pool.num_threads();
+            let search_pool = self.search_pool.clone();
 
             self.server_pool.execute(move || {
                 loop {
@@ -137,40 +153,38 @@ impl Server {
                     };
 
                     if request_opt.is_none() {
-                        // Timeout games after ~10 seconds without hearing from that ID
-                        let mut game_id_guard = state.game_id.lock().unwrap();
-                        if game_id_guard.is_none() {
-                            continue;
-                        }
-
-                        let ticks = state.ticks.fetch_add(1, Ordering::AcqRel);
-                        if ticks > (100 * num_server_threads as i64) {
-                            info!("TIMEOUT! Killing game ID {}", game_id_guard.as_ref().unwrap());
-                            let mut game_guard = state.context.game.write().unwrap();
-                            *game_id_guard = None;
-                            *game_guard = None;
-                            state.ticks.store(0, Ordering::Release);
-                        }
                         continue;
                     }
 
-                    info!(" --- start");
-
-                    let mut request = request_opt.unwrap();
-
                     let start_time = Instant::now();
 
+                    let mut request = request_opt.unwrap();
                     let method = request.method().clone();
-                    let url = request.url()[1..].to_owned();
+                    let url = request.url().to_owned();
 
-                    let response = get_response(state.clone(), &mut request, start_time);
+                    info!(" --- start {}, {}", method, url);
 
+                    let addr = request.remote_addr().to_string();
+                    let headers = request.headers();
+
+                    let mut forward_for = String::from("N/A");
+
+                    for h in headers.iter() {
+                        if h.field.as_str() == "X-Forwarded-For" {
+                            forward_for = h.value.to_string();
+                        }
+                    }
+
+                    let response = get_response(state.clone(), search_pool.clone(), &mut request, start_time);
                     let code = response.status_code().0;
 
                     request.respond(response).unwrap();
 
                     let dur = (start_time.elapsed().as_micros() as f64) / 1000.0;
-                    let msg = format!(" --- end {} {} code {} duration {}ms\n\n", method, url, code, dur);
+                    let msg = format!(
+                        " --- end - {}, {}, code {}, addr {}, forward-for {}, duration {}ms\n\n",
+                        method, url, code, addr, forward_for, dur
+                    );
 
                     if code < 400 {
                         info!("{}", msg);
@@ -178,7 +192,7 @@ impl Server {
                         error!("{}", msg);
                     }
                 }
-                state.done_barrier.wait();
+                state.server_barrier.wait();
             });
         }
     }
@@ -191,7 +205,12 @@ impl Drop for Server {
     }
 }
 
-fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Instant) -> StrResponse {
+fn get_response(
+    state: Arc<ServerState>,
+    search_pool: Arc<ThreadPool>,
+    request: &mut Request,
+    start_time: Instant,
+) -> StrResponse {
     match request.method() {
         Method::Get => match request.url() {
             "/" => StrResponse::from_string(
@@ -204,7 +223,17 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
                     version: ("1.0.0").to_owned(),
                 })
                 .unwrap(),
-            ),
+            )
+            .with_status_code(200),
+            "/ping" => {
+                let resp = if state.config.mode == Mode::Relay {
+                    ping_workers(state, &search_pool)
+                } else {
+                    Vec::new()
+                };
+
+                StrResponse::from_string(serde_json::to_string(&resp).unwrap()).with_status_code(200)
+            }
             _ => StrResponse::from_string("").with_status_code(StatusCode(404)),
         },
         Method::Post => {
@@ -227,28 +256,16 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
                 }
             }
 
-            let mut correct_game = false;
-            {
-                let game_id_guard = state.game_id.lock().unwrap();
-                if game_id_guard.is_none() {
-                    correct_game = true;
-                    let mut game_guard = state.context.game.write().unwrap();
+            let is_solo = game_state.board.snakes.len() == 1;
+            let game_id = game_state.game.id.clone();
 
-                    let is_solo = game_state.board.snakes.len() == 1;
-                    let game_id = game_state.game.id.clone();
-
-                    *game_guard = match Game::new(game_state.game.clone(), is_solo) {
-                        Ok(game) => Some(game),
-                        Err(e) => {
-                            error!("Error parsing game {} {}", game_id, e);
-                            return StrResponse::from_string("{}").with_status_code(StatusCode(400));
-                        }
-                    };
-                } else if *game_id_guard.as_ref().unwrap() == game_state.game.id {
-                    correct_game = true;
-                    state.ticks.store(0, Ordering::Release);
+            let game = match Game::new(game_state.game.clone(), is_solo) {
+                Ok(game) => game,
+                Err(e) => {
+                    error!("Error parsing game {} {}", game_id, e);
+                    return StrResponse::from_string("{}").with_status_code(StatusCode(400));
                 }
-            }
+            };
 
             let game_width = game_state.board.width;
             let game_height = game_state.board.height;
@@ -272,11 +289,7 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
                     StrResponse::from_string("{}")
                 }
                 "/move" => {
-                    // Find empty game slot
-                    if !correct_game {
-                        warn!("Game already running");
-                        return StrResponse::from_string("{}").with_status_code(StatusCode(409));
-                    } else if state.config.max_width < game_width
+                    if state.config.max_width < game_width
                         || state.config.max_height < game_height
                         || state.config.max_snakes < game_snakes
                     {
@@ -291,47 +304,46 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
                         return StrResponse::from_string("{}").with_status_code(StatusCode(409));
                     }
 
-                    let ctx = state.context.clone();
-
                     info!("turn: {}", game_state.turn);
 
                     let parsed_board = Board::from_req(
-                        game_state,
+                        &game_state,
                         state.config.max_width,
                         state.config.max_height,
                         state.config.max_snakes,
                     );
-                    let (mv, code) = match parsed_board {
+
+                    let (resp, code) = match parsed_board {
                         Err(e) => {
                             error!("Error parsing board - {}", e);
-                            (util::rand_move(), 400)
+                            return StrResponse::from_string("{}").with_status_code(StatusCode(400));
                         }
                         Ok(board) => {
                             info!("board:\n{}", board);
-                            let latency = if api_latency.is_empty() {
-                                0
-                            } else {
-                                api_latency.parse().expect("Error parsing server-reported latency")
+
+                            let resp = match state.config.mode {
+                                Mode::Worker => {
+                                    let scores = worker_search(state, &search_pool, &board, &game, start_time);
+                                    let mv = search::best_move(&scores);
+
+                                    MoveResp {
+                                        mv,
+                                        scores: Some(scores),
+                                    }
+                                }
+                                Mode::Relay => {
+                                    let scores = run_workers(state, &search_pool, &game_state, start_time);
+                                    let mv = search::best_move(&scores);
+
+                                    MoveResp { mv, scores: None }
+                                }
                             };
 
-                            {
-                                let mut prev_boards_guard = ctx.game.write().unwrap();
-                                prev_boards_guard.as_mut().unwrap().add_board(board)
-                            }
-                            let search_results = search::best_move(ctx, &state.search_pool, start_time, latency);
-                            {
-                                let mut max_nodes_guard = state.max_nodes.lock().unwrap();
-                                if search_results.total_nodes > *max_nodes_guard {
-                                    *max_nodes_guard = search_results.total_nodes;
-                                }
-                                info!("max nodes expanded: {}", *max_nodes_guard);
-                            }
-
-                            (search_results.best_move, 200)
+                            (resp, 200)
                         }
                     };
 
-                    let resp_str = serde_json::to_string(&MoveResp { mv }).unwrap();
+                    let resp_str = serde_json::to_string(&resp).unwrap();
                     StrResponse::from_string(resp_str).with_status_code(code)
                 }
                 "/end" => StrResponse::from_string("{}").with_status_code(StatusCode(200)),
@@ -340,4 +352,166 @@ fn get_response(state: Arc<ServerState>, request: &mut Request, start_time: Inst
         }
         _ => StrResponse::from_string("{}").with_status_code(StatusCode(404)),
     }
+}
+
+fn worker_search(
+    state: Arc<ServerState>,
+    search_pool: &ThreadPool,
+    board: &Board,
+    game: &Game,
+    start_time: Instant,
+) -> Scores {
+    let ctx = state.context.clone();
+
+    let search_results = search::search_moves(ctx, search_pool, board, game, start_time);
+
+    state.max_nodes.fetch_max(search_results.total_nodes, Ordering::AcqRel);
+    let max = state.max_nodes.load(Ordering::Acquire);
+    info!("max nodes expanded: {}", max);
+
+    search_results.scores
+}
+
+fn run_workers(
+    state: Arc<ServerState>,
+    search_pool: &ThreadPool,
+    game_state: &BattleState,
+    start_time: Instant,
+) -> Scores {
+    let mut total_scores: Scores = Default::default();
+
+    let relay_delay_ms = game_state.game.timeout - state.config.latency_safety;
+    let run_delay_ms = (relay_delay_ms as f64 / state.config.num_runs as f64).round() as i32;
+
+    for i in 0..state.config.worker.len() {
+        for j in 0..state.config.num_runs {
+            let state = state.clone();
+            let mut game_state = game_state.clone();
+
+            search_pool.execute(move || {
+                if j > 0 {
+                    sleep(Duration::from_millis((run_delay_ms * j) as u64));
+                }
+
+                let worker = &state.config.worker[i];
+
+                game_state.you.latency = "0".to_owned();
+                game_state.game.timeout = run_delay_ms;
+
+                let current_dur = Instant::now() - start_time;
+                let timeout_dur = Duration::from_millis(relay_delay_ms as u64).saturating_sub(current_dur);
+
+                let run_scores = Default::default();
+                if timeout_dur.is_zero() {
+                    state.worker_send.send(run_scores).unwrap();
+                    return;
+                }
+
+                let req_start = Instant::now();
+                let res = ureq::post(&format!("{}/move", worker))
+                    .timeout(timeout_dur)
+                    .send_json(game_state);
+                let req_dur = Instant::now() - req_start;
+                let server_latency = req_dur.as_micros() as i64;
+
+                info!("Worker {} latency run {} us {}", worker, j, server_latency);
+
+                let run_scores = match res {
+                    Err(e) => {
+                        error!("Error getting worker move {}: {}", worker, e);
+                        Default::default()
+                    }
+                    Ok(resp) => {
+                        let move_resp = resp.into_json::<MoveResp>().unwrap();
+                        let scores = move_resp.scores.unwrap();
+                        for (i, s) in scores.iter().enumerate() {
+                            let score = if s.games == 0 { 0.0 } else { s.score / s.games as f64 };
+
+                            info!(
+                                "Worker {} run {} resp: move: {:?}, score: {}, games: {}",
+                                worker,
+                                j,
+                                Move::from_idx(i),
+                                score,
+                                s.games
+                            );
+                        }
+                        scores
+                    }
+                };
+                state.worker_send.send(run_scores).unwrap();
+            });
+        }
+    }
+
+    for _ in 0..(state.config.worker.len() as i32 * state.config.num_runs) {
+        let recv_resp = state.worker_recv.recv();
+
+        let run_scores = match recv_resp {
+            Ok(s) => s,
+            Err(e) => {
+                error!("Worker channel error! {}", e);
+                continue;
+            }
+        };
+
+        for (i, s) in total_scores.iter_mut().enumerate() {
+            s.score += run_scores[i].score;
+            s.games += run_scores[i].games;
+        }
+    }
+
+    total_scores
+}
+
+fn ping_workers(state: Arc<ServerState>, search_pool: &ThreadPool) -> PingResp {
+    for i in 0..state.config.worker.len() {
+        let state = state.clone();
+
+        search_pool.execute(move || {
+            let worker = &state.config.worker[i];
+
+            let req_start = Instant::now();
+            let res = ureq::get(&format!("{}/", worker))
+                .timeout(Duration::from_millis(300))
+                .call();
+            let req_dur = Instant::now() - req_start;
+            let latency_ms = req_dur.as_millis() as i32;
+
+            let healthy = match res {
+                Err(e) => {
+                    error!("Error pinging worker {}: {}", worker, e);
+                    false
+                }
+                Ok(_) => {
+                    info!("Worker {} latency ms: {}", worker, latency_ms);
+                    true
+                }
+            };
+
+            let resp = WorkerResp {
+                url: worker.clone(),
+                latency: latency_ms,
+                healthy,
+            };
+
+            state.ping_send.send(resp).unwrap();
+        });
+    }
+
+    let mut pings = Vec::with_capacity(state.config.worker.len());
+
+    for _ in 0..state.config.worker.len() {
+        let worker_res = state.ping_recv.recv();
+        let resp = match worker_res {
+            Ok(s) => s,
+            Err(e) => {
+                error!("Worker channel error: {}", e);
+                continue;
+            }
+        };
+        pings.push(resp);
+    }
+
+    pings
 }

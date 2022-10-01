@@ -3,13 +3,13 @@ use crate::util::{Coord, Move};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoyaleSettings {
     pub shrink_every_n_turns: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SquadSettings {
     pub allow_body_collisions: bool,
@@ -18,7 +18,7 @@ pub struct SquadSettings {
     pub shared_length: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub food_spawn_chance: i32,
@@ -28,14 +28,14 @@ pub struct Settings {
     pub squad: SquadSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Ruleset {
     pub name: Rules,
     pub version: String,
     pub settings: Settings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct GameApi {
     pub id: String,
     pub timeout: i32,
@@ -93,7 +93,33 @@ pub struct IndexResp {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct WorkerResp {
+    pub url: String,
+    pub latency: i32,
+    pub healthy: bool,
+}
+
+pub type PingResp = Vec<WorkerResp>;
+
+pub type Scores = [SearchScore; 4];
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub total_nodes: i64,
+    pub max_depth: i32,
+    pub scores: Scores,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct SearchScore {
+    pub score: f64,
+    pub games: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MoveResp {
     #[serde(rename = "move")]
     pub mv: Move,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scores: Option<[SearchScore; 4]>,
 }

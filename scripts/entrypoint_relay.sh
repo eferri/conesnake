@@ -13,12 +13,12 @@ ORIG_ARGS="$@"
 
 for i in "$@"; do
     case "$i" in
-        --url)
-            SNAKE_URL="$2"
+        --worker)
+            WORKER_URL="$2"
             shift
 
-            until curl --max-time 0.5 -sf -o /dev/null "$SNAKE_URL"; do
-                echo "Waiting for snake $SNAKE_URL"
+            until curl --max-time 0.5 -sf -o /dev/null "$WORKER_URL"; do
+                echo "Waiting for worker $WORKER_URL"
                 sleep 0.5
             done
             ;;
@@ -28,4 +28,4 @@ for i in "$@"; do
         esac
 done
 
-exec battlesnake play $ORIG_ARGS
+exec ./target-snake/"$TARGET"/treesnake $ORIG_ARGS

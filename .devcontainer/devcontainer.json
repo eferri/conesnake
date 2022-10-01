@@ -18,7 +18,8 @@
         "twxs.cmake",
         "hashicorp.terraform",
         "redhat.vscode-yaml",
-        "ms-kubernetes-tools.vscode-kubernetes-tools"
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "eamodio.gitlens"
     ],
     "overrideCommand": true,
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
@@ -31,6 +32,6 @@
         "--env-file",
         ".env"
         // "--network",
-        // "baywatchr-api_default"
+        // "treesnake_default"
     ]
 }

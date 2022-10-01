@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::cmp::{Ord, PartialOrd};
 use std::fmt::{Display, Formatter, Result};
 use std::io;
-use std::slice::Iter;
 
 // API structs
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Serialize, Deserialize, DeepSizeOf)]
@@ -35,10 +34,6 @@ pub const MOVES: [Move; 4] = [Move::Left, Move::Right, Move::Up, Move::Down];
 impl Move {
     pub fn from_idx(idx: usize) -> Self {
         MOVES[idx]
-    }
-
-    pub fn iter() -> Iter<'static, Self> {
-        MOVES.iter()
     }
 
     pub fn num_move_perm(num_snakes: usize) -> usize {

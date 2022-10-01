@@ -1,5 +1,13 @@
-#!/usr/bin/env bash
+#!/bin/sh
 set -eu
+
+ctlc() {
+    echo ""
+    echo "Caught Ctrl-C, exiting..."
+    exit 1
+}
+
+trap ctlc INT TERM
 
 if [ "$TARGET" = "debug" ]; then
     cargo build

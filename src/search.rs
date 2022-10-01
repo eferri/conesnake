@@ -1,12 +1,12 @@
+use crate::api::{Scores, SearchResult};
 use crate::board::Board;
 use crate::config::Config;
-use crate::delay::Delay;
 use crate::game::Game;
 use crate::pool::ThreadPool;
 use crate::util::{max_children, Coord, Move};
 
 use deepsize::DeepSizeOf;
-use log::{info, warn};
+use log::{error, info, warn};
 
 use std::sync::{atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering, Arc, Barrier};
 use std::sync::{Mutex, RwLock};
@@ -17,7 +17,7 @@ pub struct SearchContext {
     pub config: Config,
     pub game: RwLock<Option<Game>>,
 
-    search_delay: Mutex<Delay>,
+    search_lock: Mutex<()>,
     node_space: NodeSpace,
     thread_scratch: RwLock<Vec<RwLock<ThreadContext>>>,
 
@@ -43,12 +43,6 @@ pub struct ThreadContext {
 pub struct SearchSort {
     index: usize,
     total_score: f64,
-}
-
-pub struct SearchResult {
-    pub best_move: Move,
-    pub max_depth: i32,
-    pub total_nodes: i64,
 }
 
 // Node in search tree
@@ -95,15 +89,12 @@ pub type NodeSpace = RwLock<Vec<Node>>;
 impl SearchContext {
     pub fn new(config: Config) -> Self {
         let num_cpu = config.num_threads;
-        let latency_safety = config.latency_safety;
-        let fallback_latency = config.fallback_latency;
         SearchContext {
             config,
-            node_space: RwLock::new(Vec::new()),
-
-            search_delay: Mutex::new(Delay::new(fallback_latency, latency_safety)),
-
             game: RwLock::new(None),
+
+            search_lock: Mutex::new(()),
+            node_space: RwLock::new(Vec::new()),
             thread_scratch: RwLock::new(Vec::new()),
 
             search_timeout: AtomicBool::new(false),
@@ -115,6 +106,10 @@ impl SearchContext {
     }
 
     pub fn allocate(&self) {
+        if self.config.max_boards == 0 {
+            return;
+        }
+
         let mut space_guard = self.node_space.write().unwrap();
         space_guard.resize_with(self.config.max_boards, || {
             Node::new(Board::new(
@@ -221,81 +216,34 @@ impl NodeState {
     }
 }
 
-pub fn best_move(
-    ctx: Arc<SearchContext>,
-    pool: &ThreadPool,
-    start_time: Instant,
-    measured_latency: i32,
-) -> SearchResult {
-    let game_guard = ctx.game.read().unwrap();
-    let game = game_guard.as_ref().unwrap();
-
-    let adaptive_search_us = ctx
-        .search_delay
-        .lock()
-        .unwrap()
-        .next_delay_us(measured_latency, game.api.timeout);
-
-    // Reset search state
-    ctx.reset();
-
-    // Set the root node
-    {
-        let space_guard = ctx.node_space.read().unwrap();
-        let mut root_state_guard = space_guard[0].state.write().unwrap();
-
-        root_state_guard.reset();
-        root_state_guard.board = game.start_board().clone();
-    }
-
-    ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
-
-    for id in 0..ctx.config.num_threads {
-        let ctx_cln = ctx.clone();
-        pool.execute(move || search_worker(ctx_cln, id));
-    }
-
-    let startup_us = (Instant::now() - start_time).as_micros() as i64;
-    let search_us = adaptive_search_us - startup_us;
-
-    if search_us > 0 {
-        sleep(Duration::from_micros(search_us as u64));
-        info!("Startup time {}us, Slept {}us", startup_us, search_us)
-    } else {
-        warn!("Search duration negative, no time to search: {}us", search_us);
-    }
-
-    ctx.search_timeout.store(true, Ordering::Release);
-    ctx.done_barrier.wait();
-
-    let space_guard = ctx.node_space.read().unwrap();
-    let root_state_guard = space_guard[0].state.read().unwrap();
-
+pub fn best_move(scores: &Scores) -> Move {
     let mut best_move_score = Move::Left;
     let mut best_move_games = Move::Left;
     let mut best_score = 0.0;
     let mut most_games = 0;
 
-    for (mv_idx, stats) in root_state_guard.cache[0].iter().enumerate() {
-        if !stats.pruned && stats.games != 0 {
-            let raw_score = stats.score / stats.games as f64;
+    for (mv_idx, stats) in scores.iter().enumerate() {
+        let final_score = if stats.games == 0 {
+            0.0
+        } else {
+            stats.score / stats.games as f64
+        };
 
-            info!(
-                "Move {:?} score: {} games: {}",
-                Move::from_idx(mv_idx),
-                raw_score,
-                stats.games
-            );
+        info!(
+            "SEARCH best_move: {:?}, score: {}, games: {}",
+            Move::from_idx(mv_idx),
+            final_score,
+            stats.games
+        );
 
-            if raw_score > best_score {
-                best_move_score = Move::from_idx(mv_idx);
-                best_score = raw_score;
-            }
+        if final_score > best_score {
+            best_move_score = Move::from_idx(mv_idx);
+            best_score = final_score;
+        }
 
-            if stats.games > most_games {
-                best_move_games = Move::from_idx(mv_idx);
-                most_games = stats.games;
-            }
+        if stats.games > most_games {
+            best_move_games = Move::from_idx(mv_idx);
+            most_games = stats.games;
         }
     }
 
@@ -305,6 +253,75 @@ pub fn best_move(
     } else {
         best_move_score
     };
+
+    info!("search best move: {:?}", best_move);
+    info!("search best move score: {:?}", best_move_score);
+    info!("search best move games: {:?}", best_move_games);
+
+    best_move
+}
+
+pub fn search_moves(
+    ctx: Arc<SearchContext>,
+    pool: &ThreadPool,
+    board: &Board,
+    game: &Game,
+    start_time: Instant,
+) -> SearchResult {
+    let _search_guard = ctx.search_lock.lock().unwrap();
+
+    // Reset search state
+    ctx.reset();
+    {
+        let mut game_guard = ctx.game.write().unwrap();
+        *game_guard = Some(game.clone());
+    }
+
+    // Set the root node
+    {
+        let space_guard = ctx.node_space.read().unwrap();
+        let mut root_state_guard = space_guard[0].state.write().unwrap();
+
+        root_state_guard.reset();
+        root_state_guard.board = board.clone();
+    }
+
+    ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
+
+    for id in 0..ctx.config.num_threads {
+        let ctx_cln = ctx.clone();
+        pool.execute(move || search_worker(ctx_cln, id));
+    }
+
+    let startup_dur = Instant::now() - start_time;
+    let search_us = (game.api.timeout - ctx.config.latency_safety) as i64 * 1000;
+    let search_dur = Duration::from_micros(search_us as u64).saturating_sub(startup_dur);
+
+    if !search_dur.is_zero() {
+        sleep(search_dur);
+        info!(
+            "Startup time {}us, Slept {}us",
+            startup_dur.as_micros(),
+            search_dur.as_micros()
+        )
+    } else {
+        warn!("Search duration negative, no time to search");
+    }
+
+    ctx.search_timeout.store(true, Ordering::Release);
+    ctx.done_barrier.wait();
+
+    let space_guard = ctx.node_space.read().unwrap();
+    let root_state_guard = space_guard[0].state.read().unwrap();
+
+    let mut scores: Scores = Default::default();
+
+    for (mv_idx, stats) in root_state_guard.cache[0].iter().enumerate() {
+        if !stats.pruned && stats.games != 0 {
+            scores[mv_idx].score = stats.score;
+            scores[mv_idx].games = stats.games;
+        }
+    }
 
     let max_depth = root_state_guard.max_depth;
     let total_nodes = ctx.total_nodes.load(Ordering::Relaxed);
@@ -319,9 +336,9 @@ pub fn best_move(
     info!("search num terminal: {}", num_terminal);
 
     SearchResult {
-        best_move,
-        max_depth,
         total_nodes,
+        max_depth,
+        scores,
     }
 }
 
@@ -359,7 +376,10 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
                 // Expand node if game not over, and another thread hasn't already expanded
                 let mut state_guard = space_guard[curr_idx].state.write().unwrap();
                 if state_guard.num_children == 0 {
-                    expand_node(&ctx, &mut scratch_guard, &mut state_guard, curr_idx, game);
+                    let space_left = expand_node(&ctx, &mut scratch_guard, &mut state_guard, curr_idx, game);
+                    if !space_left {
+                        break 'main_loop;
+                    }
                 }
             }
 
@@ -406,14 +426,13 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
         let is_terminal = {
             let _playout_guard = playout_guard;
 
-            let (depth, board) = {
+            scratch_guard.board = {
                 let state_guard = space_guard[curr_idx].state.read().unwrap();
-                (state_guard.depth, state_guard.board.clone())
+                state_guard.board.clone()
             };
 
-            scratch_guard.board = board;
             scratch_guard.play_scores.clear();
-            playout_game(&ctx, &mut scratch_guard, game, depth)
+            playout_game(&ctx, &mut scratch_guard, game)
         };
 
         if !is_terminal {
@@ -471,7 +490,7 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
     ctx.done_barrier.wait();
 }
 
-fn playout_game(_ctx: &SearchContext, state: &mut ThreadContext, game: &Game, depth: i32) -> bool {
+fn playout_game(_ctx: &SearchContext, state: &mut ThreadContext, game: &Game) -> bool {
     let mut terminal = true;
 
     while !game.over(&state.board) {
@@ -491,13 +510,19 @@ fn playout_game(_ctx: &SearchContext, state: &mut ThreadContext, game: &Game, de
     }
 
     for snake_idx in 0..state.board.num_snakes() as usize {
-        let score = game.score(&state.board, snake_idx, depth);
+        let score = game.score(&state.board, snake_idx);
         state.play_scores.push(score);
     }
     terminal
 }
 
-fn expand_node(ctx: &SearchContext, state: &mut ThreadContext, node: &mut NodeState, parent_index: usize, game: &Game) {
+fn expand_node(
+    ctx: &SearchContext,
+    state: &mut ThreadContext,
+    node: &mut NodeState,
+    parent_index: usize,
+    game: &Game,
+) -> bool {
     let num_snakes = node.board.num_snakes() as usize;
     let num_alive_snakes = node.board.num_alive_snakes();
     let space_guard = ctx.node_space.read().unwrap();
@@ -544,14 +569,15 @@ fn expand_node(ctx: &SearchContext, state: &mut ThreadContext, node: &mut NodeSt
         }
 
         let child_idx = ctx.total_nodes.fetch_add(1, Ordering::AcqRel) as usize;
-        node.children[node.num_children].index = child_idx;
+        if child_idx >= space_guard.len() {
+            error!("No more boards in search space");
+            return false;
+        }
 
+        node.children[node.num_children].index = child_idx;
         let child_moves = node.child_moves(node.num_children);
 
         {
-            if child_idx >= space_guard.len() {
-                panic!("No more boards in search space")
-            }
             let mut child_state_guard = space_guard[child_idx].state.write().unwrap();
 
             child_state_guard.reset();
@@ -566,6 +592,7 @@ fn expand_node(ctx: &SearchContext, state: &mut ThreadContext, node: &mut NodeSt
 
         node.num_children += 1;
     }
+    true
 }
 
 #[cfg(test)]

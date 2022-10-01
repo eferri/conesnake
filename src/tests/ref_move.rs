@@ -51,7 +51,7 @@ impl<'de> RefMove<'de> {
 
         let ref_state_res = self.ref_iter.next().unwrap();
         Board::from_req(
-            ref_state_res.unwrap(),
+            ref_state_res.as_ref().unwrap(),
             board.max_width,
             board.max_height,
             board.max_snakes(),

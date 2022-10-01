@@ -3,17 +3,16 @@ use num_cpus;
 
 pub const DEFAULT_TEMP: f64 = 1.1;
 
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug, PartialEq, Eq)]
 pub enum Mode {
-    Local,
-    Relay,
     Worker,
+    Relay,
 }
 
 #[derive(Parser, Clone, Debug)]
 #[clap(author, version, about = "treesnake", long_about = None)]
 pub struct Config {
-    #[clap(value_enum, default_value = "local")]
+    #[clap(value_enum, default_value = "worker")]
     pub mode: Mode,
 
     #[clap(long)]
@@ -22,7 +21,7 @@ pub struct Config {
     #[clap(long, default_value = "8080")]
     pub port: String,
 
-    #[clap(long, default_value_t = 3)]
+    #[clap(long, default_value_t = 2)]
     pub num_runs: i32,
 
     #[clap(long, default_value_t = num_cpus::get())]
@@ -45,9 +44,6 @@ pub struct Config {
 
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
-
-    #[clap(long, default_value_t = 10)]
-    pub fallback_latency: i32,
 
     #[clap(long, default_value_t = 5)]
     pub latency_safety: i32,

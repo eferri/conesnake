@@ -260,7 +260,7 @@ fn playout_test() {
     scratch_guard.play_scores.clear();
     scratch_guard.board = start_board;
 
-    search::playout_game(&ctx, &mut scratch_guard, &game, 0);
+    search::playout_game(&ctx, &mut scratch_guard, &game);
 
     assert!(scratch_guard.play_scores.len() == 2);
     check_scores(&scratch_guard.play_scores, &[1.0, 0.0]);
@@ -269,7 +269,7 @@ fn playout_test() {
     scratch_guard.play_scores.clear();
     scratch_guard.board = start_board;
 
-    search::playout_game(&ctx, &mut scratch_guard, &game, 0);
+    search::playout_game(&ctx, &mut scratch_guard, &game);
 
     assert!(scratch_guard.play_scores.len() == 2);
     check_scores(&scratch_guard.play_scores, &[1.0, 0.0]);
@@ -288,18 +288,13 @@ fn small_search_test() {
     let ctx = get_context();
     let pool = ThreadPool::new(ctx.config.num_threads);
 
-    let mut game = solo_game();
+    let game = solo_game();
+    let board = Board::from_str(SEARCH_SMALL, &game).unwrap();
 
-    game.add_board(Board::from_str(SEARCH_SMALL, &game).unwrap());
+    let search_result = search::search_moves(Arc::new(ctx), &pool, &board, &game, Instant::now());
+    let best_move = search::best_move(&search_result.scores);
 
-    {
-        let mut guard = ctx.game.write().unwrap();
-        *guard = Some(game);
-    }
-
-    let search_result = search::best_move(Arc::new(ctx), &pool, Instant::now(), 0);
-
-    assert_eq!(search_result.best_move, Move::Right);
+    assert_eq!(best_move, Move::Right);
     assert_eq!(search_result.max_depth, 2);
     assert_eq!(search_result.total_nodes, 3);
 }
@@ -322,17 +317,13 @@ fn head_on_search_test() {
     log_test_init();
     let ctx = get_context();
     let pool = ThreadPool::new(ctx.config.num_threads);
-    let mut game = test_game();
+    let game = test_game();
+    let board = Board::from_str(SEARCH_HEAD_ON, &game).unwrap();
 
-    game.add_board(Board::from_str(SEARCH_HEAD_ON, &game).unwrap());
-    {
-        let mut guard = ctx.game.write().unwrap();
-        *guard = Some(game);
-    }
+    let search_result = search::search_moves(Arc::new(ctx), &pool, &board, &game, Instant::now());
+    let best_move = search::best_move(&search_result.scores);
 
-    let search_result = search::best_move(Arc::new(ctx), &pool, Instant::now(), 0);
-
-    assert_ne!(search_result.best_move, Move::Right);
+    assert_ne!(best_move, Move::Right);
 }
 
 const ARCADE_MAZE_BOARD: &str = "
@@ -369,15 +360,12 @@ fn arcade_maze_search_test() {
     for _ in 0..4 {
         let mut game = wrapped_game();
         game.api.map = Map::ArcadeMaze;
-        game.add_board(Board::from_str(ARCADE_MAZE_BOARD, &game).unwrap());
-        {
-            let mut guard = ctx.game.write().unwrap();
-            *guard = Some(game);
-        }
+        let board = Board::from_str(ARCADE_MAZE_BOARD, &game).unwrap();
 
-        let search_result = search::best_move(ctx.clone(), &pool, Instant::now(), 0);
+        let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now());
+        let best_move = search::best_move(&search_result.scores);
 
-        assert!(search_result.best_move == Move::Down || search_result.best_move == Move::Up);
+        assert!(best_move == Move::Down || best_move == Move::Up);
     }
 }
 
@@ -414,19 +402,16 @@ fn arcade_maze_profile_test() {
     let pool = ThreadPool::new(ctx.config.num_threads);
 
     let mut game = wrapped_game();
+    let board = Board::from_str(ARCADE_MAZE_PROFILE_BOARD, &game).unwrap();
     game.api.map = Map::ArcadeMaze;
-    game.add_board(Board::from_str(ARCADE_MAZE_PROFILE_BOARD, &game).unwrap());
-    {
-        let mut guard = ctx.game.write().unwrap();
-        *guard = Some(game);
-    }
 
     #[cfg(feature = "profile")]
     let _prof = -1;
 
-    let search_result = search::best_move(ctx.clone(), &pool, Instant::now(), 15);
+    let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now());
+    let best_move = search::best_move(&search_result.scores);
 
-    info!("snake eliminated if move left, move is {:?}", search_result.best_move);
+    info!("snake eliminated if move left, move is {:?}", best_move);
 
     drop(ctx)
 }

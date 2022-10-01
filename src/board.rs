@@ -67,25 +67,25 @@ impl Board {
         }
     }
 
-    pub fn from_req(req: BattleState, max_width: i32, max_height: i32, max_snakes: i32) -> Result<Board, Error> {
+    pub fn from_req(req: &BattleState, max_width: i32, max_height: i32, max_snakes: i32) -> Result<Board, Error> {
         if req.board.snakes.is_empty() {
             return Err(Error::BadBoardReq("No snakes in request".to_owned()));
         }
 
         let mut board = Board::new(req.board.width, req.board.height, max_width, max_height, max_snakes);
-        for coord in req.board.food.into_iter() {
-            board.set_at(coord, BoardSquare::Food);
+        for coord in req.board.food.iter() {
+            board.set_at(*coord, BoardSquare::Food);
             board.num_food += 1;
         }
-        for coord in req.board.hazards.into_iter() {
-            board.set_at(coord, BoardSquare::Hazard);
+        for coord in req.board.hazards.iter() {
+            board.set_at(*coord, BoardSquare::Hazard);
         }
 
         board.turn = req.turn;
         let our_id = req.you.id.clone();
-        board.add_api_snake(req.you, req.game.ruleset.name)?;
+        board.add_api_snake(&req.you, req.game.ruleset.name)?;
 
-        for snake in req.board.snakes.into_iter() {
+        for snake in req.board.snakes.iter() {
             if our_id == snake.id {
                 continue;
             }
@@ -213,7 +213,7 @@ impl Board {
         self.snakes.append(&mut vec![snake; new_snakes as usize]);
     }
 
-    pub fn add_api_snake(&mut self, api_snake: SnakeApi, rules: Rules) -> Result<(), Error> {
+    pub fn add_api_snake(&mut self, api_snake: &SnakeApi, rules: Rules) -> Result<(), Error> {
         let snake = Snake {
             head: Coord {
                 x: api_snake.head.x,
@@ -253,35 +253,35 @@ impl Board {
             return Ok(());
         }
 
-        for (i, coord) in api_snake.body.into_iter().enumerate() {
-            if prev_coord.is_some() && coord != prev_coord.unwrap() {
+        for (i, coord) in api_snake.body.iter().enumerate() {
+            if prev_coord.is_some() && *coord != prev_coord.unwrap() {
                 prev_diff_coord = prev_coord;
             }
 
             if let Some(diff_coord) = prev_diff_coord {
-                if !self.next_to(coord, diff_coord, rules) {
+                if !self.next_to(*coord, diff_coord, rules) {
                     return Err(Error::BadBoard("Snake non-contiguous".to_owned()));
                 }
             }
 
             // Move::Left should never be used here since first turn case is handled above
             let mv_ptr = match prev_diff_coord {
-                Some(diff_coord) => self.coord_to_move(coord, diff_coord, rules),
+                Some(diff_coord) => self.coord_to_move(*coord, diff_coord, rules),
                 None => Move::Left,
             };
 
             if i == 0 {
-                self.set_at(coord, BoardSquare::SnakeHead(snake_idx, 0));
-            } else if coord == prev_coord.unwrap() {
+                self.set_at(*coord, BoardSquare::SnakeHead(snake_idx, 0));
+            } else if *coord == prev_coord.unwrap() {
                 num_stacked += 1;
-                self.set_at(coord, BoardSquare::SnakeTail(snake_idx, mv_ptr, num_stacked as i8));
+                self.set_at(*coord, BoardSquare::SnakeTail(snake_idx, mv_ptr, num_stacked as i8));
             } else if i as i32 == snake.len - 1 {
-                self.set_at(coord, BoardSquare::SnakeTail(snake_idx, mv_ptr, 0));
+                self.set_at(*coord, BoardSquare::SnakeTail(snake_idx, mv_ptr, 0));
             } else {
-                self.set_at(coord, BoardSquare::SnakeBody(snake_idx, mv_ptr));
+                self.set_at(*coord, BoardSquare::SnakeBody(snake_idx, mv_ptr));
             }
 
-            prev_coord = Some(coord);
+            prev_coord = Some(*coord);
         }
         Ok(())
     }

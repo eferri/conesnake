@@ -11,7 +11,7 @@ SERVER_INSTALL_FILES="\
   ./k8s/cloud-provider-aws.yaml \
 "
 
-SSH_ARGS="-q -i ~/.ssh/conesnake_ed25519"
+SSH_ARGS="-q -o StrictHostKeyChecking=no -i ~/.ssh/conesnake_ed25519"
 
 install_k3s_primary_server()
 {
@@ -33,6 +33,8 @@ $TEMP_DIR/k3s_install.sh server \\
   --disable-cloud-controller \\
   --disable servicelb \\
   --disable traefik \\
+  --kube-proxy-arg="--proxy-mode=ipvs" \\
+  --kube-proxy-arg="--ipvs-scheduler=lc" \\
   --kubelet-arg="provider-id=aws:///\\
 \$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)/\\
 \$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
@@ -45,7 +47,7 @@ EOF
 install_k3s_relay()
 {
   echo "Installing k3s agent for relay node..."
-  while ! ssh $SSH_ARGS -o StrictHostKeyChecking=no "ubuntu@$PUBLIC_IP" echo '$HOST'
+  while ! ssh $SSH_ARGS "ubuntu@$PUBLIC_IP" echo '$HOST'
   do
     echo "Waiting for server..."
     sleep 1
@@ -65,6 +67,8 @@ $TEMP_DIR/k3s_install.sh agent \\
   --server "https://$PRIMARY_INTERNAL_IP:6443" \\
   --token $K3S_TOKEN \\
   --flannel-iface conesnake \\
+  --kube-proxy-arg="--proxy-mode=ipvs" \\
+  --kube-proxy-arg="--ipvs-scheduler=lc" \\
   --kubelet-arg="provider-id=aws:///\\
 \$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)/\\
 \$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
@@ -88,7 +92,9 @@ $TEMP_DIR/k3s_install.sh agent \\
   --node-ip $INTERNAL_IP \\
   --server "https://$PRIMARY_INTERNAL_IP:6443" \\
   --token $K3S_TOKEN \\
-  --flannel-iface conesnake
+  --flannel-iface conesnake \\
+  --kube-proxy-arg="--proxy-mode=ipvs" \\
+  --kube-proxy-arg="--ipvs-scheduler=lc"
 
 rm -r $TEMP_DIR
 EOF

@@ -9,10 +9,12 @@ spec:
   type: NodePort
   ports:
   - port: 8080
+    targetPort: 8080
+    nodePort: 30001
     protocol: TCP
   selector:
     {{- include "common_labels" . | nindent 4 }}
-    node: relay
+    app: relay
 
 {{- range $index, $worker := .Values.workers }}
 ---
@@ -27,6 +29,7 @@ spec:
   clusterIP: "{{ $worker.service_ip }}"
   ports:
   - port: 8080
+    targetPort: 8080
     protocol: TCP
   selector:
     {{- include "common_labels" $ | nindent 4 }}

@@ -147,8 +147,8 @@ resource "aws_security_group" "conesnake_alb" {
 
   ingress {
     description     = "alb"
-    from_port       = 8080
-    to_port         = 8080
+    from_port       = 30001
+    to_port         = 30001
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
@@ -179,7 +179,7 @@ resource "aws_acm_certificate" "conesnake" {
   }
 }
 
-resource "aws_route53_record" "conesnake" {
+resource "aws_route53_record" "conesnake_validation" {
   for_each = {
     for dvo in aws_acm_certificate.conesnake.domain_validation_options : dvo.domain_name => {
       name   = dvo.resource_record_name
@@ -198,7 +198,20 @@ resource "aws_route53_record" "conesnake" {
 
 resource "aws_acm_certificate_validation" "conesnake" {
   certificate_arn         = aws_acm_certificate.conesnake.arn
-  validation_record_fqdns = [for record in aws_route53_record.conesnake : record.fqdn]
+  validation_record_fqdns = [for record in aws_route53_record.conesnake_validation : record.fqdn]
+}
+
+resource "aws_route53_record" "conesnake_lb" {
+  zone_id         = data.aws_route53_zone.conesnake.zone_id
+  name            = var.domain
+  type            = "A"
+  allow_overwrite = false
+
+  alias {
+    name                   = aws_lb.conesnake.dns_name
+    zone_id                = aws_lb.conesnake.zone_id
+    evaluate_target_health = true
+  }
 }
 
 resource "aws_lb" "conesnake" {
@@ -207,6 +220,7 @@ resource "aws_lb" "conesnake" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = [for subnet in aws_subnet.conesnake : subnet.id]
+  enable_http2       = false
 
   tags = {
     app = local.deployment
@@ -227,8 +241,8 @@ resource "aws_lb_listener" "conesnake" {
 }
 
 resource "aws_lb_target_group" "conesnake" {
-  name        = local.deployment
-  port        = 8080
+  name_prefix = "cone"
+  port        = 30001
   protocol    = "HTTP"
   vpc_id      = aws_vpc.conesnake.id
   target_type = "instance"
@@ -240,6 +254,10 @@ resource "aws_lb_target_group" "conesnake" {
     unhealthy_threshold = 2
     path                = "/"
     matcher             = "200"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

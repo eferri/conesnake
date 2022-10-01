@@ -4,41 +4,32 @@ use crate::util::{Coord, Error};
 
 use serde::{Deserialize, Serialize};
 
-use std::cmp::max;
-
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Rules {
+    #[default]
     Solo,
     Standard,
     Wrapped,
-    Royale,
-    Constrictor,
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Map {
+    #[default]
     Standard,
     Empty,
     ArcadeMaze,
-    Royale,
-    HzInnerWall,
-    HzRings,
-    HzColumns,
     HzRiversBridges,
-    HzSpiral,
-    HzScatter,
-    HzGrowBox,
-    HzExpandBox,
-    HzExpandScatter,
+    HzRiversBridgesLg,
+    HzIslandsBridges,
+    HzIslandsBridgesLg,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Game {
     pub api: GameApi,
     pub is_solo: bool,
-    pub prev_boards: Vec<Board>,
 }
 
 pub const ARCADE_FOOD_COORDS: [Coord; 12] = [
@@ -58,36 +49,10 @@ pub const ARCADE_FOOD_COORDS: [Coord; 12] = [
 
 impl Game {
     pub fn new(req_game: GameApi, solo: bool) -> Result<Self, Error> {
-        let rules = req_game.ruleset.name;
-        let map = req_game.map;
-
-        match rules {
-            Rules::Solo | Rules::Standard | Rules::Wrapped => (),
-            _ => return Err(Error::BadBoardReq(format!("unsupported game mode {:?}", rules))),
-        };
-
-        match map {
-            Map::Standard | Map::Empty | Map::ArcadeMaze => (),
-            _ => return Err(Error::BadBoardReq(format!("unsupported game map {:?}", map))),
-        };
-
         Ok(Game {
             api: req_game,
             is_solo: solo,
-            prev_boards: Vec::new(),
         })
-    }
-
-    pub fn reset(&mut self) {
-        self.prev_boards.clear();
-    }
-
-    pub fn add_board(&mut self, board: Board) {
-        self.prev_boards.push(board);
-    }
-
-    pub fn start_board(&self) -> &Board {
-        self.prev_boards.last().unwrap()
     }
 
     pub fn max_turn(&self, board: &Board) -> i32 {
@@ -98,15 +63,9 @@ impl Game {
         }
     }
 
-    pub fn score(&self, board: &Board, snake_idx: usize, depth: i32) -> f64 {
+    pub fn score(&self, board: &Board, snake_idx: usize) -> f64 {
         if self.is_solo {
-            let start_board = &self.prev_boards.last().unwrap();
-            let start_health = start_board.snakes[snake_idx].health;
-            let start_len = start_board.snakes[snake_idx].len;
-            let len = board.snakes[snake_idx].len;
-
-            let best_len = start_len + (depth + (100 - start_health)) / 100;
-            1.0 - 0.1 * max((len - best_len).abs(), 10) as f64
+            board.turn as f64 / self.max_turn(board) as f64
         } else if board.snakes[snake_idx].alive {
             1.0
         } else {

@@ -8,10 +8,12 @@ spec:
   selector:
     matchLabels:
       {{- include "common_labels" . | nindent 6 }}
+      job: ip-change
   template:
     metadata:
       labels:
         {{- include "common_labels" . | nindent 8 }}
+        job: ip-change
     spec:
       imagePullSecrets:
       - name: regcred

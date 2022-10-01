@@ -15,13 +15,15 @@ services:
     ports:
       - "8080:8080"
     command: |
-      scripts/entrypoint.sh \
-        --num-threads ${NUM_THREADS:-4} \
-        --max-boards ${MAX_BOARDS:-10000} \
+      scripts/entrypoint_relay.sh \
+        --max-boards 0 \
         --max-width ${MAX_WIDTH:-11} \
         --max-height ${MAX_HEIGHT:-11} \
-        --worker worker
+        --max-snakes ${MAX_SNAKES:-5} \
+        --worker http://worker:8081 \
         relay
+    depends_on:
+      - worker
 
   worker:
     image: conesnake:latest-dev
@@ -44,6 +46,7 @@ services:
         --max-boards ${MAX_BOARDS:-10000} \
         --max-width ${MAX_WIDTH:-11} \
         --max-height ${MAX_HEIGHT:-11} \
+        --max-snakes ${MAX_SNAKES:-5} \
         worker
 
   gpu:
@@ -66,14 +69,13 @@ services:
         --browser \
         --board-url http://localhost:3000 \
         --timeout 250 \
-        --width 5 --height 5 \
-        --gametype standard \
-        --map standard \
+        --width 11 --height 11 \
+        --gametype wrapped \
+        --map hz_islands_bridges \
         --foodSpawnChance 10 \
         --hazardDamagePerTurn 100 \
         --name treesnake --url http://localhost:${LISTEN_PORT:-8080}
     depends_on:
-      - worker
       - snake
 
   board:
@@ -84,12 +86,3 @@ services:
       - "3000:3000"
     command: |
       npm run start
-
-  snork:
-    build:
-      context: submodules/snork
-      args:
-        UID: ${UID}
-        GID: ${GID}
-    command: |
-      cargo run --release -- --host 0.0.0.0:8082

@@ -1,6 +1,14 @@
 #!/bin/sh
 set -eu
 
+ctlc() {
+    echo ""
+    echo "Caught SIGTERM, exiting..."
+    exit 1
+}
+
+trap ctlc INT TERM
+
 get_ip() {
     CURR_IP="$(dig -4 +short myip.opendns.com @resolver1.opendns.com)"
 }
