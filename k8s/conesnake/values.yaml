@@ -3,13 +3,11 @@ max_width: 19
 max_height: 21
 max_snakes: 5
 
-relay_mem: "256Mi"
+relay:
+  mem: "256Mi"
+  latency: 30
 
-worker_mem: "18Gi"
-worker_boards: 500000
-
-relay_global:
-  latency_safety: 30
-
-worker_global:
-  latency_safety: 50
+worker:
+  mem: "18Gi"
+  boards: 500000
+  latency: 50

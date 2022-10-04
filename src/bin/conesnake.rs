@@ -1,6 +1,6 @@
-use treesnake::config::Config;
-use treesnake::log::log_init;
-use treesnake::server::Server;
+use conesnake::config::Config;
+use conesnake::log::log_init;
+use conesnake::server::Server;
 
 use std::sync::Arc;
 

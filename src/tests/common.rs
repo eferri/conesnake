@@ -1,9 +1,12 @@
+use log::info;
+
 use crate::api::{GameApi, RoyaleSettings, Ruleset, Settings, SquadSettings};
 use crate::config::{Config, Mode, DEFAULT_TEMP};
 use crate::game::{Game, Map, Rules};
 use crate::search::SearchContext;
 
 pub fn test_config() -> Config {
+    info!("test_config");
     Config {
         mode: Mode::Worker,
         worker: vec![],
@@ -16,16 +19,18 @@ pub fn test_config() -> Config {
         max_height: 21,
         max_snakes: 5,
         temperature: DEFAULT_TEMP,
-        latency_safety: 5,
+        latency: 5,
+        worker_latency: 5,
     }
 }
 
 pub fn release_config() -> Config {
+    info!("release_config");
     Config {
         mode: Mode::Worker,
         worker: vec![],
         port: "".to_owned(),
-        num_runs: 3,
+        num_runs: 2,
         num_threads: 24,
         num_server_threads: 8,
         max_boards: 375000,
@@ -33,27 +38,15 @@ pub fn release_config() -> Config {
         max_height: 21,
         max_snakes: 5,
         temperature: DEFAULT_TEMP,
-        latency_safety: 100,
+        latency: 20,
+        worker_latency: 30,
     }
 }
 
-pub fn test_context() -> SearchContext {
-    let context = SearchContext::new(test_config());
-    context.allocate();
-    context
-}
-
-pub fn release_context() -> SearchContext {
-    let context = SearchContext::new(test_config());
-    context.allocate();
-    context
-}
-
 pub fn get_context() -> SearchContext {
-    #[cfg(debug_assertions)]
-    return test_context();
-    #[cfg(not(debug_assertions))]
-    return release_context();
+    let context = SearchContext::new(get_config());
+    context.allocate();
+    context
 }
 
 pub fn get_config() -> Config {
@@ -67,7 +60,7 @@ pub fn test_game() -> Game {
     Game {
         api: GameApi {
             id: "".to_owned(),
-            timeout: 500,
+            timeout: 250,
             source: "".to_owned(),
             map: Map::Standard,
             ruleset: Ruleset {

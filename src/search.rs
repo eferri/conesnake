@@ -294,7 +294,7 @@ pub fn search_moves(
     }
 
     let startup_dur = Instant::now() - start_time;
-    let search_us = (game.api.timeout - ctx.config.latency_safety) as i64 * 1000;
+    let search_us = (game.api.timeout - ctx.config.latency) as i64 * 1000;
     let search_dur = Duration::from_micros(search_us as u64).saturating_sub(startup_dur);
 
     if !search_dur.is_zero() {
@@ -497,12 +497,11 @@ fn playout_game(_ctx: &SearchContext, state: &mut ThreadContext, game: &Game) ->
         terminal = false;
 
         for s in 0..state.board.num_snakes() as usize {
-            if !state.board.snakes[s].alive {
+            if !state.board.snakes[s].alive() {
                 continue;
             }
 
-            let snake_head = state.board.snakes[s].head;
-            state.playout_moves[s] = state.board.rand_valid_move(snake_head, game.api.ruleset.name);
+            state.playout_moves[s] = state.board.gen_move(game, s);
         }
 
         let moves = &state.playout_moves[0..state.board.num_snakes() as usize];
@@ -543,7 +542,7 @@ fn expand_node(
         let mut alive_index = 0;
 
         for s in 0..num_snakes {
-            if !node.board.snakes[s].alive {
+            if !node.board.snakes[s].alive() {
                 continue;
             }
 

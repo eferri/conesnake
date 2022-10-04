@@ -1,7 +1,6 @@
 pub mod api;
 pub mod board;
 pub mod config;
-pub mod delay;
 pub mod game;
 pub mod gpu_move;
 pub mod log;

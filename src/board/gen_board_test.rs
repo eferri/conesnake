@@ -233,7 +233,7 @@ fn gen_board_ref_test() {
             let mut arr = Vec::new();
             let mut num_alive = 0;
             for j in 0..board.num_snakes() {
-                if !board.snakes[j as usize].alive {
+                if !board.snakes[j as usize].alive() {
                     arr.push(Move::Left);
                     continue;
                 }

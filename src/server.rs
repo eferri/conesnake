@@ -82,7 +82,7 @@ impl Server {
     }
 
     pub fn stop_server(&self) {
-        info!("Stopping treesnake");
+        info!("Stopping conesnake");
         self.state.done_flag.store(true, Ordering::Release);
     }
 
@@ -92,7 +92,7 @@ impl Server {
 
     pub fn wait_done(&self) {
         self.state.server_barrier.wait();
-        info!("Exiting treesnake");
+        info!("Exiting conesnake");
     }
 
     pub fn start_server(&self) {
@@ -129,7 +129,7 @@ impl Server {
         let addr = format!("0.0.0.0:{}", self.state.config.port);
         let server = Arc::new(tiny_http::Server::new(tiny_http::ServerConfig { addr, ssl: None }).unwrap());
 
-        info!("Started treesnake");
+        info!("Started conesnake");
         self.state.ready_flag.store(true, Ordering::Release);
 
         for _ in 0..self.server_pool.num_threads() {
@@ -216,7 +216,7 @@ fn get_response(
             "/" => StrResponse::from_string(
                 serde_json::to_string(&IndexResp {
                     apiversion: "1".to_owned(),
-                    author: "treesnake".to_owned(),
+                    author: "conesnake".to_owned(),
                     color: "#C42B3A".to_owned(),
                     head: "sand-worm".to_owned(),
                     tail: "fat-rattle".to_owned(),
@@ -380,8 +380,10 @@ fn run_workers(
 ) -> Scores {
     let mut total_scores: Scores = Default::default();
 
-    let relay_delay_ms = game_state.game.timeout - state.config.latency_safety;
+    let relay_delay_ms = game_state.game.timeout - state.config.latency;
     let run_delay_ms = (relay_delay_ms as f64 / state.config.num_runs as f64).round() as i32;
+
+    let worker_one_way_ms = (state.config.worker_latency as f64 / 2.0).round() as i32;
 
     for i in 0..state.config.worker.len() {
         for j in 0..state.config.num_runs {
@@ -390,7 +392,7 @@ fn run_workers(
 
             search_pool.execute(move || {
                 if j > 0 {
-                    sleep(Duration::from_millis((run_delay_ms * j) as u64));
+                    sleep(Duration::from_millis(((run_delay_ms - worker_one_way_ms) * j) as u64));
                 }
 
                 let worker = &state.config.worker[i];

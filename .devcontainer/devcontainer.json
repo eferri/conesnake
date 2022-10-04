@@ -32,6 +32,6 @@
         "--env-file",
         ".env"
         // "--network",
-        // "treesnake_default"
+        // "conesnake_default"
     ]
 }

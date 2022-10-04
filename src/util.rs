@@ -142,15 +142,7 @@ pub fn char_to_square(chr: char) -> BoardSquare {
 pub fn rand_move() -> Move {
     let mut rng = rand::thread_rng();
     let x = rng.gen_range(0..4);
-    if x == 0 {
-        Move::Left
-    } else if x == 1 {
-        Move::Right
-    } else if x == 2 {
-        Move::Up
-    } else {
-        Move::Down
-    }
+    Move::from_idx(x)
 }
 
 pub fn rand_move_arr() -> [Move; 4] {

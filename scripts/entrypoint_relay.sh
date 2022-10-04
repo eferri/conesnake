@@ -28,4 +28,4 @@ for i in "$@"; do
         esac
 done
 
-exec ./target-snake/"$TARGET"/treesnake $ORIG_ARGS
+exec ./target-snake/"$TARGET"/conesnake $ORIG_ARGS

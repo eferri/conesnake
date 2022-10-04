@@ -1,10 +1,10 @@
 use crate::api::{BattleState, BoardApi, SnakeApi};
 use crate::game::{Game, Map, Rules, ARCADE_FOOD_COORDS};
-use crate::util;
+use crate::util::{self, rand_move_arr};
 use crate::util::{Coord, Error, Move};
 
 use std::fmt;
-use std::{cmp::min, fmt::Write, str};
+use std::{cmp::max, cmp::min, fmt::Write, str};
 
 use deepsize::DeepSizeOf;
 use rand::{seq::SliceRandom, Rng};
@@ -28,7 +28,13 @@ pub struct Snake {
     pub tail: Coord,
     pub len: i32,
     pub health: i32,
-    pub alive: bool,
+    pub eliminated: bool,
+}
+
+impl Snake {
+    pub fn alive(&self) -> bool {
+        self.health > 0
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
@@ -175,7 +181,7 @@ impl Board {
     pub fn num_alive_snakes(&self) -> i32 {
         let mut alive = 0;
         for snake in self.snakes.iter() {
-            if snake.alive {
+            if snake.alive() {
                 alive += 1;
             }
         }
@@ -225,7 +231,7 @@ impl Board {
             },
             len: api_snake.body.len() as i32,
             health: api_snake.health,
-            alive: api_snake.health > 0,
+            eliminated: false,
         };
         self.add_snake(snake);
 
@@ -389,24 +395,55 @@ impl Board {
         )
     }
 
-    pub fn rand_valid_move(&self, start_square: Coord, rules: Rules) -> Move {
-        if self.is_trapped(start_square, rules) {
-            return Move::Left;
-        }
-
-        loop {
-            let mv = util::rand_move();
-            if self.valid_move(start_square, mv, rules) {
-                return mv;
-            }
-        }
-    }
-
     pub fn is_trapped(&self, snake: Coord, rules: Rules) -> bool {
         !self.valid_move(snake, Move::Left, rules)
             && !self.valid_move(snake, Move::Right, rules)
             && !self.valid_move(snake, Move::Up, rules)
             && !self.valid_move(snake, Move::Down, rules)
+    }
+
+    pub fn gen_move(&self, game: &Game, snake_idx: usize) -> Move {
+        let head = self.snakes[snake_idx].head;
+        let rules = game.api.ruleset.name;
+
+        let rand_moves = rand_move_arr();
+        let mut valid_moves = [false; 4];
+
+        let mut best_move = None;
+
+        if game.is_solo {
+            for mv in rand_moves {
+                if !self.valid_move(head, mv, rules) {
+                    continue;
+                }
+                valid_moves[mv.idx()] = true;
+                best_move = Some(mv)
+            }
+
+            for mv in rand_moves {
+                if !valid_moves[mv.idx()] {
+                    continue;
+                }
+
+                let dest = self.move_to_coord(head, mv, rules);
+
+                if self.snakes[snake_idx].health >= 6 && self.at(dest) == BoardSquare::Food {
+                    continue;
+                }
+
+                best_move = Some(mv);
+                break;
+            }
+        } else {
+            for mv in rand_moves {
+                if !self.valid_move(head, mv, rules) {
+                    continue;
+                }
+                best_move = Some(mv);
+                break;
+            }
+        }
+        best_move.unwrap_or(Move::Left)
     }
 
     pub fn gen_board(&self, moves: &[Move], game: &Game, food_buff: &mut Vec<Coord>) -> Board {
@@ -442,7 +479,7 @@ impl Board {
         // Move tails, Compute location of move ----- StageMovementStandard
         for (idx, mv) in moves.iter().enumerate() {
             let snake = &self.snakes[idx];
-            if !snake.alive {
+            if !snake.alive() {
                 continue;
             }
             let mv = *mv;
@@ -494,7 +531,7 @@ impl Board {
         let rules = game.api.ruleset.name;
 
         for (idx, mv) in moves.iter().enumerate() {
-            if !self.snakes[idx as usize].alive {
+            if !self.snakes[idx as usize].alive() {
                 continue;
             }
 
@@ -503,7 +540,7 @@ impl Board {
 
             if !on_board {
                 self.snakes[idx as usize].health = 0;
-                self.snakes[idx as usize].alive = false;
+                self.snakes[idx as usize].eliminated = true;
                 continue;
             }
 
@@ -514,7 +551,7 @@ impl Board {
             match dest_square {
                 BoardSquare::Hazard => {
                     let damage = game.api.ruleset.settings.hazard_damage_per_turn;
-                    snake.health = min(snake.health - damage, 0);
+                    snake.health = max(snake.health - damage, 0);
                 }
                 BoardSquare::Food => {
                     snake.health = 100;
@@ -524,7 +561,7 @@ impl Board {
                 _ => (),
             }
             if snake.health == 0 {
-                snake.alive = false;
+                snake.eliminated = true;
             }
             // Adjust tail if snake ate a food
             if self.snakes[idx].health == 100 {
@@ -544,7 +581,7 @@ impl Board {
 
         for (idx, mv) in moves.iter().enumerate() {
             // Dead from previous move
-            if !self.snakes[idx].alive {
+            if !self.snakes[idx].alive() {
                 continue;
             }
 
@@ -571,7 +608,7 @@ impl Board {
                     self.num_food -= 1;
                 }
                 BoardSquare::SnakeHead(s, _) => {
-                    if !self.snakes[s as usize].alive
+                    if !self.snakes[s as usize].alive()
                         || (s < snake_idx && self.snakes[idx].len > self.snakes[s as usize].len)
                     {
                         self.set_at(new_head, new_square);
@@ -581,12 +618,12 @@ impl Board {
                     }
                 }
                 BoardSquare::SnakeTail(s, _, _) => {
-                    if !self.snakes[s as usize].alive {
+                    if !self.snakes[s as usize].alive() {
                         self.set_at(new_head, new_square);
                     }
                 }
                 BoardSquare::SnakeBody(s, _) => {
-                    if !self.snakes[s as usize].alive {
+                    if !self.snakes[s as usize].alive() {
                         self.set_at(new_head, new_square);
                     }
                 }
@@ -596,7 +633,7 @@ impl Board {
 
         // Last elimination phases: -- StageEliminationStandard
         for idx in 0..self.num_snakes() as usize {
-            if !self.snakes[idx].alive {
+            if !self.snakes[idx].alive() {
                 continue;
             }
 
@@ -614,28 +651,28 @@ impl Board {
                 }
             }
             if self.snakes[idx].health == 0 {
-                self.snakes[idx].alive = false;
+                self.snakes[idx].eliminated = true;
             }
         }
     }
 
     fn cleanup_board(&mut self) {
         // Remove dead snakes from board
-        for snake in &mut self.snakes {
-            if !snake.alive {
-                *snake = Default::default();
-            }
-        }
-
         let board_len = self.len() as usize;
         for square in &mut self.board_mat[0..board_len] {
             match square {
                 BoardSquare::SnakeHead(idx, _) | BoardSquare::SnakeBody(idx, _) | BoardSquare::SnakeTail(idx, _, _) => {
-                    if !self.snakes[*idx as usize].alive {
+                    if self.snakes[*idx as usize].eliminated {
                         *square = BoardSquare::Empty;
                     }
                 }
                 _ => (),
+            }
+        }
+
+        for snake in &mut self.snakes {
+            if snake.eliminated {
+                *snake = Default::default();
             }
         }
     }
@@ -807,9 +844,6 @@ impl Board {
                 1 => {
                     let health = h.parse::<i32>().unwrap();
                     board.snakes[i / 2].health = health;
-                    if health > 0 {
-                        board.snakes[i / 2].alive = true;
-                    }
                 }
                 _ => return Err(Error::BadBoardStr("Invalid match: check mod".to_owned())),
             }
@@ -885,7 +919,7 @@ impl Board {
         // Handle edge case: heads only. We haven't found the tail
         // For string boards we assume this is always a length of 3
         for i in 0..board.num_snakes() as usize {
-            if board.snakes[i].alive && board.snakes[i].len == 0 {
+            if board.snakes[i].alive() && board.snakes[i].len == 0 {
                 board.snakes[i].tail = board.snakes[i].head;
                 board.snakes[i].len = 3;
                 board.set_at(board.snakes[i].head, BoardSquare::SnakeHead(i as u8, 2))

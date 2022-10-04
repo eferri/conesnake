@@ -10,7 +10,7 @@ pub enum Mode {
 }
 
 #[derive(Parser, Clone, Debug)]
-#[clap(author, version, about = "treesnake", long_about = None)]
+#[clap(author, version, about = "conesnake", long_about = None)]
 pub struct Config {
     #[clap(value_enum, default_value = "worker")]
     pub mode: Mode,
@@ -46,5 +46,8 @@ pub struct Config {
     pub temperature: f64,
 
     #[clap(long, default_value_t = 5)]
-    pub latency_safety: i32,
+    pub latency: i32,
+
+    #[clap(long, default_value_t = 5)]
+    pub worker_latency: i32,
 }

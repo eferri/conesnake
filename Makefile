@@ -34,7 +34,7 @@ prod-build:
 
 .PHONY: clean
 clean:
-	rm -f *.log *.pb *.svg .k8s/manifest.yaml
+	rm -f *.log .k8s/manifest.yaml *.perf perf.data perf.data.*
 
 .PHONY: veryclean
 veryclean: clean
@@ -61,22 +61,32 @@ rel-test:
 
 .PHONY: profile
 profile:
-	docker compose run --rm snake cargo test \
-		--profile=release-with-debug \
-		--features profile \
-		arcade_maze_profile_test -- \
-		--nocapture \
-		--color always
+	docker compose run --rm snake bash -c ' \
+		cargo build --profile=release-with-debug \
+		&& perf record --call-graph dwarf -F 1000 \
+			./target-snake/release-with-debug/profile \
+		&& perf report \
+			--stdio \
+			--stdio-color \
+			--percent-limit 5.0 \
+			--show-nr-samples \
+			--show-cpu-utilization \
+			--call-graph'
 
 .PHONY: bench
 bench:
-	docker compose run --rm snake cargo test \
-		--release \
-		arcade_maze_profile_test -- \
-		--nocapture \
-		--color always
+	docker compose run --rm snake bash -c ' \
+		cargo build --release \
+		&& ./target-snake/release/profile'
 
-# k3s deployment
+
+ASM_FUNC ?= "search_worker"
+
+.PHONY: asm
+asm:
+	docker compose run --rm snake \
+		cargo asm --lib $(ASM_FUNC)
+
 
 .PHONY: helm-upgrade
 helm-upgrade:

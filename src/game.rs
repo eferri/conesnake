@@ -66,7 +66,7 @@ impl Game {
     pub fn score(&self, board: &Board, snake_idx: usize) -> f64 {
         if self.is_solo {
             board.turn as f64 / self.max_turn(board) as f64
-        } else if board.snakes[snake_idx].alive {
+        } else if board.snakes[snake_idx].alive() {
             1.0
         } else {
             0.0
@@ -74,7 +74,7 @@ impl Game {
     }
 
     pub fn over(&self, board: &Board) -> bool {
-        !board.snakes[0].alive || board.num_alive_snakes() <= self.search_cutoff()
+        !board.snakes[0].alive() || board.num_alive_snakes() <= self.search_cutoff()
     }
 
     pub fn search_cutoff(&self) -> i32 {

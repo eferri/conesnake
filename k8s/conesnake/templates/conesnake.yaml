@@ -68,14 +68,15 @@ spec:
         image: {{ include "amd64_image" . }}
         resources:
           requests:
-            memory: {{ .Values.relay_mem }}
+            memory: {{ .Values.relay.mem }}
         args:
         - "--port=8080"
         - "--max-width={{ .Values.max_width }}"
         - "--max-height={{ .Values.max_height }}"
         - "--max-snakes={{ .Values.max_snakes }}"
         - "--max-boards=0"
-        - "--latency-safety={{ .Values.relay_global.latency_safety }}"
+        - "--latency={{ .Values.relay.latency }}"
+        - "--worker-latency={{ .Values.worker.latency }}"
         {{- range $index, $worker := .Values.workers }}
         - "--worker=http://{{ $worker.service_ip }}:8080"
         {{- end }}
@@ -122,13 +123,13 @@ spec:
         image: {{ include "amd64_image" $ }}
         resources:
           requests:
-            memory: {{ $.Values.worker_mem }}
+            memory: {{ $.Values.worker.mem }}
         args:
         - "--port=8080"
         - "--max-width={{ $.Values.max_width }}"
         - "--max-height={{ $.Values.max_height }}"
         - "--max-snakes={{ $.Values.max_snakes }}"
-        - "--max-boards={{ $.Values.worker_boards }}"
-        - "--latency-safety={{ $.Values.worker_global.latency_safety }}"
+        - "--max-boards={{ $.Values.worker.boards }}"
+        - "--latency={{ $.Values.worker.latency }}"
         - "worker"
 {{ end }}

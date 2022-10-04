@@ -21,3 +21,6 @@ certs
 *.log
 *.pb
 *.gpg
+*.perf
+perf.data
+perf.data.*

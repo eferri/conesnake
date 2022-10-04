@@ -4,18 +4,18 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'treesnake'",
+            "name": "Debug unit tests in library 'conesnake'",
             "cargo": {
                 "args": [
                     "test",
                     "--lib",
                     "--no-run",
-                    "--package=treesnake",
+                    "--package=conesnake",
                     "--",
                     "--test-threads=1"
                 ],
                 "filter": {
-                    "name": "treesnake",
+                    "name": "conesnake",
                     "kind": "lib"
                 }
             },
@@ -25,15 +25,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'treesnake'",
+            "name": "Debug executable 'conesnake'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=treesnake",
-                    "--package=treesnake"
+                    "--bin=conesnake",
+                    "--package=conesnake"
                 ],
                 "filter": {
-                    "name": "treesnake",
+                    "name": "conesnake",
                     "kind": "bin"
                 }
             },
@@ -46,16 +46,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'treesnake'",
+            "name": "Debug unit tests in executable 'conesnake'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=treesnake",
-                    "--package=treesnake"
+                    "--bin=conesnake",
+                    "--package=conesnake"
                 ],
                 "filter": {
-                    "name": "treesnake",
+                    "name": "conesnake",
                     "kind": "bin"
                 }
             },
@@ -71,7 +71,7 @@
                     "test",
                     "--no-run",
                     "--test=server_test",
-                    "--package=treesnake"
+                    "--package=conesnake"
                 ],
                 "filter": {
                     "name": "server_test",
@@ -79,29 +79,6 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug integration test 'profile_test'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--lib",
-                    "--no-run",
-                    "--package=treesnake",
-                    "--profile=release-with-debug",
-                    "--features=profile",
-                ],
-                "filter": {
-                    "name": "treesnake",
-                    "kind": "lib"
-                },
-            },
-            "args": [
-                "arcade_maze_profile_test"
-            ],
             "cwd": "${workspaceFolder}"
         }
     ]

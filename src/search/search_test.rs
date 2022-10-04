@@ -9,7 +9,6 @@ use crate::tests::common::{get_context, solo_game, test_game, wrapped_game};
 use crate::util::Move;
 
 use approx::assert_relative_eq;
-use log::info;
 
 use std::sync::{atomic::Ordering, Arc};
 use std::time::Instant;
@@ -203,7 +202,7 @@ fn expand_node_test() {
         for (idx, (board, moves)) in expected_results.iter().enumerate() {
             // Ignore moves of snakes that were dead before expanding
             for (snake_idx, snake) in root_state_guard.board.snakes.iter().enumerate() {
-                if snake.alive {
+                if snake.alive() {
                     assert_eq!(
                         moves[snake_idx],
                         root_state_guard.child_moves(idx as usize)[snake_idx],
@@ -367,51 +366,4 @@ fn arcade_maze_search_test() {
 
         assert!(best_move == Move::Down || best_move == Move::Up);
     }
-}
-
-const ARCADE_MAZE_PROFILE_BOARD: &str = "
-    turn: 312 health: 45 health: 32 health: 89 health: 51
-    * - * * * * * * * * * * * * * * * - *
-    * - - - - - - - - * - - - - v < < l *
-    * - * * - * * * - * - * * * v * * - *
-    * - - - > 2 - - - + - - - - v - - - *
-    * - * * ^ * - * * * * * - * v * * - *
-    * - - - ^ * - - d * - - - * v - - - *
-    * - - * ^ * * * v * - * * * v * - - *
-    * - - * ^ * v < < - - - - * v * - - *
-    * * * * ^ * v * - * - * - * v * * * *
-    - - - - ^ < < * - + - * - - v - - - -
-    * * * * - * - * - * - * - * v * * * *
-    * v < * - * - - - - - - - * v * - - *
-    * v ^ * - * - * * * * * - * 3 * - - *
-    * v ^ < < - - - - * - - - - - - - - *
-    * v * * ^ * * * - * - * * * - * * - *
-    * > v * ^ - 0 < < < < < < - - * - - *
-    * * v * u * - * * * * * ^ * - * - * *
-    * - > > 1 * r > v * > > ^ * - - - - *
-    * - * * * * * * v * ^ * * * * * * - *
-    * + - - - - - - > > ^ - - - - - - + *
-    * - * * * * * * * * * * * * * * * - *
-";
-
-#[test]
-fn arcade_maze_profile_test() {
-    log_test_init();
-
-    let ctx = Arc::new(get_context());
-    let pool = ThreadPool::new(ctx.config.num_threads);
-
-    let mut game = wrapped_game();
-    let board = Board::from_str(ARCADE_MAZE_PROFILE_BOARD, &game).unwrap();
-    game.api.map = Map::ArcadeMaze;
-
-    #[cfg(feature = "profile")]
-    let _prof = -1;
-
-    let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now());
-    let best_move = search::best_move(&search_result.scores);
-
-    info!("snake eliminated if move left, move is {:?}", best_move);
-
-    drop(ctx)
 }

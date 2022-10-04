@@ -1,7 +1,7 @@
-use treesnake::api;
-use treesnake::server::Server;
-use treesnake::tests::common::get_config;
-use treesnake::util::Move;
+use conesnake::api;
+use conesnake::server::Server;
+use conesnake::tests::common::get_config;
+use conesnake::util::Move;
 
 use env_logger::Env;
 

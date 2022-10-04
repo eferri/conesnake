@@ -1,11 +1,15 @@
 [package]
-name = "treesnake"
+name = "conesnake"
 version = "0.2.0"
 edition = "2021"
 
 [[bin]]
-name = "treesnake"
-path = "./src/bin/treesnake.rs"
+name = "conesnake"
+path = "./src/bin/conesnake.rs"
+
+[[bin]]
+name = "profile"
+path = "./src/bin/profile.rs"
 
 [dependencies]
 tiny_http = { version = "0.11" }
@@ -23,9 +27,6 @@ deepsize = "0.2"
 
 [dev-dependencies]
 approx = "0.5"
-
-[features]
-profile = []
 
 [profile.release]
 lto = "thin"

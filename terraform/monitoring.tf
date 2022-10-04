@@ -22,7 +22,7 @@ resource "aws_cloudwatch_metric_alarm" "conesnake" {
       metric_name = "UnHealthyHostCount"
       namespace   = "AWS/ApplicationELB"
       stat        = "Maximum"
-      period      = "10"
+      period      = "60"
     }
   }
 

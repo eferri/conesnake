@@ -35,10 +35,10 @@
         "editor.formatOnSave": false
     },
     "yaml.schemas": {
-        "https://json.schemastore.org/github-workflow.json": "file:///home/eferri/Documents/code/treesnake/.github/workflows/deploy.yml",
+        "https://json.schemastore.org/github-workflow.json": "file:///home/eferri/Documents/code/conesnake/.github/workflows/deploy.yml",
         "kubernetes://schema/v1%40serviceaccount": [
             "file:///app/k8s/ecr-creds.yml",
-            "file:///home/eferri/Documents/code/treesnake/k8s/conesnake/secrets.yaml"
+            "file:///home/eferri/Documents/code/conesnake/k8s/conesnake/secrets.yaml"
         ]
     }
 }

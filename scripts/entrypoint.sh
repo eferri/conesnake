@@ -15,4 +15,4 @@ else
     cargo build --"$TARGET"
 fi
 
-exec ./target-snake/"$TARGET"/treesnake $@
+exec ./target-snake/"$TARGET"/conesnake $@
