@@ -43,10 +43,6 @@ variable "deployment" {
   type = string
 }
 
-variable "internal_ip" {
-  type = string
-}
-
 
 locals {
   # Ubuntu 22.04 server us-west-2
@@ -144,10 +140,6 @@ output "public_ip" {
 
 output "private_ip" {
   value = aws_network_interface.conesnake.private_ip
-}
-
-output "internal_ip" {
-  value = var.internal_ip
 }
 
 output "network_interface_id" {

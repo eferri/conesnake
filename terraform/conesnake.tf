@@ -115,7 +115,7 @@ resource "aws_security_group" "conesnake_base" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${var.remote_ip}/32"]
+    cidr_blocks = ["${var.local_ip}/32"]
   }
 
   ingress {
@@ -271,22 +271,6 @@ resource "aws_key_pair" "conesnake" {
 }
 
 
-module "conesnake_primary" {
-  source                 = "./node"
-  node_name              = "primary"
-  node_type              = "t3.small"
-  vpc_id                 = aws_vpc.conesnake.id
-  subnet_id              = aws_subnet.conesnake["a"].id
-  container_node         = false
-  instance_profile_name  = aws_iam_instance_profile.conesnake.name
-  base_security_group_id = aws_security_group.conesnake_base.id
-  alb_security_group_id  = aws_security_group.conesnake_alb.id
-  key_pair_name          = aws_key_pair.conesnake.key_name
-  deployment             = local.deployment
-  internal_ip            = "10.9.1.0"
-}
-
-
 module "conesnake_relay" {
   source                 = "./node"
   node_name              = "relay"
@@ -300,7 +284,6 @@ module "conesnake_relay" {
   alb_security_group_id  = aws_security_group.conesnake_alb.id
   key_pair_name          = aws_key_pair.conesnake.key_name
   deployment             = local.deployment
-  internal_ip            = "10.9.1.1"
 }
 
 

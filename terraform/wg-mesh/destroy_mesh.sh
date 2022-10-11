@@ -3,13 +3,14 @@ set -eu
 
 SSH_ARGS="-q -i ~/.ssh/conesnake_ed25519"
 
-NUM_CLOUD_NODES="$(echo $CLOUD_NODES | jq length)"
-NUM_REMOTE_NODES="$(echo $REMOTE_NODES | jq length)"
+CLOUD_HOSTS="$(echo "$CLOUD_NODES" | jq -r 'keys[]')"
+LOCAL_HOSTS="$(echo "$LOCAL_NODES" | jq -r 'keys[]')"
 
-i=0
-while [ $i -lt $NUM_CLOUD_NODES ]
+while IFS= read -r NODE_HOST
 do
-    NODE_PUBLIC_IP="$(echo "$CLOUD_NODES" | jq -r '.['$i']["public_ip"]')"
+    echo "Uninstalling wg config for node $NODE_HOST"
+
+    NODE_PUBLIC_IP="$(echo "$CLOUD_NODES" | jq -r '.["'$NODE_HOST'"]["public_ip"]')"
 
     ssh $SSH_ARGS "ubuntu@$NODE_PUBLIC_IP" 'sh -s' <<EOF
 set -eu
@@ -17,15 +18,13 @@ sudo systemctl disable --now wg-quick@conesnake.service
 sudo wg-quick down conesnake || true
 sudo rm -f /etc/wireguard/conesnake.conf
 EOF
+done <<EOF
+$CLOUD_HOSTS
+EOF
 
-    i=$(($i + 1))
-done
-
-
-i=0
-while [ $i -lt $NUM_REMOTE_NODES ]
+while IFS= read -r NODE_HOST
 do
-    NODE_HOST="$(echo "$REMOTE_NODES" | jq -r '.['$i']["host"]')"
+    echo "Uninstalling wg config for node $NODE_HOST"
 
     ssh "$NODE_HOST" 'sh -s' <<EOF
 set -eu
@@ -33,6 +32,6 @@ sudo systemctl disable --now wg-quick@conesnake.service
 sudo wg-quick down conesnake || true
 sudo rm -f /etc/wireguard/conesnake.conf
 EOF
-
-    i=$(($i + 1))
-done
+done <<EOF
+$LOCAL_HOSTS
+EOF

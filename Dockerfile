@@ -1,4 +1,4 @@
-FROM ubuntu:jammy-20220815 as base
+FROM ubuntu:jammy-20221003 as base
 
 ARG UID=1000
 ARG GID=1000
@@ -75,7 +75,7 @@ RUN curl -sSfL "https://dl.k8s.io/release/v1.25.0/bin/linux/${DOCKER_ARCH}/kubec
     && cp kubectl /usr/local/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.3.1/terraform_1.3.1_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.3.2/terraform_1.3.2_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /usr/local/bin \

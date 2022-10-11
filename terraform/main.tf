@@ -1,14 +1,14 @@
 terraform {
-  required_version = "~> 1.3.0"
+  required_version = "~> 1.3.2"
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "4.32.0"
+      version = "4.34.0"
     }
-    shell = {
-      source  = "scottwinkler/shell"
-      version = "1.7.10"
+    null = {
+      source  = "hashicorp/null"
+      version = "3.1.1"
     }
   }
 
@@ -25,4 +25,4 @@ provider "aws" {
   region = "us-west-2"
 }
 
-provider "shell" {}
+provider "null" {}

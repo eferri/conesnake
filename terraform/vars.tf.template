@@ -1,4 +1,9 @@
-variable "remote_ip" {
+variable "primary_host" {
+  type = string
+  default = ""
+}
+
+variable "local_ip" {
   type = string
   default = ""
 }
@@ -23,20 +28,22 @@ variable "region" {
   default = ""
 }
 
-variable "workers" {
-  type = list(object({
-    host = string,
+variable "local_nodes" {
+  type = map(object{
     external_ip = string
     internal_ip = string
     port = string
+    primary = bool
+    run_agent = bool
   }))
 
-  default = [
-    {
-      host = "",
+  default = {
+    host = {
       external_ip = "",
       internal_ip = "",
       port = "",
+      primary = false
+      run_agent = false
     }
-  ]
+  }
 }
