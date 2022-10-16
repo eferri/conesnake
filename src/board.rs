@@ -47,6 +47,13 @@ pub enum BoardSquare {
     Hazard,
 }
 
+impl fmt::Display for BoardSquare {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", util::square_to_char(*self))?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct MoveResult {
     pub mv: Move,
@@ -174,6 +181,21 @@ impl Board {
         })
     }
 
+    pub fn set(&mut self, other: &Board) {
+        self.width = other.width;
+        self.height = other.height;
+        self.turn = other.turn;
+        self.num_food = other.num_food;
+
+        let board_len = (self.width * self.height) as usize;
+
+        self.snakes.clear();
+        for s in &other.snakes {
+            self.snakes.push(*s);
+        }
+        self.board_mat[..board_len].copy_from_slice(&other.board_mat[..board_len]);
+    }
+
     pub fn num_snakes(&self) -> i32 {
         self.snakes.len() as i32
     }
@@ -192,25 +214,32 @@ impl Board {
         self.snakes.capacity() as i32
     }
 
+    pub fn num_food(&self) -> i32 {
+        self.num_food
+    }
+
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> i32 {
         self.width * self.height
     }
 
-    fn resize(&mut self, w: i32, h: i32, max_width: i32, max_height: i32) {
-        assert!(w <= max_width);
-        assert!(h <= max_height);
-
+    fn resize(&mut self, max_width: i32, max_height: i32) {
         let mat_size = (max_width * max_height) as usize;
 
-        self.width = w;
-        self.height = h;
         self.max_width = max_width;
         self.max_height = max_height;
         self.board_mat.resize(mat_size, BoardSquare::Empty);
     }
 
-    pub fn add_snake(&mut self, snake: Snake) {
+    fn set_size(&mut self, w: i32, h: i32) {
+        assert!(w <= self.max_width);
+        assert!(h <= self.max_height);
+
+        self.width = w;
+        self.height = h;
+    }
+
+    fn add_snake(&mut self, snake: Snake) {
         assert!(self.snakes.len() < self.snakes.capacity());
         self.snakes.push(snake);
     }
@@ -297,19 +326,24 @@ impl Board {
     }
 
     pub fn at(&self, loc: Coord) -> BoardSquare {
-        self.board_mat[(loc.x + (self.width * loc.y)) as usize]
+        self.board_mat[self.act_idx(loc)]
+    }
+
+    fn act_idx(&self, loc: Coord) -> usize {
+        (loc.x + loc.y * self.width) as usize
     }
 
     pub fn at_idx(&self, idx: i32) -> BoardSquare {
-        self.board_mat[idx as usize]
+        self.at(self.coord_from_idx(idx))
     }
 
     pub fn set_at(&mut self, loc: Coord, val: BoardSquare) {
-        self.board_mat[(loc.x + (self.width * loc.y)) as usize] = val;
+        let idx = self.act_idx(loc);
+        self.board_mat[idx] = val;
     }
 
-    pub fn set_at_idx(&mut self, idx: i32, val: BoardSquare) {
-        self.board_mat[idx as usize] = val;
+    pub fn set_at_idx(&mut self, idx: usize, val: BoardSquare) {
+        self.set_at(self.coord_from_idx(idx as i32), val)
     }
 
     pub fn on_board(&self, square: Coord) -> bool {
@@ -446,31 +480,28 @@ impl Board {
         best_move.unwrap_or(Move::Left)
     }
 
-    pub fn gen_board(&self, moves: &[Move], game: &Game, food_buff: &mut Vec<Coord>) -> Board {
+    pub fn gen_board(&mut self, moves: &[Move], game: &Game, food_buff: &mut Vec<Coord>) {
         assert_eq!(moves.len(), self.num_snakes() as usize);
 
-        let mut new_board = self.clone();
-        new_board.turn += 1;
+        self.turn += 1;
 
         // ---- StageGameOver
-        assert!(!game.over(&new_board));
+        assert!(!game.over(self));
 
-        new_board.move_tails(moves, game);
+        self.move_tails(moves, game);
 
-        new_board.apply_damage(moves, game);
+        self.apply_damage(moves, game);
 
-        new_board.move_heads(moves, game);
+        self.move_heads(moves, game);
 
-        new_board.cleanup_board();
+        self.cleanup_board();
 
-        new_board.spawn_food(
+        self.spawn_food(
             game.api.map,
             game.api.ruleset.settings.food_spawn_chance,
             game.api.ruleset.settings.minimum_food,
             food_buff,
         );
-
-        new_board
     }
 
     fn move_tails(&mut self, moves: &[Move], game: &Game) {
@@ -500,7 +531,7 @@ impl Board {
                         self.set_at(new_tail, BoardSquare::SnakeTail(body_idx, mv, 0));
                     } else {
                         panic!(
-                            "snake {} new_tail set to invalid BoardSquare: {:?}\n{}",
+                            "snake {} new_tail set to invalid BoardSquare: {}\n{}",
                             idx,
                             self.at(new_tail),
                             self
@@ -581,7 +612,9 @@ impl Board {
 
         for (idx, mv) in moves.iter().enumerate() {
             // Dead from previous move
-            if !self.snakes[idx].alive() {
+            let eliminated = self.snakes[idx].eliminated;
+
+            if !self.snakes[idx].alive() && !eliminated {
                 continue;
             }
 
@@ -592,11 +625,17 @@ impl Board {
             let new_head = self.move_to_coord(self.snakes[idx].head, mv, rules);
             let new_square = BoardSquare::SnakeHead(snake_idx, 0);
 
-            // Update old head
-            if self.snakes[idx].head != self.snakes[idx].tail {
-                self.set_at(self.snakes[idx].head, BoardSquare::SnakeBody(snake_idx, mv));
-            }
+            let old_head = self.snakes[idx].head;
             self.snakes[idx].head = new_head;
+
+            if eliminated {
+                continue;
+            }
+
+            // Update old head
+            if old_head != self.snakes[idx].tail {
+                self.set_at(old_head, BoardSquare::SnakeBody(snake_idx, mv));
+            }
 
             // Track collisions by only setting head if snake is alive
             match self.at(new_head) {
@@ -669,16 +708,6 @@ impl Board {
                 _ => (),
             }
         }
-
-        for snake in &mut self.snakes {
-            if snake.eliminated {
-                *snake = Default::default();
-            }
-        }
-    }
-
-    pub fn num_food(&self) -> i32 {
-        self.num_food
     }
 
     fn spawn_food(&mut self, map: Map, chance: i32, mut min_food: i32, food_buff: &mut Vec<Coord>) {
@@ -691,6 +720,7 @@ impl Board {
         let mut rng = rand::thread_rng();
         let x = rng.gen_range(0..100);
 
+        #[allow(clippy::bool_to_int_with_if)]
         let mut num_spawn = if self.num_food() < min_food {
             min_food - self.num_food()
         } else if chance > 0 && x < chance {
@@ -767,7 +797,7 @@ impl Board {
         }
 
         if !found {
-            panic!("Could not find snake given tail {:?}", tail);
+            panic!("Could not find snake given tail {}", tail);
         }
 
         // Set index in snake squares
@@ -821,6 +851,16 @@ impl Board {
     }
 
     pub fn from_str(inp: &str, game: &Game) -> Result<Self, Error> {
+        Board::from_str_dims(inp, game, 0, 0, 0)
+    }
+
+    pub fn from_str_dims(
+        inp: &str,
+        game: &Game,
+        max_width: i32,
+        max_height: i32,
+        max_snakes: i32,
+    ) -> Result<Self, Error> {
         // Remove whitespace lines
         let lines: Vec<&str> = inp.lines().filter(|l| l.split_whitespace().next().is_some()).collect();
 
@@ -829,8 +869,7 @@ impl Board {
         assert_eq!(header.len() % 2, 0);
         assert!(header.len() >= 4);
 
-        let num_snakes = (header.len() - 2) / 2;
-        let mut board = Board::new(0, 0, 0, 0, num_snakes as i32);
+        let mut board = Board::new(0, 0, max_width, max_height, max_snakes);
 
         assert_eq!(header[0], "turn:", "Invalid board str header: turn field");
         board.turn = header[1].parse::<i32>().unwrap();
@@ -872,7 +911,10 @@ impl Board {
 
         let w = w_opt.unwrap() as i32;
 
-        board.resize(w, h, w, h);
+        if max_width == 0 && max_height == 0 && max_snakes == 0 {
+            board.resize(w, h);
+        }
+        board.set_size(w, h);
 
         // Populate board matrix, except for snake indices as they are not encoded
         for (line_idx, line) in lines_vec.iter().enumerate() {

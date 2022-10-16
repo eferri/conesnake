@@ -21,6 +21,13 @@ impl Coord {
     }
 }
 
+impl Display for Coord {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "({}, {})", self.x, self.y)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, DeepSizeOf)]
 #[serde(rename_all = "lowercase")]
 pub enum Move {
@@ -46,6 +53,18 @@ impl Move {
 
     pub fn idx(&self) -> usize {
         *self as usize
+    }
+}
+
+impl Display for Move {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        let mv_str = match self {
+            Move::Left => "Left",
+            Move::Right => "Right",
+            Move::Up => "Up",
+            Move::Down => "Down",
+        };
+        Formatter::pad(f, mv_str)
     }
 }
 

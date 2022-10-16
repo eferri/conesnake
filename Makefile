@@ -60,18 +60,25 @@ rel-test:
 		--test-threads=1
 
 .PHONY: profile
-profile:
+profile: record report
+
+.PHONY: record
+record:
 	docker compose run --rm snake bash -c ' \
 		cargo build --profile=release-with-debug \
 		&& perf record --call-graph dwarf -F 1000 \
-			./target-snake/release-with-debug/profile \
-		&& perf report \
+			./target-snake/release-with-debug/profile'
+
+.PHONY: report
+report:
+	docker compose run --rm snake \
+		perf report \
 			--stdio \
 			--stdio-color \
-			--percent-limit 5.0 \
+			--percent-limit 1.0 \
 			--show-nr-samples \
 			--show-cpu-utilization \
-			--call-graph'
+			--call-graph srcline
 
 .PHONY: bench
 bench:

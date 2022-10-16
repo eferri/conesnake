@@ -188,7 +188,14 @@ fn expand_node_test() {
     let mut root_state_guard = space_guard[0].state.write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
-        let start_board = Board::from_str(start_board, &game).unwrap();
+        let start_board = Board::from_str_dims(
+            start_board,
+            &game,
+            ctx.config.max_width,
+            ctx.config.max_height,
+            ctx.config.max_snakes,
+        )
+        .unwrap();
 
         ctx.reset();
         root_state_guard.reset();
@@ -208,16 +215,32 @@ fn expand_node_test() {
                         root_state_guard.child_moves(idx as usize)[snake_idx],
                         "Expected moves: {:?}, actual moves: {:?}",
                         moves[snake_idx],
-                        root_state_guard.child_moves(idx as usize)
+                        root_state_guard.child_moves(idx as usize)[snake_idx]
                     );
                 }
             }
 
             assert_eq!(root_state_guard.children[idx].index, idx + 1);
 
+            // Ignore status of snakes that are dead, not encoded in string
+            {
+                let mut state_guard = space_guard[idx + 1].state.write().unwrap();
+                for snake in &mut state_guard.board.snakes {
+                    if !snake.alive() {
+                        *snake = Default::default();
+                    }
+                }
+            }
             assert_eq!(
                 space_guard[idx + 1].state.read().unwrap().board,
-                Board::from_str(board, &game).unwrap()
+                Board::from_str_dims(
+                    board,
+                    &game,
+                    ctx.config.max_width,
+                    ctx.config.max_height,
+                    ctx.config.max_snakes,
+                )
+                .unwrap()
             );
         }
     }

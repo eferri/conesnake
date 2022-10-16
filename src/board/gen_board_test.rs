@@ -1,4 +1,4 @@
-use crate::board::{Board, BoardSquare};
+use crate::board::Board;
 use crate::game::{Map, Rules};
 use crate::tests::{common::test_game, ref_move::RefMove};
 use crate::util::Move;
@@ -215,6 +215,23 @@ fn gen_board_ref_test() {
             Rules::Wrapped,
             Map::ArcadeMaze,
         ),
+        (
+            // Head-to-head on food same length
+            "turn: 17 health: 93 health: 97 health: 52 health: 89
+            - - - - - - - - - - -
+            - - - - - d - - - - -
+            - - - - - v - - - - -
+            - - - - - v - - - - -
+            - - - - - 2 - - - - -
+            1 < - - - + - - - - -
+            r ^ - - - 0 < - - - -
+            - - - - - - ^ - - - -
+            - - - - - - u - - - d
+            - - - - - - - - - - v
+            - - - - - - - - - 3 < ",
+            Rules::Standard,
+            Map::Standard,
+        ),
     ];
 
     for (board_str, rules, map) in test_boards {
@@ -247,32 +264,10 @@ fn gen_board_ref_test() {
         }
 
         for moves in moves_arr {
-            let mut gen_board = board.gen_board(&moves, &game, &mut food_buff);
+            let mut gen_board = board.clone();
+            gen_board.gen_board(&moves, &game, &mut food_buff);
 
-            let mut ref_board = ref_gen.gen_ref_board(&board, &moves, &game);
-
-            // ref board indicates dead snakes with health = 0, since there is no alive field in the API
-            // ref board moves dead snake where our implementation does not
-            // Patch both so they agree
-            for (i, ref_snake) in ref_board.snakes.iter_mut().enumerate() {
-                if ref_snake.health == 0 {
-                    gen_board.snakes[i].health = 0;
-                    ref_snake.head = Default::default();
-                    ref_snake.tail = Default::default();
-                    ref_snake.len = 0;
-                }
-            }
-
-            // BUG: Arcade maze map might generate food even if chance is 0
-            // Remove before comparison.
-            if let Map::ArcadeMaze = map {
-                for i in 0..ref_board.len() {
-                    if let BoardSquare::Food = ref_board.at_idx(i) {
-                        ref_board.set_at_idx(i, BoardSquare::Empty);
-                        ref_board.num_food -= 1;
-                    }
-                }
-            }
+            let ref_board = ref_gen.gen_ref_board(&board, &moves, &game);
 
             let mut msg = format!(
                 "gen_board != ref_board\ngen_board:\n{:?}\nref_board:\n{:?}\n",

@@ -54,3 +54,9 @@ Production images are built by CirceCi. They can also be manually built and push
     cp k8s/conesnake/values.secrets.yaml.template k8s/conesnake/values.secrets.yaml
     make helm-deploy
     ```
+## Profiling
+
+1. Allow perf access to non-root user
+    ```
+    echo 'kernel.perf_event_paranoid=1' | sudo tee /etc/sysctl.d/perf.conf
+    ```

@@ -50,13 +50,22 @@ impl<'de> RefMove<'de> {
         assert_eq!(state_bytes.len(), written_bytes);
 
         let ref_state_res = self.ref_iter.next().unwrap();
-        Board::from_req(
+        let mut ref_board = Board::from_req(
             ref_state_res.as_ref().unwrap(),
             board.max_width,
             board.max_height,
             board.max_snakes(),
         )
-        .unwrap()
+        .unwrap();
+
+        // Patch "eliminated" which is not in the API
+        for snake in &mut ref_board.snakes {
+            if snake.health == 0 {
+                snake.eliminated = true
+            }
+        }
+
+        ref_board
     }
 }
 

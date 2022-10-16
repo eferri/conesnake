@@ -22,8 +22,8 @@ services:
         --max-boards 0 \
         --max-width ${MAX_WIDTH:-11} \
         --max-height ${MAX_HEIGHT:-11} \
-        --max-snakes ${MAX_SNAKES:-5} \
-        --worker http://worker:8081 \
+        --max-snakes ${MAX_SNAKES:-4} \
+        --worker http://worker:8081,1 \
         relay
 
   worker:
@@ -50,16 +50,6 @@ services:
         --max-height ${MAX_HEIGHT:-11} \
         --max-snakes ${MAX_SNAKES:-5} \
         worker
-
-  gpu:
-    build:
-      context: gpu
-      target: dev
-      args:
-        UID: ${UID}
-        GID: ${GID}
-    volumes:
-      - ".:/app"
 
   rules:
     image: conesnake:latest-dev

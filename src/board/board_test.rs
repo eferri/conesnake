@@ -344,10 +344,10 @@ pub fn gen_board_food_test() {
     game.api.ruleset.settings.food_spawn_chance = 15;
     game.api.ruleset.settings.minimum_food = 5;
 
-    let board_food = Board::from_str(BOARD_D, &game).unwrap();
+    let mut board_food = Board::from_str(BOARD_D, &game).unwrap();
     let mut food_buff = Vec::with_capacity((board_food.max_height * board_food.max_width) as usize);
 
-    let gen_board_food_right = board_food.gen_board(&[Move::Right], &game, &mut food_buff);
+    board_food.gen_board(&[Move::Right], &game, &mut food_buff);
 
-    assert!(gen_board_food_right.num_food() > 0);
+    assert!(board_food.num_food() > 0);
 }

@@ -21,7 +21,7 @@ pub struct Config {
     #[clap(long, default_value = "8080")]
     pub port: String,
 
-    #[clap(long, default_value_t = 2)]
+    #[clap(long, default_value_t = 1)]
     pub num_runs: i32,
 
     #[clap(long, default_value_t = num_cpus::get())]
@@ -45,9 +45,10 @@ pub struct Config {
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
 
-    #[clap(long, default_value_t = 5)]
+    // Latencies are round trip time
+    #[clap(long, default_value_t = 10)]
     pub latency: i32,
 
-    #[clap(long, default_value_t = 5)]
+    #[clap(long, default_value_t = 20)]
     pub worker_latency: i32,
 }

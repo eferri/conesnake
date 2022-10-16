@@ -56,11 +56,7 @@ impl Game {
     }
 
     pub fn max_turn(&self, board: &Board) -> i32 {
-        if let Map::ArcadeMaze = self.api.map {
-            (213 - 3) * 100
-        } else {
-            (board.len() - 3) * 100
-        }
+        (board.len() - 3) * 100
     }
 
     pub fn score(&self, board: &Board, snake_idx: usize) -> f64 {

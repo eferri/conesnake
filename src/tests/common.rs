@@ -1,9 +1,9 @@
-use log::info;
-
 use crate::api::{GameApi, RoyaleSettings, Ruleset, Settings, SquadSettings};
 use crate::config::{Config, Mode, DEFAULT_TEMP};
 use crate::game::{Game, Map, Rules};
 use crate::search::SearchContext;
+
+use log::info;
 
 pub fn test_config() -> Config {
     info!("test_config");
@@ -30,13 +30,13 @@ pub fn release_config() -> Config {
         mode: Mode::Worker,
         worker: vec![],
         port: "".to_owned(),
-        num_runs: 2,
-        num_threads: 24,
+        num_runs: 1,
+        num_threads: 8,
         num_server_threads: 8,
-        max_boards: 375000,
-        max_width: 19,
+        max_boards: 800000,
+        max_width: 21,
         max_height: 21,
-        max_snakes: 5,
+        max_snakes: 4,
         temperature: DEFAULT_TEMP,
         latency: 20,
         worker_latency: 30,
@@ -60,7 +60,7 @@ pub fn test_game() -> Game {
     Game {
         api: GameApi {
             id: "".to_owned(),
-            timeout: 250,
+            timeout: 500,
             source: "".to_owned(),
             map: Map::Standard,
             ruleset: Ruleset {

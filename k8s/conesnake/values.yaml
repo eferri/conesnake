@@ -1,13 +1,15 @@
 ---
 max_width: 19
 max_height: 21
-max_snakes: 5
+max_snakes: 4
+
+num_runs: 1
 
 relay:
-  mem: "256Mi"
+  mem: "100Mi"
   latency: 30
 
 worker:
-  mem: "18Gi"
-  boards: 500000
-  latency: 50
+  mem: "6128Mi"
+  boards: 600000
+  latency: 60

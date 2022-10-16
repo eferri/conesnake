@@ -6,6 +6,8 @@ SSH_ARGS="-q -i ~/.ssh/conesnake_ed25519"
 CLOUD_HOSTS="$(echo "$CLOUD_NODES" | jq -r 'keys[]')"
 LOCAL_HOSTS="$(echo "$LOCAL_NODES" | jq -r 'keys[]')"
 
+echo "Uninstalling mesh"
+
 while IFS= read -r NODE_HOST
 do
     echo "Uninstalling wg config for node $NODE_HOST"

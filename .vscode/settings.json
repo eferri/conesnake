@@ -3,7 +3,6 @@
         ".cargo": true,
         "target*": true,
         "submodules/board": true,
-        "gpu/submodules/json": true,
     },
     "files.watcherExclude": {
         ".cargo": true,

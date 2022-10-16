@@ -16,12 +16,12 @@ spec:
     {{- include "common_labels" . | nindent 4 }}
     app: relay
 
-{{- range $index, $worker := .Values.workers }}
+{{- range $worker := .Values.workers }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ $.Release.Name }}-worker-{{ $index }}"
+  name: "{{ $.Release.Name }}-worker-{{ $worker.hostname }}"
   labels:
     {{- include "common_labels" $ | nindent 4 }}
 spec:
@@ -33,5 +33,5 @@ spec:
     protocol: TCP
   selector:
     {{- include "common_labels" $ | nindent 4 }}
-    node: "worker-{{ $index }}"
+    node: "worker-{{ $worker.hostname }}"
 {{- end }}

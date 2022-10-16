@@ -222,6 +222,8 @@ pub fn best_move(scores: &Scores) -> Move {
     let mut best_score = 0.0;
     let mut most_games = 0;
 
+    let mut search_str = "".to_owned();
+
     for (mv_idx, stats) in scores.iter().enumerate() {
         let final_score = if stats.games == 0 {
             0.0
@@ -229,12 +231,12 @@ pub fn best_move(scores: &Scores) -> Move {
             stats.score / stats.games as f64
         };
 
-        info!(
-            "SEARCH best_move: {:?}, score: {}, games: {}",
+        search_str.push_str(&format!(
+            "\nSearch move: {:<6} score: {:.8}  games: {}",
             Move::from_idx(mv_idx),
             final_score,
             stats.games
-        );
+        ));
 
         if final_score > best_score {
             best_move_score = Move::from_idx(mv_idx);
@@ -254,9 +256,11 @@ pub fn best_move(scores: &Scores) -> Move {
         best_move_score
     };
 
-    info!("search best move: {:?}", best_move);
-    info!("search best move score: {:?}", best_move_score);
-    info!("search best move games: {:?}", best_move_games);
+    search_str.push_str(&format!("\nSearch best move: {}", best_move));
+    search_str.push_str(&format!("\nSearch best move score: {}", best_move_score));
+    search_str.push_str(&format!("\nSearch best move games: {}", best_move_games));
+
+    info!("{}", search_str);
 
     best_move
 }
@@ -505,7 +509,7 @@ fn playout_game(_ctx: &SearchContext, state: &mut ThreadContext, game: &Game) ->
         }
 
         let moves = &state.playout_moves[0..state.board.num_snakes() as usize];
-        state.board = state.board.gen_board(moves, game, &mut state.food_buff);
+        state.board.gen_board(moves, game, &mut state.food_buff);
     }
 
     for snake_idx in 0..state.board.num_snakes() as usize {
@@ -581,7 +585,10 @@ fn expand_node(
 
             child_state_guard.reset();
 
-            child_state_guard.board = node.board.gen_board(child_moves, game, &mut state.food_buff);
+            child_state_guard.board.set(&node.board);
+            child_state_guard
+                .board
+                .gen_board(child_moves, game, &mut state.food_buff);
 
             child_state_guard.depth = node.depth + 1;
             child_state_guard.max_depth = child_state_guard.depth;
