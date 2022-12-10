@@ -1,6 +1,7 @@
 use crate::api::{GameApi, RoyaleSettings, Ruleset, Settings, SquadSettings};
 use crate::config::{Config, Mode, DEFAULT_TEMP};
 use crate::game::{Game, Map, Rules};
+use crate::rand::{FastRand, MaxRand};
 use crate::search::SearchContext;
 
 use log::info;
@@ -43,7 +44,13 @@ pub fn release_config() -> Config {
     }
 }
 
-pub fn get_context() -> SearchContext {
+pub fn get_context() -> SearchContext<FastRand> {
+    let context = SearchContext::new(get_config());
+    context.allocate();
+    context
+}
+
+pub fn get_deterministic_context() -> SearchContext<MaxRand> {
     let context = SearchContext::new(get_config());
     context.allocate();
     context
@@ -64,11 +71,11 @@ pub fn test_game() -> Game {
             source: "".to_owned(),
             map: Map::Standard,
             ruleset: Ruleset {
-                name: Rules::Standard,
+                name: "standard".to_owned(),
                 version: "".to_owned(),
                 settings: Settings {
-                    food_spawn_chance: 0,
-                    minimum_food: 0,
+                    food_spawn_chance: 15,
+                    minimum_food: 1,
                     hazard_damage_per_turn: 100,
                     royale: RoyaleSettings {
                         shrink_every_n_turns: 0,
@@ -82,18 +89,21 @@ pub fn test_game() -> Game {
                 },
             },
         },
+        ruleset: Rules::Standard,
         is_solo: false,
     }
 }
 
 pub fn solo_game() -> Game {
     let mut game = test_game();
-    game.api.ruleset.name = Rules::Solo;
+    game.ruleset = Rules::Solo;
+    game.api.ruleset.name = "solo".to_owned();
     game
 }
 
 pub fn wrapped_game() -> Game {
     let mut game = test_game();
-    game.api.ruleset.name = Rules::Wrapped;
+    game.ruleset = Rules::Wrapped;
+    game.api.ruleset.name = "wrapped".to_owned();
     game
 }

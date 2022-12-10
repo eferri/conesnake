@@ -52,6 +52,7 @@ impl<'de> RefMove<'de> {
         let ref_state_res = self.ref_iter.next().unwrap();
         let mut ref_board = Board::from_req(
             ref_state_res.as_ref().unwrap(),
+            game,
             board.max_width,
             board.max_height,
             board.max_snakes(),

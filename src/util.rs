@@ -1,7 +1,7 @@
 use crate::board::BoardSquare;
+use crate::rand::Rand;
 
 use deepsize::DeepSizeOf;
-use rand::{seq::SliceRandom, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
 use std::cmp::{Ord, PartialOrd};
@@ -43,12 +43,38 @@ impl Move {
         MOVES[idx]
     }
 
-    pub fn num_move_perm(num_snakes: usize) -> usize {
-        1 << (num_snakes * 2)
+    pub fn num_perm(num_snakes: i32) -> u32 {
+        // Equivalent to 4^(max_snakes)
+        1 << (2 * num_snakes)
     }
 
-    pub fn get_perm_idx(move_idx: usize, snake_idx: usize) -> usize {
-        (move_idx & (0x3 << (2 * snake_idx))) >> (2 * snake_idx)
+    // Extract the move index from snake at index snake_idx,
+    pub fn extract_idx(moves: u32, snake_idx: u32) -> u32 {
+        (moves & (0x3 << (2 * snake_idx))) >> (2 * snake_idx)
+    }
+
+    pub fn extract(moves: u32, snake_idx: u32) -> Self {
+        Self::from_idx(Self::extract_idx(moves, snake_idx) as usize)
+    }
+
+    pub fn set_move(moves: u32, snake_idx: u32, mv: Self) -> u32 {
+        ((mv as u32) << (2 * snake_idx)) | (!(0x3 << (2 * snake_idx)) & moves)
+    }
+
+    pub fn encode(moves: &[Self]) -> u32 {
+        let mut encoded_moves = 0;
+        for (idx, mv) in moves.iter().enumerate() {
+            encoded_moves = Self::set_move(encoded_moves, idx as u32, *mv);
+        }
+        encoded_moves
+    }
+
+    pub fn decode(moves: u32, num_snakes: i32) -> Vec<Self> {
+        let mut moves_vec = Vec::with_capacity(num_snakes as usize);
+        for idx in 0..(num_snakes as u32) {
+            moves_vec.push(Self::extract(moves, idx));
+        }
+        moves_vec
     }
 
     pub fn idx(&self) -> usize {
@@ -158,19 +184,13 @@ pub fn char_to_square(chr: char) -> BoardSquare {
     }
 }
 
-pub fn rand_move() -> Move {
-    let mut rng = rand::thread_rng();
-    let x = rng.gen_range(0..4);
-    Move::from_idx(x)
+pub fn rand_move(r: &mut impl Rand) -> Move {
+    let x = r.range(0, 3);
+    Move::from_idx(x as usize)
 }
 
-pub fn rand_move_arr() -> [Move; 4] {
+pub fn rand_move_arr(r: &mut impl Rand) -> [Move; 4] {
     let mut move_list = MOVES;
-    let mut rng = thread_rng();
-    move_list.shuffle(&mut rng);
+    r.shuffle(&mut move_list);
     move_list
-}
-
-pub fn max_children(max_snakes: i32) -> usize {
-    4usize.pow((max_snakes) as u32)
 }

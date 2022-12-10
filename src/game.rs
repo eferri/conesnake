@@ -20,6 +20,7 @@ pub enum Map {
     Standard,
     Empty,
     ArcadeMaze,
+    Royale,
     HzRiversBridges,
     HzRiversBridgesLg,
     HzIslandsBridges,
@@ -29,6 +30,7 @@ pub enum Map {
 #[derive(Debug, Default, Clone)]
 pub struct Game {
     pub api: GameApi,
+    pub ruleset: Rules,
     pub is_solo: bool,
 }
 
@@ -49,8 +51,23 @@ pub const ARCADE_FOOD_COORDS: [Coord; 12] = [
 
 impl Game {
     pub fn new(req_game: GameApi, solo: bool) -> Result<Self, Error> {
+        // Simulated move doesn't return ruleset name
+        if req_game.ruleset.name.is_empty() {
+            return Ok(Game {
+                api: req_game,
+                ruleset: Rules::Standard,
+                is_solo: solo,
+            });
+        }
+
+        let mut ruleset_str = "\"".to_owned();
+        ruleset_str.push_str(&req_game.ruleset.name);
+        ruleset_str.push('"');
+
+        let ruleset = serde_json::from_str(&ruleset_str)?;
         Ok(Game {
             api: req_game,
+            ruleset,
             is_solo: solo,
         })
     }
@@ -74,7 +91,7 @@ impl Game {
     }
 
     pub fn search_cutoff(&self) -> i32 {
-        match (self.api.ruleset.name, self.is_solo) {
+        match (self.ruleset, self.is_solo) {
             (_, true) => 0,
             (Rules::Solo, _) => 0,
             (Rules::Standard, false) => 1,

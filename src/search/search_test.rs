@@ -5,7 +5,7 @@ use crate::game::Map;
 use crate::log::log_test_init;
 use crate::pool::ThreadPool;
 
-use crate::tests::common::{get_context, solo_game, test_game, wrapped_game};
+use crate::tests::common::{get_deterministic_context, solo_game, test_game, wrapped_game};
 use crate::util::Move;
 
 use approx::assert_relative_eq;
@@ -15,7 +15,7 @@ use std::time::Instant;
 
 #[test]
 fn expand_node_test() {
-    let ctx = get_context();
+    let ctx = get_deterministic_context();
     let game = test_game();
 
     let test_cases = [
@@ -29,7 +29,7 @@ fn expand_node_test() {
                 (
                     "turn: 3 health: 44 health: 92
                     > > 0 -
-                    ^ 1 < -
+                    ^ 1 < +
                     ^ - ^ d
                     ^ l ^ <",
                     vec![Move::Right, Move::Left],
@@ -38,21 +38,21 @@ fn expand_node_test() {
                     "turn: 3 health: 44 health: 0
                     > v - -
                     ^ 0 - -
-                    ^ - - -
+                    ^ - + -
                     ^ l - -",
                     vec![Move::Down, Move::Left],
                 ),
                 (
                     "turn: 3 health: 44 health: 92
                     > > 0 -
-                    ^ - > 1
+                    ^ + > 1
                     ^ - ^ d
                     ^ l ^ <",
                     vec![Move::Right, Move::Right],
                 ),
                 (
                     "turn: 3 health: 44 health: 92
-                    > v - -
+                    > v + -
                     ^ 0 > 1
                     ^ - ^ d
                     ^ l ^ <",
@@ -61,7 +61,7 @@ fn expand_node_test() {
                 (
                     "turn: 3 health: 44 health: 0
                     > > 0 -
-                    ^ - - -
+                    ^ + - -
                     ^ - - -
                     ^ l - -",
                     vec![Move::Right, Move::Up],
@@ -69,7 +69,7 @@ fn expand_node_test() {
                 (
                     "turn: 3 health: 44 health: 92
                     > v 1 -
-                    ^ 0 ^ -
+                    ^ 0 ^ +
                     ^ - ^ d
                     ^ l ^ <",
                     vec![Move::Down, Move::Up],
@@ -87,7 +87,7 @@ fn expand_node_test() {
                     "turn: 3 health: 0 health: 92
                     - - - -
                     - - > 1
-                    - - ^ d
+                    + - ^ d
                     - - ^ <",
                     vec![Move::Left, Move::Right],
                 ),
@@ -95,7 +95,7 @@ fn expand_node_test() {
                     "turn: 3 health: 0 health: 92
                     - - 1 -
                     - - ^ -
-                    - - ^ d
+                    + - ^ d
                     - - ^ <",
                     vec![Move::Left, Move::Up],
                 ),
@@ -111,7 +111,7 @@ fn expand_node_test() {
                 (
                     "turn: 3 health: 44 health: 0 health: 99
                     > > 0 -
-                    ^ - - -
+                    ^ - - +
                     ^ 2 < d
                     u - ^ <
                     ",
@@ -120,7 +120,7 @@ fn expand_node_test() {
                 (
                     "turn: 3 health: 44 health: 0 health: 99
                     > v - -
-                    ^ 0 - -
+                    ^ 0 - +
                     ^ 2 < d
                     u - ^ <
                     ",
@@ -130,14 +130,14 @@ fn expand_node_test() {
                     "turn: 3 health: 44 health: 0 health: 99
                     > > 0 -
                     ^ - 2 -
-                    ^ - ^ d
+                    ^ + ^ d
                     u - ^ <
                     ",
                     vec![Move::Right, Move::Left, Move::Up],
                 ),
                 (
                     "turn: 3 health: 44 health: 0 health: 99
-                    > v - -
+                    > v - +
                     ^ 0 2 -
                     ^ - ^ d
                     u - ^ <
@@ -163,7 +163,7 @@ fn expand_node_test() {
                     ^ - - d d v < <
                     ^ < < < v v - ^
                     - - - - 0 v - u
-                    - - - - - v - 2
+                    + - - - - v - 2
                     - - - - - > > ^",
                     vec![Move::Down, Move::Right, Move::Up],
                 ),
@@ -174,7 +174,7 @@ fn expand_node_test() {
                     ^ - - d d v < <
                     ^ < < < v v - ^
                     - - - - 0 v - u
-                    - - - - - v - 2
+                    + - - - - v - 2
                     - - - - - > > ^",
                     vec![Move::Down, Move::Down, Move::Up],
                 ),
@@ -204,23 +204,28 @@ fn expand_node_test() {
 
         search::expand_node(&ctx, &mut state, &mut root_state_guard, 0, &test_game());
 
-        assert_eq!(root_state_guard.num_children, expected_results.len());
+        assert_eq!(root_state_guard.num_children as usize, expected_results.len());
 
-        for (idx, (board, moves)) in expected_results.iter().enumerate() {
+        for (idx, (board, exp_moves)) in expected_results.iter().enumerate() {
             // Ignore moves of snakes that were dead before expanding
-            for (snake_idx, snake) in root_state_guard.board.snakes.iter().enumerate() {
-                if snake.alive() {
-                    assert_eq!(
-                        moves[snake_idx],
-                        root_state_guard.child_moves(idx as usize)[snake_idx],
-                        "Expected moves: {:?}, actual moves: {:?}",
-                        moves[snake_idx],
-                        root_state_guard.child_moves(idx as usize)[snake_idx]
-                    );
+            let mut act_moves = Move::decode(
+                root_state_guard.child_moves(idx as usize),
+                root_state_guard.board.num_snakes(),
+            );
+
+            for (idx, snake) in root_state_guard.board.snakes.iter().enumerate() {
+                if !snake.alive() {
+                    act_moves[idx] = Move::Left;
                 }
             }
 
-            assert_eq!(root_state_guard.children[idx].index, idx + 1);
+            assert_eq!(
+                *exp_moves, act_moves,
+                "Expected moves: {:?}, actual moves: {:?}",
+                *exp_moves, act_moves
+            );
+
+            assert_eq!(root_state_guard.children[idx].index, idx as u32 + 1);
 
             // Ignore status of snakes that are dead, not encoded in string
             {
@@ -271,7 +276,7 @@ fn check_scores(exp_score: &[f64], act_score: &[f64]) {
 
 #[test]
 fn playout_test() {
-    let ctx = get_context();
+    let ctx = get_deterministic_context();
     let game = test_game();
 
     let scratch_space_guard = ctx.thread_scratch.write().unwrap();
@@ -307,7 +312,7 @@ const SEARCH_SMALL: &str = "
 #[test]
 fn small_search_test() {
     log_test_init();
-    let ctx = get_context();
+    let ctx = get_deterministic_context();
     let pool = ThreadPool::new(ctx.config.num_threads);
 
     let game = solo_game();
@@ -337,7 +342,7 @@ const SEARCH_HEAD_ON: &str = "
 #[test]
 fn head_on_search_test() {
     log_test_init();
-    let ctx = get_context();
+    let ctx = get_deterministic_context();
     let pool = ThreadPool::new(ctx.config.num_threads);
     let game = test_game();
     let board = Board::from_str(SEARCH_HEAD_ON, &game).unwrap();
@@ -376,7 +381,7 @@ const ARCADE_MAZE_BOARD: &str = "
 #[test]
 fn arcade_maze_search_test() {
     log_test_init();
-    let ctx = Arc::new(get_context());
+    let ctx = Arc::new(get_deterministic_context());
     let pool = ThreadPool::new(ctx.config.num_threads);
 
     for _ in 0..4 {

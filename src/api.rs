@@ -1,4 +1,4 @@
-use crate::game::{Map, Rules};
+use crate::game::Map;
 use crate::util::{Coord, Move};
 
 use serde::{Deserialize, Serialize};
@@ -30,7 +30,7 @@ pub struct Settings {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Ruleset {
-    pub name: Rules,
+    pub name: String,
     pub version: String,
     pub settings: Settings,
 }

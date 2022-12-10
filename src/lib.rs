@@ -4,6 +4,7 @@ pub mod config;
 pub mod game;
 pub mod log;
 pub mod pool;
+pub mod rand;
 pub mod search;
 pub mod server;
 pub mod tests;

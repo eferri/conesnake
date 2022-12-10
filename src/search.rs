@@ -3,7 +3,8 @@ use crate::board::Board;
 use crate::config::Config;
 use crate::game::Game;
 use crate::pool::ThreadPool;
-use crate::util::{max_children, Coord, Move};
+use crate::rand::Rand;
+use crate::util::{Coord, Move};
 
 use deepsize::DeepSizeOf;
 use log::{error, info, warn};
@@ -13,13 +14,13 @@ use std::sync::{Mutex, RwLock};
 use std::{thread::sleep, time::Duration, time::Instant};
 
 // Global search resources shared among search threads
-pub struct SearchContext {
+pub struct SearchContext<R: Rand> {
     pub config: Config,
     pub game: RwLock<Option<Game>>,
 
     search_lock: Mutex<()>,
     node_space: NodeSpace,
-    thread_scratch: RwLock<Vec<RwLock<ThreadContext>>>,
+    thread_scratch: RwLock<Vec<RwLock<ThreadContext<R>>>>,
 
     // Search state
     search_timeout: AtomicBool,
@@ -30,9 +31,10 @@ pub struct SearchContext {
 }
 
 // Thread-local search resources, pre-allocated
-pub struct ThreadContext {
+pub struct ThreadContext<R: Rand> {
+    rng: R,
+
     board: Board,
-    playout_moves: Vec<Move>,
     food_buff: Vec<Coord>,
 
     play_scores: Vec<f64>,
@@ -41,7 +43,7 @@ pub struct ThreadContext {
 
 #[derive(Clone)]
 pub struct SearchSort {
-    index: usize,
+    index: u32,
     total_score: f64,
 }
 
@@ -56,17 +58,19 @@ pub struct Node {
 pub struct NodeState {
     board: Board,
 
-    parent_node_idx: usize,
-    parent_move_idx: usize,
+    parent_node_idx: u32,
+    parent_move_idx: u32,
 
     depth: i32,
     max_depth: i32,
 
+    games: i32,
     score: Vec<f64>,
-    games: i64,
     cache: Vec<[NodeScoreCache; 4]>,
 
-    num_children: usize,
+    num_children: u32,
+    // This uses a LOT of memory
+    // each node has 4^max_snakes children
     children: Vec<NodePtr>,
 }
 
@@ -78,15 +82,17 @@ pub struct NodeScoreCache {
 }
 
 // Pointer to child nodes, with corresponding moves
+// 2-bit moves are encoded into "moves" u32 to save memory
+// In Royale map, shrink direction is encoded in last 2 bits
 #[derive(Clone, DeepSizeOf)]
 pub struct NodePtr {
-    moves: Vec<Move>,
-    index: usize,
+    moves: u32,
+    index: u32,
 }
 
 pub type NodeSpace = RwLock<Vec<Node>>;
 
-impl SearchContext {
+impl<R: Rand> SearchContext<R> {
     pub fn new(config: Config) -> Self {
         let num_cpu = config.num_threads;
         SearchContext {
@@ -124,6 +130,7 @@ impl SearchContext {
         let mut scratch_guard = self.thread_scratch.write().unwrap();
         scratch_guard.resize_with(self.config.num_threads, || {
             RwLock::new(ThreadContext {
+                rng: R::new(),
                 board: Board::new(
                     0,
                     0,
@@ -131,7 +138,6 @@ impl SearchContext {
                     self.config.max_height,
                     self.config.max_snakes,
                 ),
-                playout_moves: vec![Move::Left; self.config.max_snakes as usize],
                 food_buff: Vec::with_capacity((self.config.max_width * self.config.max_height) as usize),
 
                 play_scores: vec![0.; self.config.max_snakes as usize],
@@ -168,13 +174,7 @@ impl Node {
                 cache: vec![Default::default(); max_snakes as usize],
 
                 num_children: 0,
-                children: vec![
-                    NodePtr {
-                        moves: Vec::with_capacity(max_snakes as usize),
-                        index: 0,
-                    };
-                    max_children(max_snakes)
-                ],
+                children: vec![NodePtr { moves: 0, index: 0 }; max_children(max_snakes)],
             }),
         }
     }
@@ -199,8 +199,8 @@ impl NodeState {
         }
     }
 
-    pub fn child_moves(&self, idx: usize) -> &[Move] {
-        &self.children[idx].moves
+    pub fn child_moves(&self, idx: usize) -> u32 {
+        self.children[idx].moves
     }
 
     fn duct_score(&self, snake_idx: usize, mv: Move, temp: f64) -> f64 {
@@ -265,8 +265,8 @@ pub fn best_move(scores: &Scores) -> Move {
     best_move
 }
 
-pub fn search_moves(
-    ctx: Arc<SearchContext>,
+pub fn search_moves<R: Rand>(
+    ctx: Arc<SearchContext<R>>,
     pool: &ThreadPool,
     board: &Board,
     game: &Game,
@@ -346,7 +346,7 @@ pub fn search_moves(
     }
 }
 
-fn search_worker(ctx: Arc<SearchContext>, id: usize) {
+fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
     let space_guard = ctx.node_space.read().unwrap();
     let thread_guard = ctx.thread_scratch.read().unwrap();
     let mut scratch_guard = thread_guard[id].write().unwrap();
@@ -380,7 +380,7 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
                 // Expand node if game not over, and another thread hasn't already expanded
                 let mut state_guard = space_guard[curr_idx].state.write().unwrap();
                 if state_guard.num_children == 0 {
-                    let space_left = expand_node(&ctx, &mut scratch_guard, &mut state_guard, curr_idx, game);
+                    let space_left = expand_node(&ctx, &mut scratch_guard, &mut state_guard, curr_idx as u32, game);
                     if !space_left {
                         break 'main_loop;
                     }
@@ -392,14 +392,15 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
             scratch_guard.all_node_scores.clear();
 
             // Assign DUCT scores to child nodes based on snake-move
-            for child_ptr in state_guard.children[0..state_guard.num_children].iter() {
+            for child_ptr in state_guard.children[0..state_guard.num_children as usize].iter() {
                 let mut node_totals = SearchSort {
                     index: child_ptr.index,
                     total_score: 0.0,
                 };
 
-                for (snake_idx, mv) in child_ptr.moves.iter().enumerate() {
-                    let mv_duct_score = state_guard.duct_score(snake_idx, *mv, ctx.config.temperature);
+                for snake_idx in 0..state_guard.board.num_snakes() {
+                    let mv = Move::extract(child_ptr.moves, snake_idx as u32);
+                    let mv_duct_score = state_guard.duct_score(snake_idx as usize, mv, ctx.config.temperature);
 
                     node_totals.total_score += mv_duct_score;
                 }
@@ -414,15 +415,15 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
             // Pick the child node with the highest DUCT score
             // or a child of the highest child node if all direct children are locked
             for score in scratch_guard.all_node_scores.iter() {
-                let guard_opt = space_guard[score.index].play_lock.try_lock();
+                let guard_opt = space_guard[score.index as usize].play_lock.try_lock();
                 if let Ok(guard) = guard_opt {
                     playout_guard = Some(guard);
-                    curr_idx = score.index;
+                    curr_idx = score.index as usize;
                     break;
                 }
             }
             if playout_guard.is_none() {
-                curr_idx = scratch_guard.all_node_scores.first().unwrap().index;
+                curr_idx = scratch_guard.all_node_scores.first().unwrap().index as usize;
             }
         }
 
@@ -456,7 +457,7 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
 
             state_guard.games += 1;
             (
-                state_guard.parent_node_idx,
+                state_guard.parent_node_idx as usize,
                 state_guard.parent_move_idx,
                 state_guard.max_depth,
             )
@@ -476,7 +477,8 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
                 let snake_score = scratch_guard.play_scores[snake_idx];
 
                 // Update cached score and game count of each snake-move for this node
-                let snake_mv = parent_state_guard.children[curr_move_idx].moves[snake_idx];
+                let moves = parent_state_guard.children[curr_move_idx as usize].moves;
+                let snake_mv = Move::extract(moves, snake_idx as u32);
                 let mut cache = &mut parent_state_guard.cache[snake_idx][snake_mv.idx()];
 
                 cache.score += snake_score;
@@ -486,7 +488,7 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
             if curr_idx == 0 {
                 break;
             } else {
-                curr_idx = parent_state_guard.parent_node_idx;
+                curr_idx = parent_state_guard.parent_node_idx as usize;
                 curr_move_idx = parent_state_guard.parent_move_idx;
             }
         }
@@ -494,8 +496,10 @@ fn search_worker(ctx: Arc<SearchContext>, id: usize) {
     ctx.done_barrier.wait();
 }
 
-fn playout_game(_ctx: &SearchContext, state: &mut ThreadContext, game: &Game) -> bool {
+fn playout_game<R: Rand>(_ctx: &SearchContext<R>, state: &mut ThreadContext<R>, game: &Game) -> bool {
     let mut terminal = true;
+
+    let mut playout_moves: u32 = 0;
 
     while !game.over(&state.board) {
         terminal = false;
@@ -505,11 +509,12 @@ fn playout_game(_ctx: &SearchContext, state: &mut ThreadContext, game: &Game) ->
                 continue;
             }
 
-            state.playout_moves[s] = state.board.gen_move(game, s);
+            playout_moves = Move::set_move(playout_moves, s as u32, state.board.gen_move(game, s, &mut state.rng));
         }
 
-        let moves = &state.playout_moves[0..state.board.num_snakes() as usize];
-        state.board.gen_board(moves, game, &mut state.food_buff);
+        state
+            .board
+            .gen_board(playout_moves, game, &mut state.food_buff, &mut state.rng);
     }
 
     for snake_idx in 0..state.board.num_snakes() as usize {
@@ -519,30 +524,24 @@ fn playout_game(_ctx: &SearchContext, state: &mut ThreadContext, game: &Game) ->
     terminal
 }
 
-fn expand_node(
-    ctx: &SearchContext,
-    state: &mut ThreadContext,
+fn expand_node<R: Rand>(
+    ctx: &SearchContext<R>,
+    state: &mut ThreadContext<R>,
     node: &mut NodeState,
-    parent_index: usize,
+    parent_index: u32,
     game: &Game,
 ) -> bool {
     let num_snakes = node.board.num_snakes() as usize;
     let num_alive_snakes = node.board.num_alive_snakes();
     let space_guard = ctx.node_space.read().unwrap();
 
-    let rules = game.api.ruleset.name;
-
     // Shouldn't try and expand an end of game board
     debug_assert!(!game.over(&node.board));
 
-    let num_alive_snake_moves = Move::num_move_perm(num_alive_snakes as usize);
+    let num_alive_snake_moves = Move::num_perm(num_alive_snakes);
 
     // Iterate over permutations of moves for all alive snakes
     'expand_loop: for move_idx in 0..num_alive_snake_moves {
-        if node.children[node.num_children].moves.len() != num_snakes {
-            node.children[node.num_children].moves.resize(num_snakes, Move::Left);
-        }
-
         let mut alive_index = 0;
 
         for s in 0..num_snakes {
@@ -551,21 +550,22 @@ fn expand_node(
             }
 
             let snake_head = node.board.snakes[s].head;
-            let snake_mv_idx = Move::get_perm_idx(move_idx, alive_index);
+            let snake_mv_idx = Move::extract_idx(move_idx, alive_index) as usize;
             let snake_move = Move::from_idx(snake_mv_idx);
 
             // If this is a bad move for the snake and it is not trapped, prune the node
             // Otherwise expand a single node for the snakes death
             if node.cache[s][snake_mv_idx].pruned {
                 continue 'expand_loop;
-            } else if (!node.board.valid_move(snake_head, snake_move, rules)
-                && !node.board.is_trapped(snake_head, rules))
-                || (node.board.is_trapped(snake_head, rules) && snake_move != Move::Left)
+            } else if (!node.board.valid_move(snake_head, snake_move, game.ruleset)
+                && !node.board.is_trapped(snake_head, game.ruleset))
+                || (node.board.is_trapped(snake_head, game.ruleset) && snake_move != Move::Left)
             {
                 node.cache[s][snake_mv_idx].pruned = true;
                 continue 'expand_loop;
             } else {
-                node.children[node.num_children].moves[s] = snake_move;
+                let moves = node.children[node.num_children as usize].moves;
+                node.children[node.num_children as usize].moves = Move::set_move(moves, s as u32, snake_move);
             }
 
             alive_index += 1;
@@ -577,8 +577,8 @@ fn expand_node(
             return false;
         }
 
-        node.children[node.num_children].index = child_idx;
-        let child_moves = node.child_moves(node.num_children);
+        node.children[node.num_children as usize].index = child_idx as u32;
+        let child_moves = node.child_moves(node.num_children as usize);
 
         {
             let mut child_state_guard = space_guard[child_idx].state.write().unwrap();
@@ -588,7 +588,7 @@ fn expand_node(
             child_state_guard.board.set(&node.board);
             child_state_guard
                 .board
-                .gen_board(child_moves, game, &mut state.food_buff);
+                .gen_board(child_moves, game, &mut state.food_buff, &mut state.rng);
 
             child_state_guard.depth = node.depth + 1;
             child_state_guard.max_depth = child_state_guard.depth;
@@ -599,6 +599,11 @@ fn expand_node(
         node.num_children += 1;
     }
     true
+}
+
+pub fn max_children(max_snakes: i32) -> usize {
+    // 1 extra space for royale mode shrink direction
+    Move::num_perm(max_snakes + 1) as usize
 }
 
 #[cfg(test)]

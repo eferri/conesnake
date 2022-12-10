@@ -1,14 +1,19 @@
 # Todo:
+- Change node pointer to two u32s
 
 - Fix timeout when node down
+    - Test fix with explicit connection timeout
+
 - Add playout strength
+    - Move to closest food if shorter
+    - If longer move to head-to-head
+
 - View assembly, vector commands
 - Propagate thread pool panic instead of crash
 
-
 # Performance scaling
 
-5950x, threads - total nodes
+5950x, threads - total nodes per worker
 
 ## Single worker
 

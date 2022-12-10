@@ -25,7 +25,7 @@
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
     "workspaceFolder": "/app",
     "mounts": [
-        "source=${localEnv:HOME}/.kube/config,target=/home/rust/.kube/config,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.kube,target=/home/rust/.kube,type=bind,consistency=cached"
     ],
     "runArgs": [
         "--rm",

@@ -101,6 +101,7 @@ fn main() {
 
     total_node_res.sort();
 
+    info!("********** RESULTS **********");
     info!("Mean total nodes: {}", total_node_res[num_search / 2]);
     info!("Average total nodes: {}", total_node_sum as f64 / num_search as f64);
 

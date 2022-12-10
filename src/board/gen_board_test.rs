@@ -1,5 +1,6 @@
 use crate::board::Board;
 use crate::game::{Map, Rules};
+use crate::rand::{MaxRand, Rand};
 use crate::tests::{common::test_game, ref_move::RefMove};
 use crate::util::Move;
 
@@ -236,15 +237,22 @@ fn gen_board_ref_test() {
 
     for (board_str, rules, map) in test_boards {
         let mut game = test_game();
-        game.api.ruleset.name = rules;
+        game.ruleset = rules;
         game.api.map = map;
+
+        let mut rng = MaxRand::new();
+
+        // Remove extra quotes from serde output
+        let mut rules_str = serde_json::to_string(&rules).unwrap();
+        rules_str = rules_str[1..rules_str.len() - 1].to_owned();
+        game.api.ruleset.name = rules_str;
 
         let board = Board::from_str(board_str, &game).unwrap();
         let mut food_buff = Vec::with_capacity((board.max_height * board.max_width) as usize);
 
         // Create permutations of all possible moves
         let mut moves_arr = Vec::new();
-        let num_alive_snake_moves = Move::num_move_perm(board.num_alive_snakes() as usize);
+        let num_alive_snake_moves = Move::num_perm(board.num_alive_snakes());
 
         for mv_idx in 0..num_alive_snake_moves {
             let mut arr = Vec::new();
@@ -254,8 +262,7 @@ fn gen_board_ref_test() {
                     arr.push(Move::Left);
                     continue;
                 }
-                let snake_mv_idx = Move::get_perm_idx(mv_idx, num_alive);
-                arr.push(Move::from_idx(snake_mv_idx));
+                arr.push(Move::extract(mv_idx, num_alive));
 
                 num_alive += 1;
             }
@@ -265,7 +272,7 @@ fn gen_board_ref_test() {
 
         for moves in moves_arr {
             let mut gen_board = board.clone();
-            gen_board.gen_board(&moves, &game, &mut food_buff);
+            gen_board.gen_board(Move::encode(&moves), &game, &mut food_buff, &mut rng);
 
             let ref_board = ref_gen.gen_ref_board(&board, &moves, &game);
 

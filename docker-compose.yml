@@ -48,7 +48,7 @@ services:
         --max-boards ${MAX_BOARDS:-10000} \
         --max-width ${MAX_WIDTH:-11} \
         --max-height ${MAX_HEIGHT:-11} \
-        --max-snakes ${MAX_SNAKES:-5} \
+        --max-snakes ${MAX_SNAKES:-4} \
         worker
 
   rules:
@@ -61,11 +61,11 @@ services:
         --browser \
         --board-url http://localhost:3000 \
         --timeout 250 \
-        --width 11 --height 11 \
-        --gametype wrapped \
-        --map hz_islands_bridges \
+        --width 7 --height 7 \
+        --gametype solo \
+        --map standard \
         --foodSpawnChance 10 \
-        --hazardDamagePerTurn 100 \
+        --hazardDamagePerTurn 15 \
         --name conesnake --url http://localhost:${LISTEN_PORT:-8080}
     depends_on:
       - snake

@@ -43,9 +43,8 @@ Production images are built by CirceCi. They can also be manually built and push
     make terraform-apply
     ```
 
-1. Decrypt iam keys using gpg key:
+1. Decrypt iam keys using gpg key. Using the output values printed at the end of terraform `make terraform-apply`:
     ```
-    make terraform-output
     echo <encrypted_secret_access_key> | base64 --decode | gpg --decrypt
     ```
 

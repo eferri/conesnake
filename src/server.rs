@@ -5,6 +5,7 @@ use crate::board::Board;
 use crate::config::{Config, Mode};
 use crate::game::Game;
 use crate::pool::ThreadPool;
+use crate::rand::FastRand;
 use crate::search::{Node, SearchContext};
 use crate::util::{Error, Move};
 
@@ -32,7 +33,7 @@ struct ServerState {
     workers: Vec<String>,
 
     // resources
-    context: Arc<SearchContext>,
+    context: Arc<SearchContext<FastRand>>,
 
     // synchronization
     done_flag: AtomicBool,
@@ -111,7 +112,7 @@ impl Server {
     }
 
     pub fn start_server(&self) {
-        if self.state.config.max_boards > 0 {
+        if self.state.config.mode != Mode::Relay && self.state.config.max_boards > 0 {
             let test_node = Node::new(Board::new(
                 0,
                 0,
@@ -247,7 +248,7 @@ fn get_response(
                     Vec::new()
                 };
 
-                let code = if state.config.mode != Mode::Relay || resp.iter().filter(|x| x.healthy).count() >= 3 {
+                let code = if state.config.mode != Mode::Relay || resp.iter().filter(|x| x.healthy).count() > 0 {
                     200
                 } else {
                     500
@@ -329,6 +330,7 @@ fn get_response(
 
                     let parsed_board = Board::from_req(
                         &game_state,
+                        &game,
                         state.config.max_width,
                         state.config.max_height,
                         state.config.max_snakes,
@@ -430,10 +432,13 @@ fn run_workers(
                     return;
                 }
 
-                let req_start = Instant::now();
-                let res = ureq::post(&format!("{}/move", worker))
+                let ureq_agent = ureq::builder()
                     .timeout(timeout_dur)
-                    .send_json(game_state);
+                    .timeout_connect(timeout_dur)
+                    .build();
+
+                let req_start = Instant::now();
+                let res = ureq_agent.post(&format!("{}/move", worker)).send_json(game_state);
                 let req_dur = Instant::now() - req_start;
                 let server_latency = req_dur.as_micros() as i64;
 

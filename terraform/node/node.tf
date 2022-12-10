@@ -46,23 +46,7 @@ variable "deployment" {
 
 locals {
   # Ubuntu 22.04 server us-west-2
-  ubuntu_ami     = "ami-08df94af6199f15b6"
-  startup_script = <<-EOF
-    #!/bin/sh
-    sudo apt-get update
-    sudo apt-get upgrade
-    sudo apt-get install --no-install-recommends -y wireguard ipvsadm
-    sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
-    sudo sysctl -p /etc/sysctl.conf
-    cat <<EOFSH | sudo tee /etc/modules-load.d/ipvs.conf
-    ip_vs_rr
-    ip_vs_wrr
-    ip_vs_sh
-    ip_vs_lc
-    ip_vs
-    EOFSH
-    sudo systemctl restart systemd-modules-load.service
-  EOF
+  ubuntu_ami = "ami-03f8756d29f0b5f21"
 }
 
 
@@ -99,9 +83,6 @@ resource "aws_instance" "conesnake" {
   instance_type        = var.node_type
   iam_instance_profile = var.instance_profile_name
   key_name             = var.key_pair_name
-
-  user_data                   = local.startup_script
-  user_data_replace_on_change = true
 
   disable_api_termination = true
   monitoring              = true

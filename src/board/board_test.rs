@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardSquare};
+use crate::rand::{FastRand, Rand};
 use crate::tests::common::{solo_game, test_game, wrapped_game};
 use crate::util::{Coord, Move};
 
@@ -141,25 +142,37 @@ const BOARD_X: &str = "
     - - - - - -
 ";
 
+const BOARD_Y: &str = "
+    turn: 10 health: 45 health: 42
+    - - - - - -
+    - d - > > 0
+    1 v - ^ - -
+    ^ < - ^ - -
+    - - - ^ < l
+    - - - - - -
+";
+
 #[test]
 pub fn move_to_coord_test() {
     let game = test_game();
-    let rules = game.api.ruleset.name;
     let board_a = Board::from_str(BOARD_A, &game).unwrap();
 
     let test_coord = Coord { x: 4, y: 3 };
 
     assert_eq!(
-        board_a.move_to_coord(test_coord, Move::Left, rules),
+        board_a.move_to_coord(test_coord, Move::Left, game.ruleset),
         Coord { x: 3, y: 3 }
     );
     assert_eq!(
-        board_a.move_to_coord(test_coord, Move::Right, rules),
+        board_a.move_to_coord(test_coord, Move::Right, game.ruleset),
         Coord { x: 5, y: 3 }
     );
-    assert_eq!(board_a.move_to_coord(test_coord, Move::Up, rules), Coord { x: 4, y: 4 });
     assert_eq!(
-        board_a.move_to_coord(test_coord, Move::Down, rules),
+        board_a.move_to_coord(test_coord, Move::Up, game.ruleset),
+        Coord { x: 4, y: 4 }
+    );
+    assert_eq!(
+        board_a.move_to_coord(test_coord, Move::Down, game.ruleset),
         Coord { x: 4, y: 2 }
     );
 }
@@ -167,22 +180,24 @@ pub fn move_to_coord_test() {
 #[test]
 pub fn move_to_coord_wrapped_test() {
     let game = wrapped_game();
-    let rules = game.api.ruleset.name;
     let board_a = Board::from_str(BOARD_A, &game).unwrap();
 
     let test_coord = Coord { x: 0, y: 5 };
 
     assert_eq!(
-        board_a.move_to_coord(test_coord, Move::Left, rules),
+        board_a.move_to_coord(test_coord, Move::Left, game.ruleset),
         Coord { x: 5, y: 5 }
     );
     assert_eq!(
-        board_a.move_to_coord(test_coord, Move::Right, rules),
+        board_a.move_to_coord(test_coord, Move::Right, game.ruleset),
         Coord { x: 1, y: 5 }
     );
-    assert_eq!(board_a.move_to_coord(test_coord, Move::Up, rules), Coord { x: 0, y: 0 });
     assert_eq!(
-        board_a.move_to_coord(test_coord, Move::Down, rules),
+        board_a.move_to_coord(test_coord, Move::Up, game.ruleset),
+        Coord { x: 0, y: 0 }
+    );
+    assert_eq!(
+        board_a.move_to_coord(test_coord, Move::Down, game.ruleset),
         Coord { x: 0, y: 4 }
     );
 }
@@ -190,7 +205,6 @@ pub fn move_to_coord_wrapped_test() {
 #[test]
 pub fn next_to_test() {
     let game = test_game();
-    let rules = game.api.ruleset.name;
     let board = Board::from_str(BOARD_A, &game).unwrap();
 
     let a = Coord { x: 1, y: 1 };
@@ -200,17 +214,16 @@ pub fn next_to_test() {
     let e = Coord { x: 5, y: 2 };
     let f = Coord { x: 4, y: 2 };
 
-    assert!(board.next_to(e, f, rules));
-    assert!(!board.next_to(a, b, rules));
-    assert!(!board.next_to(b, a, rules));
-    assert!(board.next_to(c, d, rules));
-    assert!(!board.next_to(d, e, rules));
+    assert!(board.next_to(e, f, game.ruleset));
+    assert!(!board.next_to(a, b, game.ruleset));
+    assert!(!board.next_to(b, a, game.ruleset));
+    assert!(board.next_to(c, d, game.ruleset));
+    assert!(!board.next_to(d, e, game.ruleset));
 }
 
 #[test]
 pub fn next_to_wrapped_test() {
     let game = wrapped_game();
-    let rules = game.api.ruleset.name;
     let board = Board::from_str(BOARD_A, &game).unwrap();
 
     let a = Coord { x: 0, y: 4 };
@@ -224,22 +237,21 @@ pub fn next_to_wrapped_test() {
     let h = Coord { x: 2, y: 2 };
     let i = Coord { x: 3, y: 2 };
 
-    assert!(board.next_to(a, b, rules));
-    assert!(board.next_to(b, a, rules));
-    assert!(!board.next_to(e, f, rules));
-    assert!(board.next_to(c, d, rules));
-    assert!(!board.next_to(d, e, rules));
+    assert!(board.next_to(a, b, game.ruleset));
+    assert!(board.next_to(b, a, game.ruleset));
+    assert!(!board.next_to(e, f, game.ruleset));
+    assert!(board.next_to(c, d, game.ruleset));
+    assert!(!board.next_to(d, e, game.ruleset));
 
-    assert!(!board.next_to(g, h, rules));
-    assert!(!board.next_to(h, g, rules));
-    assert!(board.next_to(h, i, rules));
-    assert!(board.next_to(i, h, rules));
+    assert!(!board.next_to(g, h, game.ruleset));
+    assert!(!board.next_to(h, g, game.ruleset));
+    assert!(board.next_to(h, i, game.ruleset));
+    assert!(board.next_to(i, h, game.ruleset));
 }
 
 #[test]
 pub fn coord_to_move_test() {
     let game = test_game();
-    let rules = game.api.ruleset.name;
     let board = Board::from_str(BOARD_A, &game).unwrap();
 
     let a = Coord { x: 1, y: 1 };
@@ -247,16 +259,15 @@ pub fn coord_to_move_test() {
     let c = Coord { x: 0, y: 0 };
     let d = Coord { x: 1, y: 0 };
 
-    assert_eq!(board.coord_to_move(a, b, rules), Move::Up);
-    assert_eq!(board.coord_to_move(b, a, rules), Move::Down);
-    assert_eq!(board.coord_to_move(c, d, rules), Move::Right);
-    assert_eq!(board.coord_to_move(d, c, rules), Move::Left);
+    assert_eq!(board.coord_to_move(a, b, game.ruleset), Move::Up);
+    assert_eq!(board.coord_to_move(b, a, game.ruleset), Move::Down);
+    assert_eq!(board.coord_to_move(c, d, game.ruleset), Move::Right);
+    assert_eq!(board.coord_to_move(d, c, game.ruleset), Move::Left);
 }
 
 #[test]
 pub fn coord_to_move_wrapped_test() {
     let game = wrapped_game();
-    let rules = game.api.ruleset.name;
     let board = Board::from_str(BOARD_A, &game).unwrap();
 
     let a = Coord { x: 1, y: 1 };
@@ -266,20 +277,19 @@ pub fn coord_to_move_wrapped_test() {
     let e = Coord { x: 5, y: 0 };
     let f = Coord { x: 0, y: 5 };
 
-    assert_eq!(board.coord_to_move(a, b, rules), Move::Up);
-    assert_eq!(board.coord_to_move(b, a, rules), Move::Down);
-    assert_eq!(board.coord_to_move(c, d, rules), Move::Right);
-    assert_eq!(board.coord_to_move(d, c, rules), Move::Left);
-    assert_eq!(board.coord_to_move(c, e, rules), Move::Left);
-    assert_eq!(board.coord_to_move(e, c, rules), Move::Right);
-    assert_eq!(board.coord_to_move(c, f, rules), Move::Down);
-    assert_eq!(board.coord_to_move(d, c, rules), Move::Left);
+    assert_eq!(board.coord_to_move(a, b, game.ruleset), Move::Up);
+    assert_eq!(board.coord_to_move(b, a, game.ruleset), Move::Down);
+    assert_eq!(board.coord_to_move(c, d, game.ruleset), Move::Right);
+    assert_eq!(board.coord_to_move(d, c, game.ruleset), Move::Left);
+    assert_eq!(board.coord_to_move(c, e, game.ruleset), Move::Left);
+    assert_eq!(board.coord_to_move(e, c, game.ruleset), Move::Right);
+    assert_eq!(board.coord_to_move(c, f, game.ruleset), Move::Down);
+    assert_eq!(board.coord_to_move(d, c, game.ruleset), Move::Left);
 }
 
 #[test]
 pub fn move_test() {
     let game = test_game();
-    let rules = game.api.ruleset.name;
 
     let board_a = Board::from_str(BOARD_A, &game).unwrap();
     let board_b = Board::from_str(BOARD_B, &game).unwrap();
@@ -288,35 +298,72 @@ pub fn move_test() {
     let head_b_1 = Coord::new(2, 3);
     let head_b_2 = Coord::new(1, 4);
 
-    assert!(board_a.on_board(board_a.move_to_coord(head_a_2, Move::Right, rules)));
-    assert!(!board_a.on_board(board_a.move_to_coord(head_a_2, Move::Left, rules)));
-    assert!(board_b.on_board(board_b.move_to_coord(head_b_1, Move::Up, rules)));
+    assert!(board_a.on_board(board_a.move_to_coord(head_a_2, Move::Right, game.ruleset)));
+    assert!(!board_a.on_board(board_a.move_to_coord(head_a_2, Move::Left, game.ruleset)));
+    assert!(board_b.on_board(board_b.move_to_coord(head_b_1, Move::Up, game.ruleset)));
 
-    assert!(!board_a.valid_move(head_a_1, Move::Left, rules));
-    assert!(board_a.valid_move(head_a_1, Move::Right, rules));
-    assert!(board_a.valid_move(head_a_1, Move::Up, rules));
+    assert!(!board_a.valid_move(head_a_1, Move::Left, game.ruleset));
+    assert!(board_a.valid_move(head_a_1, Move::Right, game.ruleset));
+    assert!(board_a.valid_move(head_a_1, Move::Up, game.ruleset));
 
-    assert!(!board_a.valid_move(head_a_2, Move::Left, rules));
-    assert!(!board_a.valid_move(head_a_2, Move::Right, rules));
-    assert!(board_a.valid_move(head_a_2, Move::Up, rules));
-    assert!(!board_a.valid_move(head_a_2, Move::Down, rules));
+    assert!(!board_a.valid_move(head_a_2, Move::Left, game.ruleset));
+    assert!(!board_a.valid_move(head_a_2, Move::Right, game.ruleset));
+    assert!(board_a.valid_move(head_a_2, Move::Up, game.ruleset));
+    assert!(!board_a.valid_move(head_a_2, Move::Down, game.ruleset));
 
-    assert!(board_b.valid_move(head_b_1, Move::Up, rules));
-    assert!(board_b.valid_move(head_b_2, Move::Right, rules));
+    assert!(board_b.valid_move(head_b_1, Move::Up, game.ruleset));
+    assert!(board_b.valid_move(head_b_2, Move::Right, game.ruleset));
 }
 
 #[test]
 pub fn tail_test() {
     let game = test_game();
-    let rules = game.api.ruleset.name;
 
     let board_tail = Board::from_str(BOARD_TAIL, &game).unwrap();
     let head_tail_0 = Coord::new(2, 3);
 
-    assert!(board_tail.valid_move(head_tail_0, Move::Up, rules));
+    assert!(board_tail.valid_move(head_tail_0, Move::Up, game.ruleset));
 
     // Stacked, shouldn't be able to move into tail
-    assert!(!board_tail.valid_move(head_tail_0, Move::Left, rules));
+    assert!(!board_tail.valid_move(head_tail_0, Move::Left, game.ruleset));
+}
+
+#[test]
+pub fn head_on_col_test() {
+    let game = test_game();
+
+    let board_b = Board::from_str(BOARD_B, &game).unwrap();
+    let head_0 = board_b.snakes[0].head;
+    let head_1 = board_b.snakes[1].head;
+
+    assert!(!board_b.head_on_col(&game, head_0, Move::Left));
+    assert!(!board_b.head_on_col(&game, head_0, Move::Right));
+    assert!(!board_b.head_on_col(&game, head_0, Move::Up));
+    assert!(!board_b.head_on_col(&game, head_0, Move::Down));
+
+    assert!(!board_b.head_on_col(&game, head_1, Move::Left));
+    assert!(board_b.head_on_col(&game, head_1, Move::Right));
+    assert!(!board_b.head_on_col(&game, head_1, Move::Up));
+    assert!(board_b.head_on_col(&game, head_1, Move::Down));
+}
+
+#[test]
+pub fn head_on_col_wrapped_test() {
+    let game = wrapped_game();
+
+    let board_y = Board::from_str(BOARD_Y, &game).unwrap();
+    let head_0 = board_y.snakes[0].head;
+    let head_1 = board_y.snakes[1].head;
+
+    assert!(!board_y.head_on_col(&game, head_0, Move::Left));
+    assert!(board_y.head_on_col(&game, head_0, Move::Right));
+    assert!(!board_y.head_on_col(&game, head_0, Move::Up));
+    assert!(board_y.head_on_col(&game, head_0, Move::Down));
+
+    assert!(!board_y.head_on_col(&game, head_1, Move::Left));
+    assert!(!board_y.head_on_col(&game, head_1, Move::Right));
+    assert!(!board_y.head_on_col(&game, head_1, Move::Up));
+    assert!(!board_y.head_on_col(&game, head_1, Move::Down));
 }
 
 #[test]
@@ -340,6 +387,7 @@ pub fn iter_test() {
 #[test]
 pub fn gen_board_food_test() {
     let mut game = solo_game();
+    let mut rng = FastRand::new();
 
     game.api.ruleset.settings.food_spawn_chance = 15;
     game.api.ruleset.settings.minimum_food = 5;
@@ -347,7 +395,7 @@ pub fn gen_board_food_test() {
     let mut board_food = Board::from_str(BOARD_D, &game).unwrap();
     let mut food_buff = Vec::with_capacity((board_food.max_height * board_food.max_width) as usize);
 
-    board_food.gen_board(&[Move::Right], &game, &mut food_buff);
+    board_food.gen_board(Move::Right as u32, &game, &mut food_buff, &mut rng);
 
     assert!(board_food.num_food() > 0);
 }
