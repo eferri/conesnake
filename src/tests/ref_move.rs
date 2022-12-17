@@ -38,7 +38,7 @@ impl<'de> RefMove<'de> {
         RefMove { child, ref_iter }
     }
 
-    pub fn gen_ref_board(&mut self, board: &Board, moves: &[Move], game: &Game) -> Board {
+    pub fn gen_ref_board(&mut self, game: &Game, board: &Board, moves: &[Move]) -> Board {
         let req = board.to_req(game).unwrap();
         let state = MoveState {
             request: req,
@@ -51,16 +51,18 @@ impl<'de> RefMove<'de> {
 
         let ref_state_res = self.ref_iter.next().unwrap();
         let mut ref_board = Board::from_req(
-            ref_state_res.as_ref().unwrap(),
             game,
-            board.max_width,
-            board.max_height,
+            ref_state_res.as_ref().unwrap(),
+            board.width,
+            board.height,
             board.max_snakes(),
         )
         .unwrap();
 
         // Patch "eliminated" which is not in the API
-        for snake in &mut ref_board.snakes {
+        for snake_idx in 0..ref_board.num_snakes() as usize {
+            let snake = &mut ref_board.snakes[snake_idx];
+
             if snake.health == 0 {
                 snake.eliminated = true
             }

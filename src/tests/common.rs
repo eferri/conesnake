@@ -1,8 +1,9 @@
-use crate::api::{GameApi, RoyaleSettings, Ruleset, Settings, SquadSettings};
+use crate::api::{Customizations, GameApi, RoyaleSettings, Ruleset, Settings, SnakeApi, SquadSettings};
 use crate::config::{Config, Mode, DEFAULT_TEMP};
 use crate::game::{Game, Map, Rules};
 use crate::rand::{FastRand, MaxRand};
 use crate::search::SearchContext;
+use crate::util::Coord;
 
 use log::info;
 
@@ -15,7 +16,7 @@ pub fn test_config() -> Config {
         num_runs: 1,
         num_threads: 1,
         num_server_threads: 1,
-        max_boards: 2000,
+        max_boards: 5000,
         max_width: 19,
         max_height: 21,
         max_snakes: 5,
@@ -78,7 +79,7 @@ pub fn test_game() -> Game {
                     minimum_food: 1,
                     hazard_damage_per_turn: 100,
                     royale: RoyaleSettings {
-                        shrink_every_n_turns: 0,
+                        shrink_every_n_turns: 20,
                     },
                     squad: SquadSettings {
                         allow_body_collisions: false,
@@ -106,4 +107,23 @@ pub fn wrapped_game() -> Game {
     game.ruleset = Rules::Wrapped;
     game.api.ruleset.name = "wrapped".to_owned();
     game
+}
+
+pub fn test_snake(coords: &[Coord], health: i32) -> SnakeApi {
+    SnakeApi {
+        id: "0".to_owned(),
+        name: "conesnake".to_owned(),
+        customizations: Customizations {
+            color: None,
+            head: None,
+            tail: None,
+        },
+        body: coords.to_vec(),
+        head: coords[0],
+        health,
+        latency: "10".to_owned(),
+        length: coords.len() as i32,
+        shout: None,
+        squad: "".to_owned(),
+    }
 }

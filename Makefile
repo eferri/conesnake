@@ -66,7 +66,7 @@ profile: record report
 record:
 	docker compose run --rm snake bash -c ' \
 		cargo build --profile=release-with-debug \
-		&& perf record --call-graph dwarf -F 1000 \
+		&& perf record --call-graph dwarf -F 5000 \
 			./target-snake/release-with-debug/profile'
 
 .PHONY: report

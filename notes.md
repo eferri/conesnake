@@ -1,40 +1,21 @@
 # Todo:
-- Change node pointer to two u32s
+- Debug crash with +1 snake
+    - Set max nodes for new profile
 
 - Fix timeout when node down
     - Test fix with explicit connection timeout
 
 - Add playout strength
-    - Move to closest food if shorter
-    - If longer move to head-to-head
+    - test, improve
 
-- View assembly, vector commands
+- Investigate performance without locking heuristic
+- Investigate virtual loss / watch the unobserved
+- Investigate integrating royale shrink into tree branching
+    - Choose random shrink direction when moving down tree
+    - May be complicated, high branch-factor gives us randomization even without
+
+- Find test snakes for win rate benchmarking
+
+- View assembly, investigate vector intrinsics
+
 - Propagate thread pool panic instead of crash
-
-# Performance scaling
-
-5950x, threads - total nodes per worker
-
-## Single worker
-
-32 - 840k
-28 - 836k
-24 - 828k
-20 - 824k
-16 - 849k
-14 - 862k
-12 - 815k
-10 - 720k
-8  - 625k
-
-
-## Two workers
-
-16 - 614k
-12 - 595k
-8  - 574k
-4  - 366k
-
-## Four workers
-
-8 - 408k

@@ -549,7 +549,6 @@ fn expand_node<R: Rand>(
                 continue;
             }
 
-            let snake_head = node.board.snakes[s].head;
             let snake_mv_idx = Move::extract_idx(move_idx, alive_index) as usize;
             let snake_move = Move::from_idx(snake_mv_idx);
 
@@ -557,9 +556,8 @@ fn expand_node<R: Rand>(
             // Otherwise expand a single node for the snakes death
             if node.cache[s][snake_mv_idx].pruned {
                 continue 'expand_loop;
-            } else if (!node.board.valid_move(snake_head, snake_move, game.ruleset)
-                && !node.board.is_trapped(snake_head, game.ruleset))
-                || (node.board.is_trapped(snake_head, game.ruleset) && snake_move != Move::Left)
+            } else if (!node.board.valid_move(game, s, snake_move) && !node.board.is_trapped(game, s))
+                || (node.board.is_trapped(game, s) && snake_move != Move::Left)
             {
                 node.cache[s][snake_mv_idx].pruned = true;
                 continue 'expand_loop;

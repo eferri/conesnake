@@ -4,3 +4,6 @@
 [submodule "submodules/board"]
 	path = submodules/board
 	url = git@github.com:BattlesnakeOfficial/board.git
+[submodule "submodules/snork/snork"]
+	path = submodules/snork/snork
+	url = https://github.com/wrenger/snork.git

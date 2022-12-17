@@ -329,8 +329,8 @@ fn get_response(
                     info!("turn: {}", game_state.turn);
 
                     let parsed_board = Board::from_req(
-                        &game_state,
                         &game,
+                        &game_state,
                         state.config.max_width,
                         state.config.max_height,
                         state.config.max_snakes,

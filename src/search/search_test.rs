@@ -9,6 +9,7 @@ use crate::tests::common::{get_deterministic_context, solo_game, test_game, wrap
 use crate::util::Move;
 
 use approx::assert_relative_eq;
+use pretty_assertions::assert_eq;
 
 use std::sync::{atomic::Ordering, Arc};
 use std::time::Instant;
@@ -31,7 +32,7 @@ fn expand_node_test() {
                     > > 0 -
                     ^ 1 < +
                     ^ - ^ d
-                    ^ l ^ <",
+                    ^ a ^ <",
                     vec![Move::Right, Move::Left],
                 ),
                 (
@@ -39,7 +40,7 @@ fn expand_node_test() {
                     > v - -
                     ^ 0 - -
                     ^ - + -
-                    ^ l - -",
+                    ^ a - -",
                     vec![Move::Down, Move::Left],
                 ),
                 (
@@ -47,7 +48,7 @@ fn expand_node_test() {
                     > > 0 -
                     ^ + > 1
                     ^ - ^ d
-                    ^ l ^ <",
+                    ^ a ^ <",
                     vec![Move::Right, Move::Right],
                 ),
                 (
@@ -55,7 +56,7 @@ fn expand_node_test() {
                     > v + -
                     ^ 0 > 1
                     ^ - ^ d
-                    ^ l ^ <",
+                    ^ a ^ <",
                     vec![Move::Down, Move::Right],
                 ),
                 (
@@ -63,7 +64,7 @@ fn expand_node_test() {
                     > > 0 -
                     ^ + - -
                     ^ - - -
-                    ^ l - -",
+                    ^ a - -",
                     vec![Move::Right, Move::Up],
                 ),
                 (
@@ -71,7 +72,7 @@ fn expand_node_test() {
                     > v 1 -
                     ^ 0 ^ +
                     ^ - ^ d
-                    ^ l ^ <",
+                    ^ a ^ <",
                     vec![Move::Down, Move::Up],
                 ),
             ],
@@ -81,7 +82,7 @@ fn expand_node_test() {
             > v - -
             ^ v 1 d
             ^ 0 ^ v
-            ^ L ^ <",
+            ^ e ^ <",
             vec![
                 (
                     "turn: 3 health: 0 health: 92
@@ -105,15 +106,15 @@ fn expand_node_test() {
             "turn: 2 health: 45  health: 0 health: 100
             > 0 - -
             ^ - - -
-            ^ - 2 D
-            ^ l ^ <",
+            ^ - 2 h
+            ^ a ^ <",
             vec![
                 (
                     "turn: 3 health: 44 health: 0 health: 99
                     > > 0 -
                     ^ - - +
                     ^ 2 < d
-                    u - ^ <
+                    c  - ^ <
                     ",
                     vec![Move::Right, Move::Left, Move::Left],
                 ),
@@ -122,7 +123,7 @@ fn expand_node_test() {
                     > v - -
                     ^ 0 - +
                     ^ 2 < d
-                    u - ^ <
+                    c  - ^ <
                     ",
                     vec![Move::Down, Move::Left, Move::Left],
                 ),
@@ -131,7 +132,7 @@ fn expand_node_test() {
                     > > 0 -
                     ^ - 2 -
                     ^ + ^ d
-                    u - ^ <
+                    c  - ^ <
                     ",
                     vec![Move::Right, Move::Left, Move::Up],
                 ),
@@ -140,7 +141,7 @@ fn expand_node_test() {
                     > v - +
                     ^ 0 2 -
                     ^ - ^ d
-                    u - ^ <
+                    c  - ^ <
                     ",
                     vec![Move::Down, Move::Left, Move::Up],
                 ),
@@ -153,7 +154,7 @@ fn expand_node_test() {
             ^ - - v v v < <
             ^ < < < 0 v - ^
             - - - - - v - ^
-            - - - - - v - u
+            - - - - - v - c
             - - - - - > > 2",
             vec![
                 (
@@ -162,7 +163,7 @@ fn expand_node_test() {
                     ^ - - - - - - -
                     ^ - - d d v < <
                     ^ < < < v v - ^
-                    - - - - 0 v - u
+                    - - - - 0 v - c
                     + - - - - v - 2
                     - - - - - > > ^",
                     vec![Move::Down, Move::Right, Move::Up],
@@ -173,7 +174,7 @@ fn expand_node_test() {
                     ^ - - 1 - - - -
                     ^ - - d d v < <
                     ^ < < < v v - ^
-                    - - - - 0 v - u
+                    - - - - 0 v - c
                     + - - - - v - 2
                     - - - - - > > ^",
                     vec![Move::Down, Move::Down, Move::Up],
@@ -208,14 +209,12 @@ fn expand_node_test() {
 
         for (idx, (board, exp_moves)) in expected_results.iter().enumerate() {
             // Ignore moves of snakes that were dead before expanding
-            let mut act_moves = Move::decode(
-                root_state_guard.child_moves(idx as usize),
-                root_state_guard.board.num_snakes(),
-            );
+            let mut act_moves = Move::decode(root_state_guard.child_moves(idx), root_state_guard.board.num_snakes());
 
-            for (idx, snake) in root_state_guard.board.snakes.iter().enumerate() {
-                if !snake.alive() {
-                    act_moves[idx] = Move::Left;
+            #[allow(clippy::needless_range_loop)]
+            for snake_idx in 0..root_state_guard.board.num_snakes() as usize {
+                if !root_state_guard.board.snakes[snake_idx].alive() {
+                    act_moves[snake_idx] = Move::Left;
                 }
             }
 
@@ -230,7 +229,8 @@ fn expand_node_test() {
             // Ignore status of snakes that are dead, not encoded in string
             {
                 let mut state_guard = space_guard[idx + 1].state.write().unwrap();
-                for snake in &mut state_guard.board.snakes {
+                for snake_idx in 0..state_guard.board.num_snakes() as usize {
+                    let snake = &mut state_guard.board.snakes[snake_idx];
                     if !snake.alive() {
                         *snake = Default::default();
                     }
@@ -255,9 +255,9 @@ fn expand_node_test() {
 const PLAYOUT_TRAPPED: &str = "
     turn: 2 health: 45 health: 93
     > 0 v <
-    ^ - v U
+    ^ - v g
     ^ - > 1
-    ^ < < L
+    ^ < < e
 ";
 
 const PLAYOUT_WIN: &str = "
@@ -265,7 +265,7 @@ const PLAYOUT_WIN: &str = "
     > 0 - -
     ^ - - -
     ^ - - -
-    ^ < < L
+    ^ < < e
 ";
 
 fn check_scores(exp_score: &[f64], act_score: &[f64]) {
@@ -306,7 +306,7 @@ const SEARCH_SMALL: &str = "
     turn: 2 health: 45
     > 0 +
     ^ v <
-    ^ < u
+    ^ < c
 ";
 
 #[test]
@@ -328,11 +328,11 @@ fn small_search_test() {
 
 const SEARCH_HEAD_ON: &str = "
     turn: 2 health: 45 health: 34
-    v l - - - - - - - -
+    v a - - - - - - - -
     v - - - - - - - - -
     0 - 1 - - - - - - -
     - - ^ - - - - - - -
-    - - ^ < < l - - - -
+    - - ^ < < a - - - -
     - - - - - - - - - -
     - - - - - - - - - -
     - - - - - - - - - -
@@ -358,13 +358,13 @@ const ARCADE_MAZE_BOARD: &str = "
     * - * * * * * * * * * * * * * * * v *
     * - - - - - - - - * - - - - - - - 1 *
     * - * * - * * * - * - * * * - * * - *
-    * 0 < l - - - - - - - - - - - - - - *
+    * 0 < a - - - - - - - - - - - - - - *
     * - * * - * - * * * * * - * - * * - *
     * - - - - * - - - * - - - * - - - - *
     * - - * - * * * - * - * * * - * - - *
     * - - * - * - - - - - - - * - * - - *
     * * * * - * - * - * - * - * - * * * *
-    - - - - v l - * - - - * - - - - - - -
+    - - - - v a - * - - - * - - - - - - -
     * * * * 2 * - * - * - * - * - * * * *
     * - - * - * - - - - - - - * - * - - *
     * - - * - * - * * * * * - * - * - - *

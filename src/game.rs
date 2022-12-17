@@ -11,6 +11,7 @@ pub enum Rules {
     Solo,
     Standard,
     Wrapped,
+    Constrictor,
 }
 
 #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]

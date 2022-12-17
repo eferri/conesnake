@@ -51,6 +51,48 @@ services:
         --max-snakes ${MAX_SNAKES:-4} \
         worker
 
+  snork-flood:
+    build:
+      context: submodules/snork
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+    ports:
+      - "8082:8082"
+    command: ["--host", "0.0.0.0:8082", "--color", "#4400ff", "--config", "{ \"Flood\": {} }"]
+
+  snork-tree:
+    build:
+      context: submodules/snork
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+    ports:
+      - "8083:8083"
+    command: ["--host", "0.0.0.0:8083", "--color", "#00ff59", "--config", "{ \"Tree\": {} }"]
+
+  snork-mobility:
+    build:
+      context: submodules/snork
+      args:
+        UID: ${UID}
+        GID: ${GID}
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+    ports:
+      - "8084:8084"
+    command: ["--host", "0.0.0.0:8084", "--color", "#ffff00", "--config", "{ \"Mobility\": {} }"]
+
   rules:
     image: conesnake:latest-dev
     network_mode: host
@@ -60,13 +102,16 @@ services:
       scripts/entrypoint_rules.sh \
         --browser \
         --board-url http://localhost:3000 \
-        --timeout 250 \
-        --width 7 --height 7 \
-        --gametype solo \
+        --timeout 500 \
+        --width 11 --height 11 \
+        --gametype standard \
         --map standard \
         --foodSpawnChance 10 \
-        --hazardDamagePerTurn 15 \
+        --hazardDamagePerTurn 16 \
         --name conesnake --url http://localhost:${LISTEN_PORT:-8080}
+        --name snork-flood --url http://localhost:8082
+        --name snork-tree --url http://localhost:8083
+        --name snork-mobility --url http://localhost:8084
     depends_on:
       - snake
 

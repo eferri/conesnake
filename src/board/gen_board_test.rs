@@ -4,6 +4,8 @@ use crate::rand::{MaxRand, Rand};
 use crate::tests::{common::test_game, ref_move::RefMove};
 use crate::util::Move;
 
+use pretty_assertions::assert_eq;
+
 #[test]
 fn gen_board_ref_test() {
     let mut ref_gen = RefMove::new();
@@ -15,7 +17,7 @@ fn gen_board_ref_test() {
             - - - - - -
             - - 0 - - -
             - - ^ - - -
-            - - ^ < < l
+            - - ^ < < a
             - - - - - -",
             Rules::Solo,
             Map::Standard,
@@ -35,7 +37,7 @@ fn gen_board_ref_test() {
             "turn: 2 health: 64
             - - - - - -
             - - - - - -
-            - 0 L - - -
+            - 0 e - - -
             - - - - - -
             - - - - - -
             - - - - - -",
@@ -59,7 +61,7 @@ fn gen_board_ref_test() {
             - - - - - -
             - 0 < - - -
             - - ^ - - -
-            - - ^ < l -
+            - - ^ < a -
             - - - - - -",
             Rules::Solo,
             Map::Standard,
@@ -71,7 +73,7 @@ fn gen_board_ref_test() {
             - > 0 + - -
             - ^ - - - -
             - ^ - - - -
-            - ^ l - - -",
+            - ^ a - - -",
             Rules::Solo,
             Map::Standard,
         ),
@@ -79,11 +81,11 @@ fn gen_board_ref_test() {
             // Head
             "turn: 12 health: 93 health: 53 health: 29
             - - - - - -
-            - - r > > 1
+            - - b > > 1
             2 - 0 - - -
             ^ - ^ - - -
-            ^ - ^ < < l
-            u - - - - -",
+            ^ - ^ < < a
+            c - - - - -",
             Rules::Standard,
             Map::Standard,
         ),
@@ -91,11 +93,11 @@ fn gen_board_ref_test() {
             // Head 2
             "turn: 12 health: 93 health: 53 health: 29
             - - - - - -
-            - - r > > 1
+            - - b > > 1
             0 - 2 - - -
             ^ - ^ - - -
-            ^ - ^ < < l
-            u - - - - -",
+            ^ - ^ < < a
+            c - - - - -",
             Rules::Standard,
             Map::Standard,
         ),
@@ -103,11 +105,11 @@ fn gen_board_ref_test() {
             // Head 3
             "turn: 12 health: 93 health: 53 health: 29
             - - - - - -
-            - - r > > 1
+            - - b > > 1
             0 - 2 - - -
             ^ - ^ - - -
-            ^ - ^ < l -
-            ^ l - - - -",
+            ^ - ^ < a -
+            ^ a - - - -",
             Rules::Standard,
             Map::Standard,
         ),
@@ -115,11 +117,11 @@ fn gen_board_ref_test() {
             // Food
             "turn: 13 health: 72 health: 53 health: 9
             - - - - - -
-            - r > > > 1
+            - b > > > 1
             2 - - - - +
-            ^ - r > v 0
+            ^ - b > v 0
             ^ - - - > ^
-            u - - - - -",
+            c - - - - -",
             Rules::Standard,
             Map::Standard,
         ),
@@ -127,11 +129,11 @@ fn gen_board_ref_test() {
             // Food 2
             "turn: 13 health: 72 health: 53 health: 9
             - - - - - -
-            - r > > > 1
+            - b > > > 1
             2 - - - - +
-            ^ - - r v 0
+            ^ - - b v 0
             ^ - - - > ^
-            u - - - - -",
+            c - - - - -",
             Rules::Standard,
             Map::Standard,
         ),
@@ -139,10 +141,10 @@ fn gen_board_ref_test() {
             // Tail
             "turn: 10 health: 45 health: 42 health: 42
             - - - - - -
-            - - r > > 1
-            v L 0 - - -
+            - - b > > 1
+            v E 0 - - -
             v - ^ - - -
-            v - ^ < < l
+            v - ^ < < a
             2 - - - - -",
             Rules::Standard,
             Map::Standard,
@@ -151,11 +153,11 @@ fn gen_board_ref_test() {
             // Challenge
             "turn: 1 health: 100 health: 100 health: 100
             - - - - - - -
-            - 1 r v - - -
+            - 1 b v - - -
             - ^ - v - - -
             - ^ < < - - -
             - - - - 2 < <
-            r > 0 - d - ^
+            b > 0 - d - ^
             - - - - > > ^",
             Rules::Standard,
             Map::Standard,
@@ -163,7 +165,7 @@ fn gen_board_ref_test() {
         (
             // Simultaneous body
             "turn: 1 health: 45 health: 43
-            r > v - - - -
+            b > v - - - -
             - 1 v - - - -
             - ^ 0 d - - -
             - ^ < < - - -
@@ -175,16 +177,16 @@ fn gen_board_ref_test() {
         ),
         (
             "turn: 3 health: 97 health: 97 health: 97 health: 97 health: 97
-            - - - - - - - v < l 4
-            - > > 1 r v - v - - ^
+            - - - - - - - v < a 4
+            - > > 1 b v - v - - ^
             - ^ - - - v - v - - ^
             - ^ - - - v - v - - ^
             - ^ < < < < - > > > ^
-            - - - - v L - - - - -
+            - - - - v e - - - - -
             3 < < < v > > > > v -
             d - - ^ 0 ^ - - - v -
             v - - ^ - ^ - - - v -
-            v - - ^ - ^ < < l 2 -
+            v - - ^ - ^ < < a 2 -
             > > > ^ - - - - - - - ",
             Rules::Standard,
             Map::Standard,
@@ -195,13 +197,13 @@ fn gen_board_ref_test() {
             * - * * * * * * * * * * * * * * * v *
             * - - - - - - - - * - - - - - - - 1 *
             * - * * - * * * - * - * * * - * * - *
-            * 0 < l - - - - - - - - - - - - - - *
+            * 0 < a - - - - - - - - - - - - - - *
             * - * * - * - * * * * * - * - * * - *
             * - - - - * - - - * - - - * - - - - *
             * - - * - * * * - * - * * * - * - - *
             * - - * - * - - - - - - - * - * - - *
             * * * * - * - * - * - * - * - * * * *
-            - - - - v l - * - - - * - - - - - - -
+            - - - - v a - * - - - * - - - - - - -
             * * * * 2 * - * - * - * - * - * * * *
             * - - * - * - - - - - - - * - * - - *
             * - - * - * - * * * * * - * - * - - *
@@ -225,12 +227,58 @@ fn gen_board_ref_test() {
             - - - - - v - - - - -
             - - - - - 2 - - - - -
             1 < - - - + - - - - -
-            r ^ - - - 0 < - - - -
+            b ^ - - - 0 < - - - -
             - - - - - - ^ - - - -
-            - - - - - - u - - - d
+            - - - - - - c - - - d
             - - - - - - - - - - v
             - - - - - - - - - 3 < ",
             Rules::Standard,
+            Map::Standard,
+        ),
+        (
+            "turn: 99 health: 95 health: 84 health: 89 health: 95
+            * * * * * * * * * * *
+            * * * * * * * * * * @
+            * * S { u E * * * * *
+            * * * n u * * * T * *
+            - - - ^ < - - - ^ - -
+            - - 2 < < < < - ^ - -
+            - + b > > > ^ - ^ - -
+            - - - - - - - - c - -
+            > > > > 3 - - - - - b
+            - - - - - - - - - - -",
+            Rules::Wrapped,
+            Map::Royale,
+        ),
+        (
+            "turn: 93 health: 95 health: 84
+            * * * * * * * * * * *
+            * * * u { * * * * * *
+            * @ S { n A * * * * *
+            * * * * * * * * * * *
+            - - - - - - - - - - -
+            - - - - - - - - + - -
+            - + - - - - - - - - -
+            - - - - - - - - - - -
+            > > > > 1 - - - - - f
+            - - - - - - - - - - -",
+            Rules::Wrapped,
+            Map::Royale,
+        ),
+        (
+            "turn: 10 health: 90 health: 90
+            > > 0 - - - - - - - -
+            ^ - - - - - - - - - -
+            ^ - - - - - - 1 < - -
+            ^ - - - - - - - ^ - -
+            ^ < - - - - - - ^ - -
+            b ^ - - - - > > ^ - -
+            - - - - - - ^ < a - -
+            - - - - - - - - - - -
+            - - - - - - - - - - -
+            - - - - - - - - - - -
+            - - - - - - - - - - - ",
+            Rules::Constrictor,
             Map::Standard,
         ),
     ];
@@ -248,7 +296,11 @@ fn gen_board_ref_test() {
         game.api.ruleset.name = rules_str;
 
         let board = Board::from_str(board_str, &game).unwrap();
-        let mut food_buff = Vec::with_capacity((board.max_height * board.max_width) as usize);
+        let mut food_buff = Vec::with_capacity((board.width * board.height) as usize);
+
+        if let Map::Royale = game.api.map {
+            game.api.ruleset.settings.hazard_damage_per_turn = 16;
+        }
 
         // Create permutations of all possible moves
         let mut moves_arr = Vec::new();
@@ -273,15 +325,13 @@ fn gen_board_ref_test() {
         for moves in moves_arr {
             let mut gen_board = board.clone();
             gen_board.gen_board(Move::encode(&moves), &game, &mut food_buff, &mut rng);
+            let ref_board = ref_gen.gen_ref_board(&game, &board, &moves);
 
-            let ref_board = ref_gen.gen_ref_board(&board, &moves, &game);
-
-            let mut msg = format!(
-                "gen_board != ref_board\ngen_board:\n{:?}\nref_board:\n{:?}\n",
-                gen_board, ref_board
-            );
-            msg = format!("{}moves: {:?}\ninput board:\n{}\n", msg, moves, board);
-            assert!(gen_board == ref_board, "{}", msg);
+            if gen_board != ref_board {
+                println!("\nmoves: {:?}\ninput board:\n{}", moves, board);
+                println!("gen_board:\n{}\nref_board:\n{}\n-----", gen_board, ref_board);
+            }
+            assert_eq!(gen_board, ref_board);
         }
     }
 }

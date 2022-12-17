@@ -88,7 +88,7 @@ ENV PATH "/usr/local/go/bin:/home/rust/go/bin:/home/rust/.cargo/bin:${PATH}"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=1.65.0
+    && ./rustup_init.sh -y -v --default-toolchain=1.66.0
 
 # Rust development tools
 RUN rustup component add rustfmt clippy \

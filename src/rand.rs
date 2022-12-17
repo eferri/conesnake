@@ -1,14 +1,14 @@
-use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
+use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
 pub trait Rand: Send + Sync + 'static {
     fn new() -> Self;
     fn int_n(&mut self, n: i32) -> i32;
     fn range(&mut self, min: i32, max: i32) -> i32;
-    fn shuffle<A>(&mut self, arr: &mut [A]);
+    fn shuffle<A>(&mut self, arr: &mut [A], n: usize);
 }
 
 pub struct FastRand {
-    rng: SmallRng,
+    rng: StdRng,
 }
 
 impl Rand for FastRand {
@@ -25,8 +25,8 @@ impl Rand for FastRand {
         self.rng.gen_range(min..(max + 1))
     }
 
-    fn shuffle<A>(&mut self, arr: &mut [A]) {
-        arr.shuffle(&mut self.rng);
+    fn shuffle<A>(&mut self, arr: &mut [A], n: usize) {
+        arr.partial_shuffle(&mut self.rng, n);
     }
 }
 
@@ -46,7 +46,7 @@ impl Rand for MaxRand {
         max
     }
 
-    fn shuffle<A>(&mut self, arr: &mut [A]) {
+    fn shuffle<A>(&mut self, arr: &mut [A], _n: usize) {
         arr.rotate_left(1);
     }
 }
