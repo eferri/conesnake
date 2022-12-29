@@ -1,10 +1,10 @@
-use crate::api::{Scores, SearchResult};
+use crate::api::{Scores, SearchStats};
 use crate::board::Board;
 use crate::config::Config;
 use crate::game::Game;
 use crate::pool::ThreadPool;
 use crate::rand::Rand;
-use crate::util::{Coord, Move};
+use crate::util::{Coord, Error, Move};
 
 use deepsize::DeepSizeOf;
 use log::{error, info, warn};
@@ -19,8 +19,8 @@ pub struct SearchContext<R: Rand> {
     pub game: RwLock<Option<Game>>,
 
     search_lock: Mutex<()>,
-    node_space: NodeSpace,
-    thread_scratch: RwLock<Vec<RwLock<ThreadContext<R>>>>,
+    node_space: Vec<Node>,
+    thread_state: Vec<Mutex<ThreadContext<R>>>,
 
     // Search state
     search_timeout: AtomicBool,
@@ -90,60 +90,40 @@ pub struct NodePtr {
     index: u32,
 }
 
-pub type NodeSpace = RwLock<Vec<Node>>;
-
 impl<R: Rand> SearchContext<R> {
-    pub fn new(config: Config) -> Self {
-        let num_cpu = config.num_threads;
+    pub fn new(config: &Config) -> Self {
+        let mut node_space = Vec::with_capacity(config.max_boards);
+        node_space.resize_with(config.max_boards, || {
+            Node::new(Board::new(0, 0, config.max_width, config.max_height, config.max_snakes))
+        });
+
+        let mut thread_state = Vec::with_capacity(config.num_worker_threads);
+        thread_state.resize_with(config.num_worker_threads, || {
+            Mutex::new(ThreadContext {
+                rng: R::new(),
+                board: Board::new(0, 0, config.max_width, config.max_height, config.max_snakes),
+                food_buff: Vec::with_capacity((config.max_width * config.max_height) as usize),
+
+                play_scores: vec![0.0; config.max_snakes as usize],
+                all_node_scores: Vec::with_capacity(max_children(config.max_snakes)),
+            })
+        });
+
         SearchContext {
-            config,
+            config: config.clone(),
             game: RwLock::new(None),
 
             search_lock: Mutex::new(()),
-            node_space: RwLock::new(Vec::new()),
-            thread_scratch: RwLock::new(Vec::new()),
+
+            node_space,
+            thread_state,
 
             search_timeout: AtomicBool::new(false),
-            done_barrier: Barrier::new(num_cpu + 1),
+            done_barrier: Barrier::new(config.num_worker_threads + 1),
             total_nodes: AtomicI64::new(0),
             num_games: AtomicI64::new(0),
             num_playouts: AtomicI64::new(0),
         }
-    }
-
-    pub fn allocate(&self) {
-        if self.config.max_boards == 0 {
-            return;
-        }
-
-        let mut space_guard = self.node_space.write().unwrap();
-        space_guard.resize_with(self.config.max_boards, || {
-            Node::new(Board::new(
-                0,
-                0,
-                self.config.max_width,
-                self.config.max_height,
-                self.config.max_snakes,
-            ))
-        });
-
-        let mut scratch_guard = self.thread_scratch.write().unwrap();
-        scratch_guard.resize_with(self.config.num_threads, || {
-            RwLock::new(ThreadContext {
-                rng: R::new(),
-                board: Board::new(
-                    0,
-                    0,
-                    self.config.max_width,
-                    self.config.max_height,
-                    self.config.max_snakes,
-                ),
-                food_buff: Vec::with_capacity((self.config.max_width * self.config.max_height) as usize),
-
-                play_scores: vec![0.; self.config.max_snakes as usize],
-                all_node_scores: Vec::with_capacity(max_children(self.config.max_snakes)),
-            })
-        });
     }
 
     pub fn reset(&self) {
@@ -271,8 +251,11 @@ pub fn search_moves<R: Rand>(
     board: &Board,
     game: &Game,
     start_time: Instant,
-) -> SearchResult {
-    let _search_guard = ctx.search_lock.lock().unwrap();
+) -> Result<SearchStats, Error> {
+    let _search_guard = match ctx.search_lock.try_lock() {
+        Ok(guard) => guard,
+        Err(e) => return Err(Error::LockHeld(e.to_string())),
+    };
 
     // Reset search state
     ctx.reset();
@@ -283,8 +266,7 @@ pub fn search_moves<R: Rand>(
 
     // Set the root node
     {
-        let space_guard = ctx.node_space.read().unwrap();
-        let mut root_state_guard = space_guard[0].state.write().unwrap();
+        let mut root_state_guard = ctx.node_space[0].state.write().unwrap();
 
         root_state_guard.reset();
         root_state_guard.board = board.clone();
@@ -292,7 +274,7 @@ pub fn search_moves<R: Rand>(
 
     ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
-    for id in 0..ctx.config.num_threads {
+    for id in 0..ctx.config.num_worker_threads {
         let ctx_cln = ctx.clone();
         pool.execute(move || search_worker(ctx_cln, id));
     }
@@ -315,8 +297,7 @@ pub fn search_moves<R: Rand>(
     ctx.search_timeout.store(true, Ordering::Release);
     ctx.done_barrier.wait();
 
-    let space_guard = ctx.node_space.read().unwrap();
-    let root_state_guard = space_guard[0].state.read().unwrap();
+    let root_state_guard = ctx.node_space[0].state.read().unwrap();
 
     let mut scores: Scores = Default::default();
 
@@ -339,17 +320,15 @@ pub fn search_moves<R: Rand>(
     info!("search num playouts: {}", num_playouts);
     info!("search num terminal: {}", num_terminal);
 
-    SearchResult {
+    Ok(SearchStats {
         total_nodes,
         max_depth,
         scores,
-    }
+    })
 }
 
 fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
-    let space_guard = ctx.node_space.read().unwrap();
-    let thread_guard = ctx.thread_scratch.read().unwrap();
-    let mut scratch_guard = thread_guard[id].write().unwrap();
+    let mut scratch_guard = ctx.thread_state[id].lock().unwrap();
 
     let game_guard = ctx.game.read().unwrap();
     let game = game_guard.as_ref().unwrap();
@@ -364,7 +343,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         let mut playout_guard = None;
         loop {
             let try_expand = {
-                let state_guard = space_guard[curr_idx].state.read().unwrap();
+                let state_guard = ctx.node_space[curr_idx].state.read().unwrap();
 
                 // We have reached a leaf that is end of the game
                 // OR reached node that hasn't been played out yet.
@@ -378,7 +357,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
             if try_expand {
                 // Expand node if game not over, and another thread hasn't already expanded
-                let mut state_guard = space_guard[curr_idx].state.write().unwrap();
+                let mut state_guard = ctx.node_space[curr_idx].state.write().unwrap();
                 if state_guard.num_children == 0 {
                     let space_left = expand_node(&ctx, &mut scratch_guard, &mut state_guard, curr_idx as u32, game);
                     if !space_left {
@@ -387,7 +366,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                 }
             }
 
-            let state_guard = space_guard[curr_idx].state.read().unwrap();
+            let state_guard = ctx.node_space[curr_idx].state.read().unwrap();
 
             scratch_guard.all_node_scores.clear();
 
@@ -415,7 +394,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             // Pick the child node with the highest DUCT score
             // or a child of the highest child node if all direct children are locked
             for score in scratch_guard.all_node_scores.iter() {
-                let guard_opt = space_guard[score.index as usize].play_lock.try_lock();
+                let guard_opt = ctx.node_space[score.index as usize].play_lock.try_lock();
                 if let Ok(guard) = guard_opt {
                     playout_guard = Some(guard);
                     curr_idx = score.index as usize;
@@ -432,7 +411,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             let _playout_guard = playout_guard;
 
             scratch_guard.board = {
-                let state_guard = space_guard[curr_idx].state.read().unwrap();
+                let state_guard = ctx.node_space[curr_idx].state.read().unwrap();
                 state_guard.board.clone()
             };
 
@@ -449,7 +428,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         let mut curr_move_idx;
         let new_depth;
         (curr_idx, curr_move_idx, new_depth) = {
-            let mut state_guard = space_guard[curr_idx].state.write().unwrap();
+            let mut state_guard = ctx.node_space[curr_idx].state.write().unwrap();
 
             for snake_idx in 0..state_guard.board.num_snakes() as usize {
                 state_guard.score[snake_idx] += scratch_guard.play_scores[snake_idx];
@@ -465,7 +444,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
         // Backpropagate results from playout
         loop {
-            let mut parent_state_guard = space_guard[curr_idx].state.write().unwrap();
+            let mut parent_state_guard = ctx.node_space[curr_idx].state.write().unwrap();
 
             parent_state_guard.games += 1;
 
@@ -533,7 +512,6 @@ fn expand_node<R: Rand>(
 ) -> bool {
     let num_snakes = node.board.num_snakes() as usize;
     let num_alive_snakes = node.board.num_alive_snakes();
-    let space_guard = ctx.node_space.read().unwrap();
 
     // Shouldn't try and expand an end of game board
     debug_assert!(!game.over(&node.board));
@@ -570,7 +548,7 @@ fn expand_node<R: Rand>(
         }
 
         let child_idx = ctx.total_nodes.fetch_add(1, Ordering::AcqRel) as usize;
-        if child_idx >= space_guard.len() {
+        if child_idx >= ctx.node_space.len() {
             error!("No more boards in search space");
             return false;
         }
@@ -579,7 +557,7 @@ fn expand_node<R: Rand>(
         let child_moves = node.child_moves(node.num_children as usize);
 
         {
-            let mut child_state_guard = space_guard[child_idx].state.write().unwrap();
+            let mut child_state_guard = ctx.node_space[child_idx].state.write().unwrap();
 
             child_state_guard.reset();
 

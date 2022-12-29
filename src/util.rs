@@ -102,6 +102,7 @@ pub enum Error {
     BadBoard(String),
     BadBoardReq(String),
     BadBoardStr(String),
+    LockHeld(String),
 }
 
 impl From<serde_json::Error> for Error {
@@ -124,6 +125,7 @@ impl Display for Error {
             Error::BadBoard(s) => write!(f, "BadBoard: {}", s),
             Error::BadBoardReq(s) => write!(f, "BadBoardReq: {}", s),
             Error::BadBoardStr(s) => write!(f, "BadBoardStr: {}", s),
+            Error::LockHeld(s) => write!(f, "LockHeld: {}", s),
         }
     }
 }

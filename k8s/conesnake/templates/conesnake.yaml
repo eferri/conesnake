@@ -75,7 +75,7 @@ spec:
         - "--max-height={{ .Values.max_height }}"
         - "--max-snakes={{ .Values.max_snakes }}"
         - "--max-boards=0"
-        - "--num-runs={{ .Values.num_runs }}"
+        - "--num-relay-reqs={{ $.Values.relay.num_reqs }}"
         - "--latency={{ .Values.relay.latency }}"
         - "--worker-latency={{ .Values.worker.latency }}"
         {{- range $worker := .Values.workers }}
@@ -131,7 +131,7 @@ spec:
         - "--max-height={{ $.Values.max_height }}"
         - "--max-snakes={{ $.Values.max_snakes }}"
         - "--max-boards={{ $.Values.worker.boards }}"
-        - "--num-runs={{ $.Values.num_runs }}"
         - "--latency={{ $.Values.worker.latency }}"
+        - "--num-worker-threads={{ $.Values.worker.num_threads }}"
         - "worker"
 {{ end }}

@@ -92,28 +92,18 @@ pub struct IndexResp {
     pub version: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WorkerResp {
-    pub url: String,
-    pub latency: i32,
-    pub healthy: bool,
-}
-
-pub type PingResp = Vec<WorkerResp>;
-
-pub type Scores = [SearchScore; 4];
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct SearchResult {
-    pub total_nodes: i64,
-    pub max_depth: i32,
-    pub scores: Scores,
-}
-
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SearchScore {
     pub score: f64,
     pub games: i64,
+}
+pub type Scores = [SearchScore; 4];
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct SearchStats {
+    pub total_nodes: i64,
+    pub max_depth: i32,
+    pub scores: Scores,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -121,5 +111,5 @@ pub struct MoveResp {
     #[serde(rename = "move")]
     pub mv: Move,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub scores: Option<[SearchScore; 4]>,
+    pub scores: Option<Scores>,
 }

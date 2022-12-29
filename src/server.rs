@@ -1,6 +1,6 @@
 use crate::search;
 
-use crate::api::{BattleState, IndexResp, MoveResp, PingResp, Scores, WorkerResp};
+use crate::api::{BattleState, IndexResp, MoveResp, Scores};
 use crate::board::Board;
 use crate::config::{Config, Mode};
 use crate::game::Game;
@@ -18,13 +18,11 @@ use std::{
     io::Cursor,
     sync::atomic::{AtomicBool, AtomicI64, Ordering},
     sync::{Arc, Barrier},
-    thread::sleep,
     time::{Duration, Instant},
 };
 
 pub struct Server {
-    server_pool: ThreadPool,
-    search_pool: Arc<ThreadPool>,
+    pool: Arc<ThreadPool>,
     state: Arc<ServerState>,
 }
 
@@ -32,51 +30,100 @@ struct ServerState {
     config: Config,
     workers: Vec<String>,
 
-    // resources
+    // search resources
     context: Arc<SearchContext<FastRand>>,
 
     // synchronization
     done_flag: AtomicBool,
     ready_flag: AtomicBool,
     server_barrier: Barrier,
-    ping_send: Sender<WorkerResp>,
-    ping_recv: Receiver<WorkerResp>,
-    worker_send: Sender<Scores>,
-    worker_recv: Receiver<Scores>,
+
+    request_states: (Sender<ServerThreadState>, Receiver<ServerThreadState>),
 
     // game stats
     max_nodes: AtomicI64,
 }
+
+//
+
+struct PingResults {
+    healthy: bool,
+}
+
+struct WorkerResults {
+    scores: Scores,
+    healthy: bool,
+}
+
+struct ServerThreadState {
+    ping_chans: (Sender<PingResults>, Receiver<PingResults>),
+    worker_chans: (Sender<WorkerResults>, Receiver<WorkerResults>),
+}
+
+//
+
+type WorkerPingResp = i32;
+
+struct WorkerMoveResp {
+    pub status: i32,
+    pub scores: Scores,
+}
+
+//
 
 type StrResponse = Response<Cursor<Vec<u8>>>;
 
 impl Server {
     const TICK_MS: u64 = 100;
 
-    pub fn new(mut config: Config) -> Self {
+    pub fn new(config: Config) -> Self {
         let mut workers = Vec::new();
 
         for w in &config.worker {
             let strs: Vec<&str> = w.split(',').collect();
             let addr = strs[0];
-            let par_reqs = strs[1].parse::<i32>().unwrap();
+            let worker_par_reqs = strs[1].parse::<i32>().unwrap();
 
-            for _ in 0..par_reqs {
+            for _ in 0..worker_par_reqs {
                 workers.push(addr.to_owned());
             }
         }
 
-        if config.mode == Mode::Relay {
-            config.num_threads = workers.len() * config.num_runs as usize;
+        if config.mode != Mode::Relay && config.max_boards > 0 {
+            let test_node = Node::new(Board::new(0, 0, config.max_width, config.max_height, config.max_snakes));
+
+            let node_size = test_node.deep_size_of();
+            let num_boards = config.max_boards;
+            let space_size = node_size as i64 * num_boards as i64;
+
+            info!("Size of Node: {}B", node_size);
+
+            info!("Approx. size of search space: {}MiB", space_size >> 20);
+            info!("Approx. size of search space: {}GiB", space_size >> 30);
         }
 
-        let (worker_send, worker_recv) = crossbeam_channel::bounded(config.num_threads);
-        let (ping_send, ping_recv) = crossbeam_channel::bounded(workers.len());
+        info!(
+            "Starting search space allocation max_boards: {}, width: {}, height: {}, max_snakes {}",
+            config.max_boards, config.max_width, config.max_height, config.max_snakes
+        );
+
+        let (request_sender, request_reciever) = crossbeam_channel::bounded(config.num_relay_reqs);
+        for _ in 0..config.num_relay_reqs {
+            request_sender
+                .send(ServerThreadState {
+                    ping_chans: crossbeam_channel::bounded(workers.len()),
+                    worker_chans: crossbeam_channel::bounded(workers.len()),
+                })
+                .unwrap()
+        }
+
+        let num_threads = match config.mode {
+            Mode::Relay => config.num_relay_reqs * workers.len(),
+            Mode::Worker => config.num_worker_threads,
+        };
 
         Server {
-            server_pool: ThreadPool::new(config.num_server_threads),
-            // Ping could happen simultaneously to move
-            search_pool: Arc::new(ThreadPool::new(config.num_threads * 2)),
+            pool: Arc::new(ThreadPool::new(config.num_server_threads + num_threads)),
 
             state: Arc::new(ServerState {
                 config: config.clone(),
@@ -85,14 +132,11 @@ impl Server {
                 done_flag: AtomicBool::new(false),
                 ready_flag: AtomicBool::new(false),
                 server_barrier: Barrier::new(config.num_server_threads + 1),
-                ping_send,
-                ping_recv,
-                worker_send,
-                worker_recv,
+                request_states: (request_sender, request_reciever),
 
                 max_nodes: AtomicI64::new(0),
 
-                context: Arc::new(SearchContext::new(config)),
+                context: Arc::new(SearchContext::new(&config)),
             }),
         }
     }
@@ -112,48 +156,18 @@ impl Server {
     }
 
     pub fn start_server(&self) {
-        if self.state.config.mode != Mode::Relay && self.state.config.max_boards > 0 {
-            let test_node = Node::new(Board::new(
-                0,
-                0,
-                self.state.config.max_width,
-                self.state.config.max_height,
-                self.state.config.max_snakes,
-            ));
-
-            let node_size = test_node.deep_size_of();
-            let num_boards = self.state.config.max_boards;
-            let space_size = node_size as i64 * num_boards as i64;
-
-            info!("Size of Node: {}B", node_size);
-
-            info!("Approx. size of search space: {}MiB", space_size >> 20);
-            info!("Approx. size of search space: {}GiB", space_size >> 30);
-        }
-
-        info!(
-            "Starting search space allocation max_boards: {}, width: {}, height: {}, max_snakes {}",
-            self.state.config.max_boards,
-            self.state.config.max_width,
-            self.state.config.max_height,
-            self.state.config.max_snakes
-        );
-        self.state.context.allocate();
-
-        info!("Allocation complete");
-
         let addr = ConfigListenAddr::from_socket_addrs(format!("0.0.0.0:{}", self.state.config.port)).unwrap();
         let server = Arc::new(tiny_http::Server::new(tiny_http::ServerConfig { addr, ssl: None }).unwrap());
 
         info!("Started conesnake");
         self.state.ready_flag.store(true, Ordering::Release);
 
-        for _ in 0..self.server_pool.num_threads() {
+        for _ in 0..self.state.config.num_server_threads {
             let server = server.clone();
             let state = self.state.clone();
-            let search_pool = self.search_pool.clone();
+            let pool = self.pool.clone();
 
-            self.server_pool.execute(move || {
+            self.pool.execute(move || {
                 loop {
                     if state.done_flag.load(Ordering::Acquire) {
                         break;
@@ -191,7 +205,7 @@ impl Server {
                         }
                     }
 
-                    let response = get_response(state.clone(), search_pool.clone(), &mut request, start_time);
+                    let response = get_response(state.clone(), pool.clone(), &mut request, start_time);
                     let code = response.status_code().0;
 
                     request.respond(response).unwrap();
@@ -223,11 +237,14 @@ impl Drop for Server {
 
 fn get_response(
     state: Arc<ServerState>,
-    search_pool: Arc<ThreadPool>,
+    pool: Arc<ThreadPool>,
     request: &mut Request,
     start_time: Instant,
 ) -> StrResponse {
-    match request.method() {
+    let (req_send, req_recv) = state.request_states.clone();
+    let req_state = req_recv.recv().unwrap();
+
+    let resp = match request.method() {
         Method::Get => match request.url() {
             "/" => StrResponse::from_string(
                 serde_json::to_string(&IndexResp {
@@ -242,19 +259,13 @@ fn get_response(
             )
             .with_status_code(200),
             "/ping" => {
-                let resp = if state.config.mode == Mode::Relay {
-                    ping_workers(state.clone(), &search_pool)
+                let code = if state.config.mode == Mode::Relay {
+                    ping_workers(state, &req_state, &pool)
                 } else {
-                    Vec::new()
-                };
-
-                let code = if state.config.mode != Mode::Relay || resp.iter().filter(|x| x.healthy).count() > 0 {
                     200
-                } else {
-                    500
                 };
 
-                StrResponse::from_string(serde_json::to_string(&resp).unwrap()).with_status_code(code)
+                StrResponse::from_string("").with_status_code(code)
             }
             _ => StrResponse::from_string("").with_status_code(StatusCode(404)),
         },
@@ -344,25 +355,27 @@ fn get_response(
                         Ok(board) => {
                             info!("board:\n{}", board);
 
-                            let resp = match state.config.mode {
+                            let (resp, status) = match state.config.mode {
                                 Mode::Worker => {
-                                    let scores = worker_search(state, &search_pool, &board, &game, start_time);
-                                    let mv = search::best_move(&scores);
+                                    let resp = worker_search(state, &pool, &board, &game, start_time);
+                                    let mv = search::best_move(&resp.scores);
 
-                                    MoveResp {
-                                        mv,
-                                        scores: Some(scores),
-                                    }
+                                    (
+                                        MoveResp {
+                                            mv,
+                                            scores: Some(resp.scores),
+                                        },
+                                        resp.status,
+                                    )
                                 }
                                 Mode::Relay => {
-                                    let scores = run_workers(state, &search_pool, &game_state, start_time);
-                                    let mv = search::best_move(&scores);
-
-                                    MoveResp { mv, scores: None }
+                                    let resp = run_workers(state, &req_state, &pool, &game_state, start_time);
+                                    let mv = search::best_move(&resp.scores);
+                                    (MoveResp { mv, scores: None }, resp.status)
                                 }
                             };
 
-                            (resp, 200)
+                            (resp, status)
                         }
                     };
 
@@ -374,109 +387,135 @@ fn get_response(
             }
         }
         _ => StrResponse::from_string("{}").with_status_code(StatusCode(404)),
-    }
+    };
+
+    req_send
+        .send(req_state)
+        .unwrap_or_else(|err| error!("Error sending to req_state channel {}", err));
+
+    resp
 }
 
 fn worker_search(
     state: Arc<ServerState>,
-    search_pool: &ThreadPool,
+    pool: &ThreadPool,
     board: &Board,
     game: &Game,
     start_time: Instant,
-) -> Scores {
+) -> WorkerMoveResp {
     let ctx = state.context.clone();
 
-    let search_results = search::search_moves(ctx, search_pool, board, game, start_time);
+    let search_res = search::search_moves(ctx, pool, board, game, start_time);
 
-    state.max_nodes.fetch_max(search_results.total_nodes, Ordering::AcqRel);
+    let resp = match search_res {
+        Ok(stats) => {
+            state.max_nodes.fetch_max(stats.total_nodes, Ordering::AcqRel);
+
+            WorkerMoveResp {
+                scores: stats.scores,
+                status: 200,
+            }
+        }
+        Err(e) => {
+            error!("Error getting search_moves: {}", e);
+            WorkerMoveResp {
+                scores: Default::default(),
+                status: 500,
+            }
+        }
+    };
+
     let max = state.max_nodes.load(Ordering::Acquire);
     info!("max nodes expanded: {}", max);
 
-    search_results.scores
+    resp
 }
 
 fn run_workers(
     state: Arc<ServerState>,
-    search_pool: &ThreadPool,
+    req_state: &ServerThreadState,
+    pool: &ThreadPool,
     game_state: &BattleState,
     start_time: Instant,
-) -> Scores {
-    let mut total_scores: Scores = Default::default();
+) -> WorkerMoveResp {
+    let mut resp = WorkerMoveResp {
+        scores: Default::default(),
+        status: 500,
+    };
 
-    let relay_delay_ms = game_state.game.timeout - state.config.latency;
-    let run_delay_ms = (relay_delay_ms as f64 / state.config.num_runs as f64).round() as i32;
-
-    let worker_one_way_ms = (state.config.worker_latency as f64 / 2.0).round() as i32;
+    let delay_ms = game_state.game.timeout - state.config.latency;
 
     for i in 0..state.workers.len() {
-        for j in 0..state.config.num_runs {
-            let state = state.clone();
-            let mut game_state = game_state.clone();
+        let state = state.clone();
+        let mut game_state = game_state.clone();
 
-            search_pool.execute(move || {
-                if j > 0 {
-                    sleep(Duration::from_millis(((run_delay_ms - worker_one_way_ms) * j) as u64));
-                }
+        let worker_send = req_state.worker_chans.0.clone();
 
-                let worker = &state.workers[i];
+        pool.execute(move || {
+            let worker = &state.workers[i];
 
-                game_state.you.latency = "0".to_owned();
-                game_state.game.timeout = run_delay_ms;
+            game_state.you.latency = "0".to_owned();
+            game_state.game.timeout = delay_ms;
 
-                let current_dur = Instant::now() - start_time;
-                let timeout_dur = Duration::from_millis(relay_delay_ms as u64).saturating_sub(current_dur);
+            let current_dur = Instant::now() - start_time;
+            let timeout_dur = Duration::from_millis(delay_ms as u64).saturating_sub(current_dur);
 
-                let run_scores = Default::default();
-                if timeout_dur.is_zero() {
-                    state.worker_send.send(run_scores).unwrap();
-                    return;
-                }
-
-                let ureq_agent = ureq::builder()
-                    .timeout(timeout_dur)
-                    .timeout_connect(timeout_dur)
-                    .build();
-
-                let req_start = Instant::now();
-                let res = ureq_agent.post(&format!("{}/move", worker)).send_json(game_state);
-                let req_dur = Instant::now() - req_start;
-                let server_latency = req_dur.as_micros() as i64;
-
-                let mut run_str = format!("\nWorker {} latency run {} us {}\n", worker, j, server_latency);
-
-                let run_scores = match res {
-                    Err(e) => {
-                        error!("Error getting worker move: {}", e);
-                        Default::default()
-                    }
-                    Ok(resp) => {
-                        let move_resp = resp.into_json::<MoveResp>().unwrap();
-                        let scores = move_resp.scores.unwrap();
-                        for (i, s) in scores.iter().enumerate() {
-                            let score = if s.games == 0 { 0.0 } else { s.score / s.games as f64 };
-
-                            run_str.push_str(&format!(
-                                "move: {:<6} score: {:.8}  games: {}\n",
-                                Move::from_idx(i),
-                                score,
-                                s.games
-                            ));
-                        }
-                        scores
-                    }
+            if timeout_dur.is_zero() {
+                let run_scores = WorkerResults {
+                    scores: Default::default(),
+                    healthy: false,
                 };
+                worker_send.send(run_scores).unwrap();
+                return;
+            }
 
-                info!("{}\n", run_str);
+            let ureq_agent = ureq::builder()
+                .timeout(timeout_dur)
+                .timeout_connect(timeout_dur)
+                .build();
 
-                state.worker_send.send(run_scores).unwrap();
-            });
-        }
+            let req_start = Instant::now();
+            let res = ureq_agent.post(&format!("{}/move", worker)).send_json(game_state);
+            let req_dur = Instant::now() - req_start;
+            let server_latency = req_dur.as_micros() as i64;
+
+            let mut run_str = format!("\nWorker {} latency us {}\n", worker, server_latency);
+
+            let run_scores = match res {
+                Err(e) => {
+                    error!("Error getting worker move: {}", e);
+                    WorkerResults {
+                        scores: Default::default(),
+                        healthy: false,
+                    }
+                }
+                Ok(resp) => {
+                    let move_resp = resp.into_json::<MoveResp>().unwrap();
+                    let scores = move_resp.scores.unwrap();
+                    for (i, s) in scores.iter().enumerate() {
+                        let score = if s.games == 0 { 0.0 } else { s.score / s.games as f64 };
+
+                        run_str.push_str(&format!(
+                            "move: {:<6} score: {:.8}  games: {}\n",
+                            Move::from_idx(i),
+                            score,
+                            s.games
+                        ));
+                    }
+                    WorkerResults { scores, healthy: true }
+                }
+            };
+
+            info!("{}\n", run_str);
+
+            worker_send.send(run_scores).unwrap();
+        });
     }
 
-    for _ in 0..(state.workers.len() as i32 * state.config.num_runs) {
-        let recv_resp = state.worker_recv.recv();
+    for _ in 0..(state.workers.len() as i32) {
+        let recv_resp = req_state.worker_chans.1.recv();
 
-        let run_scores = match recv_resp {
+        let worker_res = match recv_resp {
             Ok(s) => s,
             Err(e) => {
                 error!("Worker channel error! {}", e);
@@ -484,20 +523,25 @@ fn run_workers(
             }
         };
 
-        for (i, s) in total_scores.iter_mut().enumerate() {
-            s.score += run_scores[i].score;
-            s.games += run_scores[i].games;
+        if worker_res.healthy {
+            resp.status = 200;
+        }
+
+        for (i, s) in resp.scores.iter_mut().enumerate() {
+            s.score += worker_res.scores[i].score;
+            s.games += worker_res.scores[i].games;
         }
     }
 
-    total_scores
+    resp
 }
 
-fn ping_workers(state: Arc<ServerState>, ping_pool: &ThreadPool) -> PingResp {
+fn ping_workers(state: Arc<ServerState>, req_state: &ServerThreadState, pool: &ThreadPool) -> WorkerPingResp {
     for i in 0..state.workers.len() {
+        let ping_send = req_state.ping_chans.0.clone();
         let state = state.clone();
 
-        ping_pool.execute(move || {
+        pool.execute(move || {
             let worker = &state.workers[i];
 
             let req_start = Instant::now();
@@ -518,29 +562,28 @@ fn ping_workers(state: Arc<ServerState>, ping_pool: &ThreadPool) -> PingResp {
                 }
             };
 
-            let resp = WorkerResp {
-                url: worker.clone(),
-                latency: latency_ms,
-                healthy,
-            };
+            let resp = PingResults { healthy };
 
-            state.ping_send.send(resp).unwrap();
+            ping_send.send(resp).unwrap();
         });
     }
 
-    let mut pings = Vec::with_capacity(state.workers.len());
+    let mut resp_status = 500;
 
     for _ in 0..state.workers.len() {
-        let worker_res = state.ping_recv.recv();
-        let resp = match worker_res {
+        let worker_res = req_state.ping_chans.1.recv();
+        let worker_resp = match worker_res {
             Ok(s) => s,
             Err(e) => {
                 error!("Worker channel error: {}", e);
                 continue;
             }
         };
-        pings.push(resp);
+
+        if worker_resp.healthy {
+            resp_status = 200;
+        }
     }
 
-    pings
+    resp_status
 }

@@ -21,11 +21,11 @@ pub struct Config {
     #[clap(long, default_value = "8080")]
     pub port: String,
 
-    #[clap(long, default_value_t = 1)]
-    pub num_runs: i32,
+    #[clap(long, default_value_t = 8)]
+    pub num_relay_reqs: usize,
 
     #[clap(long, default_value_t = num_cpus::get())]
-    pub num_threads: usize,
+    pub num_worker_threads: usize,
 
     #[clap(long, default_value_t = 8)]
     pub num_server_threads: usize,
@@ -42,13 +42,14 @@ pub struct Config {
     #[clap(long, default_value_t = 5)]
     pub max_snakes: i32,
 
-    #[clap(long, default_value_t = DEFAULT_TEMP)]
-    pub temperature: f64,
-
     // Latencies are round trip time
     #[clap(long, default_value_t = 10)]
     pub latency: i32,
 
     #[clap(long, default_value_t = 20)]
     pub worker_latency: i32,
+
+    // Algorithm parameters
+    #[clap(long, default_value_t = DEFAULT_TEMP)]
+    pub temperature: f64,
 }

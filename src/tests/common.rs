@@ -13,8 +13,8 @@ pub fn test_config() -> Config {
         mode: Mode::Worker,
         worker: vec![],
         port: "".to_owned(),
-        num_runs: 1,
-        num_threads: 1,
+        num_relay_reqs: 1,
+        num_worker_threads: 1,
         num_server_threads: 1,
         max_boards: 5000,
         max_width: 19,
@@ -32,8 +32,8 @@ pub fn release_config() -> Config {
         mode: Mode::Worker,
         worker: vec![],
         port: "".to_owned(),
-        num_runs: 1,
-        num_threads: 8,
+        num_relay_reqs: 1,
+        num_worker_threads: 8,
         num_server_threads: 8,
         max_boards: 800000,
         max_width: 21,
@@ -46,15 +46,11 @@ pub fn release_config() -> Config {
 }
 
 pub fn get_context() -> SearchContext<FastRand> {
-    let context = SearchContext::new(get_config());
-    context.allocate();
-    context
+    SearchContext::new(&get_config())
 }
 
 pub fn get_deterministic_context() -> SearchContext<MaxRand> {
-    let context = SearchContext::new(get_config());
-    context.allocate();
-    context
+    SearchContext::new(&get_config())
 }
 
 pub fn get_config() -> Config {

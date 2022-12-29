@@ -183,10 +183,8 @@ fn expand_node_test() {
         ),
     ];
 
-    let scratch_guard = ctx.thread_scratch.read().unwrap();
-    let mut state = scratch_guard[0].write().unwrap();
-    let space_guard = ctx.node_space.read().unwrap();
-    let mut root_state_guard = space_guard[0].state.write().unwrap();
+    let mut state = ctx.thread_state[0].lock().unwrap();
+    let mut root_state_guard = ctx.node_space[0].state.write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str_dims(
@@ -228,7 +226,7 @@ fn expand_node_test() {
 
             // Ignore status of snakes that are dead, not encoded in string
             {
-                let mut state_guard = space_guard[idx + 1].state.write().unwrap();
+                let mut state_guard = ctx.node_space[idx + 1].state.write().unwrap();
                 for snake_idx in 0..state_guard.board.num_snakes() as usize {
                     let snake = &mut state_guard.board.snakes[snake_idx];
                     if !snake.alive() {
@@ -237,7 +235,7 @@ fn expand_node_test() {
                 }
             }
             assert_eq!(
-                space_guard[idx + 1].state.read().unwrap().board,
+                ctx.node_space[idx + 1].state.read().unwrap().board,
                 Board::from_str_dims(
                     board,
                     &game,
@@ -279,8 +277,7 @@ fn playout_test() {
     let ctx = get_deterministic_context();
     let game = test_game();
 
-    let scratch_space_guard = ctx.thread_scratch.write().unwrap();
-    let mut scratch_guard = scratch_space_guard[0].write().unwrap();
+    let mut scratch_guard = ctx.thread_state[0].lock().unwrap();
 
     let start_board = Board::from_str(PLAYOUT_TRAPPED, &game).unwrap();
 
@@ -313,12 +310,12 @@ const SEARCH_SMALL: &str = "
 fn small_search_test() {
     log_test_init();
     let ctx = get_deterministic_context();
-    let pool = ThreadPool::new(ctx.config.num_threads);
+    let pool = ThreadPool::new(ctx.config.num_worker_threads);
 
     let game = solo_game();
     let board = Board::from_str(SEARCH_SMALL, &game).unwrap();
 
-    let search_result = search::search_moves(Arc::new(ctx), &pool, &board, &game, Instant::now());
+    let search_result = search::search_moves(Arc::new(ctx), &pool, &board, &game, Instant::now()).unwrap();
     let best_move = search::best_move(&search_result.scores);
 
     assert_eq!(best_move, Move::Right);
@@ -343,11 +340,11 @@ const SEARCH_HEAD_ON: &str = "
 fn head_on_search_test() {
     log_test_init();
     let ctx = get_deterministic_context();
-    let pool = ThreadPool::new(ctx.config.num_threads);
+    let pool = ThreadPool::new(ctx.config.num_worker_threads);
     let game = test_game();
     let board = Board::from_str(SEARCH_HEAD_ON, &game).unwrap();
 
-    let search_result = search::search_moves(Arc::new(ctx), &pool, &board, &game, Instant::now());
+    let search_result = search::search_moves(Arc::new(ctx), &pool, &board, &game, Instant::now()).unwrap();
     let best_move = search::best_move(&search_result.scores);
 
     assert_ne!(best_move, Move::Right);
@@ -382,14 +379,14 @@ const ARCADE_MAZE_BOARD: &str = "
 fn arcade_maze_search_test() {
     log_test_init();
     let ctx = Arc::new(get_deterministic_context());
-    let pool = ThreadPool::new(ctx.config.num_threads);
+    let pool = ThreadPool::new(ctx.config.num_worker_threads);
 
     for _ in 0..4 {
         let mut game = wrapped_game();
         game.api.map = Map::ArcadeMaze;
         let board = Board::from_str(ARCADE_MAZE_BOARD, &game).unwrap();
 
-        let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now());
+        let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
         let best_move = search::best_move(&search_result.scores);
 
         assert!(best_move == Move::Down || best_move == Move::Up);

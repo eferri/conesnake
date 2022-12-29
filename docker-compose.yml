@@ -23,10 +23,12 @@ services:
         --max-width ${MAX_WIDTH:-11} \
         --max-height ${MAX_HEIGHT:-11} \
         --max-snakes ${MAX_SNAKES:-4} \
-        --worker http://worker:8081,1 \
+        --worker http://worker-1:8081,1 \
+        --worker http://worker-2:8081,1 \
+        --worker http://worker-3:8081,1 \
         relay
 
-  worker:
+  worker-1: &worker
     image: conesnake:latest-dev
     build:
       target: dev
@@ -39,19 +41,23 @@ services:
       - TARGET
     volumes:
       - ".:/app"
-    ports:
-      - "8081:8081"
     command: |
       scripts/entrypoint.sh \
         --port 8081 \
-        --num-threads ${NUM_THREADS:-4} \
+        --num-worker-threads ${NUM_THREADS:-4} \
         --max-boards ${MAX_BOARDS:-10000} \
         --max-width ${MAX_WIDTH:-11} \
         --max-height ${MAX_HEIGHT:-11} \
         --max-snakes ${MAX_SNAKES:-4} \
         worker
 
-  snork-flood:
+  worker-2:
+    <<: *worker
+
+  worker-3:
+    <<: *worker
+
+  snork-flood: &snork
     build:
       context: submodules/snork
       args:
@@ -60,35 +66,19 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "4"
+          cpus: "2"
     ports:
       - "8082:8082"
     command: ["--host", "0.0.0.0:8082", "--color", "#4400ff", "--config", "{ \"Flood\": {} }"]
 
   snork-tree:
-    build:
-      context: submodules/snork
-      args:
-        UID: ${UID}
-        GID: ${GID}
-    deploy:
-      resources:
-        limits:
-          cpus: "4"
+    <<: *snork
     ports:
       - "8083:8083"
     command: ["--host", "0.0.0.0:8083", "--color", "#00ff59", "--config", "{ \"Tree\": {} }"]
 
   snork-mobility:
-    build:
-      context: submodules/snork
-      args:
-        UID: ${UID}
-        GID: ${GID}
-    deploy:
-      resources:
-        limits:
-          cpus: "4"
+    <<: *snork
     ports:
       - "8084:8084"
     command: ["--host", "0.0.0.0:8084", "--color", "#ffff00", "--config", "{ \"Mobility\": {} }"]

@@ -70,7 +70,7 @@ fn main() {
     );
 
     let args = Args::parse();
-    let pool = ThreadPool::new(ctx.config.num_threads);
+    let pool = ThreadPool::new(ctx.config.num_worker_threads);
 
     let num_search = 20;
 
@@ -88,7 +88,7 @@ fn main() {
     let mut total_node_sum = 0;
 
     for _ in 0..num_search {
-        let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now());
+        let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
         let best_move = search::best_move(&search_result.scores);
 
         total_node_res.push(search_result.total_nodes);

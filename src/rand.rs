@@ -7,6 +7,8 @@ pub trait Rand: Send + Sync + 'static {
     fn shuffle<A>(&mut self, arr: &mut [A], n: usize);
 }
 
+// Profiling shows StdRng may actually be slightly faster than
+// Non-cryptographically secure generators
 pub struct FastRand {
     rng: StdRng,
 }
