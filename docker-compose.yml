@@ -11,6 +11,7 @@ services:
     environment:
       - RUST_BACKTRACE
       - TARGET
+      - NUM_THREADS
     volumes:
       - ".:/app"
     ports:

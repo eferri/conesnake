@@ -184,7 +184,7 @@ fn expand_node_test() {
     ];
 
     let mut state = ctx.thread_state[0].lock().unwrap();
-    let mut root_state_guard = ctx.node_space[0].state.write().unwrap();
+    let mut root_state_guard = ctx.node_space[0].write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str_dims(
@@ -226,7 +226,7 @@ fn expand_node_test() {
 
             // Ignore status of snakes that are dead, not encoded in string
             {
-                let mut state_guard = ctx.node_space[idx + 1].state.write().unwrap();
+                let mut state_guard = ctx.node_space[idx + 1].write().unwrap();
                 for snake_idx in 0..state_guard.board.num_snakes() as usize {
                     let snake = &mut state_guard.board.snakes[snake_idx];
                     if !snake.alive() {
@@ -235,7 +235,7 @@ fn expand_node_test() {
                 }
             }
             assert_eq!(
-                ctx.node_space[idx + 1].state.read().unwrap().board,
+                ctx.node_space[idx + 1].read().unwrap().board,
                 Board::from_str_dims(
                     board,
                     &game,
@@ -325,11 +325,11 @@ fn small_search_test() {
 
 const SEARCH_HEAD_ON: &str = "
     turn: 2 health: 45 health: 34
-    v a - - - - - - - -
-    v - - - - - - - - -
-    0 - 1 - - - - - - -
-    - - ^ - - - - - - -
-    - - ^ < < a - - - -
+    - v a - - - - - - -
+    - v - - - - - - - -
+    - 0 - 1 - - - - - -
+    - - - ^ - - - - - -
+    - - - ^ < < a - - -
     - - - - - - - - - -
     - - - - - - - - - -
     - - - - - - - - - -

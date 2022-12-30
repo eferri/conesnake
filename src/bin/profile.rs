@@ -2,13 +2,15 @@ use conesnake::board::{Board, BoardSquare};
 use conesnake::game::Map;
 use conesnake::log::log_init;
 use conesnake::pool::ThreadPool;
+use conesnake::rand::FastRand;
 use conesnake::search;
-use conesnake::tests::common::{get_context, wrapped_game};
+use conesnake::search::SearchContext;
+use conesnake::tests::common::{get_config, wrapped_game};
 
 use clap::Parser;
 use log::info;
 
-use std::{sync::Arc, time::Instant};
+use std::{env, sync::Arc, time::Instant};
 
 const HAZARD_ISLAND_PROFILE_BOARD: &str = "
     turn: 22 health: 80 health: 84 health: 89 health: 100
@@ -59,18 +61,27 @@ struct Args {
 
 fn main() {
     log_init();
-    let ctx = Arc::new(get_context());
+
+    let args = Args::parse();
+    let mut config = get_config();
+
+    if let Ok(t) = env::var("NUM_THREADS") {
+        config.num_worker_threads = str::parse(&t).unwrap();
+    }
+
+    let ctx = SearchContext::<FastRand>::new(&config);
 
     let square_size = std::mem::size_of::<BoardSquare>();
 
     info!("size of BoardSquare : {} B", square_size);
     info!(
         "size of Board : {} B",
-        square_size as i32 * ctx.config.max_width * ctx.config.max_height
+        square_size as i32 * config.max_width * config.max_height
     );
 
-    let args = Args::parse();
-    let pool = ThreadPool::new(ctx.config.num_worker_threads);
+    println!("num_worker {}", config.num_worker_threads);
+
+    let pool = ThreadPool::new(1 + config.num_worker_threads);
 
     let num_search = 20;
 
@@ -86,6 +97,8 @@ fn main() {
 
     let mut total_node_res = Vec::new();
     let mut total_node_sum = 0;
+
+    let ctx = Arc::new(ctx);
 
     for _ in 0..num_search {
         let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();

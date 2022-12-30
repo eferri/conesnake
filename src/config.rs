@@ -2,6 +2,7 @@ use clap::{Parser, ValueEnum};
 use num_cpus;
 
 pub const DEFAULT_TEMP: f64 = 1.1;
+pub const DEFAULT_LOSS: f64 = 0.1;
 
 #[derive(ValueEnum, Clone, Debug, PartialEq, Eq)]
 pub enum Mode {
@@ -52,4 +53,7 @@ pub struct Config {
     // Algorithm parameters
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
+
+    #[clap(long, default_value_t = DEFAULT_LOSS)]
+    pub virtual_loss: f64,
 }
