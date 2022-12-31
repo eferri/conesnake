@@ -1,8 +1,11 @@
 use clap::{Parser, ValueEnum};
 use num_cpus;
 
-pub const DEFAULT_TEMP: f64 = 1.1;
+pub const DEFAULT_TEMP: f64 = 3.6;
 pub const DEFAULT_LOSS: f64 = 0.2;
+
+pub const DEFAULT_RAVE_EQUIV: i32 = 2048;
+pub const DEFAULT_RAVE_MOVES: i32 = 6;
 
 #[derive(ValueEnum, Clone, Debug, PartialEq, Eq)]
 pub enum Mode {
@@ -56,4 +59,10 @@ pub struct Config {
 
     #[clap(long, default_value_t = DEFAULT_LOSS)]
     pub virtual_loss: f64,
+
+    #[clap(long, default_value_t = DEFAULT_RAVE_EQUIV)]
+    pub rave_equiv: i32,
+
+    #[clap(long, default_value_t = DEFAULT_RAVE_MOVES)]
+    pub rave_moves: i32,
 }

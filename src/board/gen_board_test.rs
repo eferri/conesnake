@@ -236,6 +236,22 @@ fn gen_board_ref_test() {
             Map::Standard,
         ),
         (
+            "turn: 232 health: 81 health: 45 health: 58 health: 42
+            - - + > > > > v - - -
+            - - - ^ < < a 3 - b v
+            - d - + - - - - - - v
+            - v - - - - - 0 < < v
+            - > v - - v < < < ^ <
+            - - > v v < - b ^ - -
+            - - 1 v v - 2 - - - -
+            - - ^ v > > ^ - - - -
+            - - ^ < - - - - - - -
+            - - - - - - - - - - -
+            - - - - - - - - - - -",
+            Rules::Standard,
+            Map::Standard,
+        ),
+        (
             "turn: 99 health: 95 health: 84 health: 89 health: 95
             * * * * * * * * * * *
             * * * * * * * * * * @

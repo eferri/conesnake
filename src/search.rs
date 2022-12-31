@@ -55,7 +55,9 @@ pub struct Node {
 
     games: i32,
     score: Vec<f64>,
+
     cache: Vec<[NodeScoreCache; 4]>,
+    rave_cache: Vec<[NodeRaveCache; 4]>,
 
     num_children: u32,
     // This uses a LOT of memory
@@ -68,6 +70,12 @@ pub struct NodeScoreCache {
     score: f64,
     games: i64,
     pruned: bool,
+}
+
+#[derive(Default, Debug, Clone, DeepSizeOf)]
+pub struct NodeRaveCache {
+    score: f64,
+    games: i64,
 }
 
 // Pointer to child nodes, with corresponding moves
@@ -145,6 +153,8 @@ impl Node {
             score: vec![0.0; max_snakes as usize],
             cache: vec![Default::default(); max_snakes as usize],
 
+            rave_cache: vec![Default::default(); max_snakes as usize],
+
             num_children: 0,
             children: vec![NodePtr { moves: 0, index: 0 }; max_children(max_snakes)],
         }
@@ -166,27 +176,42 @@ impl Node {
         for score_cache in self.cache.iter_mut() {
             *score_cache = Default::default();
         }
+
+        for rave_cache in self.rave_cache.iter_mut() {
+            *rave_cache = Default::default();
+        }
     }
 
     pub fn child_moves(&self, idx: usize) -> u32 {
         self.children[idx].moves
     }
 
-    fn duct_score(&self, snake_idx: usize, mv: Move, temp: f64, loss: f64) -> f64 {
-        let cache = &self.cache[snake_idx][mv.idx()];
+    fn duct_score(&self, snake_idx: usize, mv: Move, cfg: &Config) -> f64 {
+        let mcts_scores = &self.cache[snake_idx][mv.idx()];
+        let rave_scores = &self.rave_cache[snake_idx][mv.idx()];
 
-        let loss = if self.virtual_loss { loss } else { 0.0 };
+        let virtual_loss = if self.virtual_loss { cfg.virtual_loss } else { 0.0 };
 
-        if cache.pruned {
+        if mcts_scores.pruned {
             f64::MIN
-        } else if cache.games == 0 || self.games == 0 {
+        } else if mcts_scores.games == 0 || self.games == 0 {
             if self.virtual_loss {
-                -loss
+                -virtual_loss
             } else {
                 f64::MAX
             }
+        } else if cfg.rave_moves != 0 {
+            let uct_score = cfg.temperature * ((self.games as f64).ln() / mcts_scores.games as f64).sqrt();
+            let amaf_score = (cfg.rave_equiv as f64 / (3.0 * self.games as f64 + cfg.rave_equiv as f64)).sqrt();
+
+            (1.0 - amaf_score) * (mcts_scores.score / mcts_scores.games as f64)
+                + amaf_score * (rave_scores.score / rave_scores.games as f64)
+                + uct_score
+                - virtual_loss
         } else {
-            cache.score / cache.games as f64 + temp * ((self.games as f64).ln() / cache.games as f64).sqrt() - loss
+            let uct_score = cfg.temperature * ((self.games as f64).ln() / mcts_scores.games as f64).sqrt();
+
+            (mcts_scores.score / mcts_scores.games as f64) + uct_score - virtual_loss
         }
     }
 }
@@ -369,12 +394,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
                     for snake_idx in 0..state_guard.board.num_snakes() {
                         let mv = Move::extract(child_ptr.moves, snake_idx as u32);
-                        let mv_duct_score = state_guard.duct_score(
-                            snake_idx as usize,
-                            mv,
-                            ctx.config.temperature,
-                            ctx.config.virtual_loss,
-                        );
+                        let mv_duct_score = state_guard.duct_score(snake_idx as usize, mv, &ctx.config);
 
                         child_score += mv_duct_score;
                     }
@@ -414,6 +434,9 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         // Update rollout node score, get parent node for backprop
         let mut curr_move_idx;
         let new_depth;
+
+        let mut orig_moves = None;
+
         (curr_idx, curr_move_idx, new_depth) = {
             let mut state_guard = ctx.node_space[curr_idx].write().unwrap();
 
@@ -441,16 +464,29 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                 state_guard.max_depth = new_depth;
             }
 
+            let moves = state_guard.children[curr_move_idx as usize].moves;
+            if orig_moves.is_none() {
+                orig_moves = Some(moves);
+            }
+
             for snake_idx in 0..state_guard.board.num_snakes() as usize {
                 let snake_score = scratch_guard.play_scores[snake_idx];
 
                 // Update cached score and game count of each snake-move for this node
-                let moves = state_guard.children[curr_move_idx as usize].moves;
                 let snake_mv = Move::extract(moves, snake_idx as u32);
-                let mut cache = &mut state_guard.cache[snake_idx][snake_mv.idx()];
+
+                let cache = &mut state_guard.cache[snake_idx][snake_mv.idx()];
 
                 cache.score += snake_score;
                 cache.games += 1;
+
+                if (new_depth - state_guard.depth) <= ctx.config.rave_moves {
+                    let rave_snake_mv = Move::extract(orig_moves.unwrap(), snake_idx as u32);
+                    let rave_cache = &mut state_guard.rave_cache[snake_idx][rave_snake_mv.idx()];
+
+                    rave_cache.score += snake_score;
+                    rave_cache.games += 1;
+                }
             }
 
             if curr_idx == 0 {

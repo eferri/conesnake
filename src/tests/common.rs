@@ -1,5 +1,5 @@
 use crate::api::{Customizations, GameApi, RoyaleSettings, Ruleset, Settings, SnakeApi, SquadSettings};
-use crate::config::{Config, Mode, DEFAULT_LOSS, DEFAULT_TEMP};
+use crate::config::{Config, Mode, DEFAULT_LOSS, DEFAULT_RAVE_EQUIV, DEFAULT_RAVE_MOVES, DEFAULT_TEMP};
 use crate::game::{Game, Map, Rules};
 use crate::rand::{FastRand, MaxRand};
 use crate::search::SearchContext;
@@ -16,14 +16,16 @@ pub fn test_config() -> Config {
         num_relay_reqs: 1,
         num_worker_threads: 1,
         num_server_threads: 1,
-        max_boards: 50000,
+        max_boards: 5000,
         max_width: 19,
         max_height: 21,
         max_snakes: 5,
-        temperature: DEFAULT_TEMP,
-        virtual_loss: DEFAULT_LOSS,
         latency: 5,
         worker_latency: 5,
+        temperature: DEFAULT_TEMP,
+        virtual_loss: DEFAULT_LOSS,
+        rave_equiv: 10384,
+        rave_moves: DEFAULT_RAVE_MOVES,
     }
 }
 
@@ -40,10 +42,12 @@ pub fn release_config() -> Config {
         max_width: 21,
         max_height: 21,
         max_snakes: 4,
-        temperature: DEFAULT_TEMP,
-        virtual_loss: DEFAULT_LOSS,
         latency: 20,
         worker_latency: 30,
+        temperature: DEFAULT_TEMP,
+        virtual_loss: DEFAULT_LOSS,
+        rave_equiv: DEFAULT_RAVE_EQUIV,
+        rave_moves: DEFAULT_RAVE_MOVES,
     }
 }
 
