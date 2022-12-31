@@ -455,14 +455,3 @@ pub fn gen_board_food_test() {
 
     assert!(board_food.num_food() > 0);
 }
-
-#[test]
-pub fn gen_mov_test() {
-    let game = test_game();
-    let mut rng = FastRand::new();
-
-    let board = Board::from_str(BOARD_B, &game).unwrap();
-    let mv = board.gen_move(&game, 0, &mut rng);
-
-    assert_eq!(mv, Move::Right);
-}

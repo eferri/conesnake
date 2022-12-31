@@ -2,7 +2,7 @@ use clap::{Parser, ValueEnum};
 use num_cpus;
 
 pub const DEFAULT_TEMP: f64 = 1.1;
-pub const DEFAULT_LOSS: f64 = 0.1;
+pub const DEFAULT_LOSS: f64 = 0.2;
 
 #[derive(ValueEnum, Clone, Debug, PartialEq, Eq)]
 pub enum Mode {

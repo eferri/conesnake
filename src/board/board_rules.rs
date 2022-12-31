@@ -71,34 +71,6 @@ impl Board {
                 best_move = Some(mv);
                 break;
             }
-
-            for mv in rand_moves {
-                if !valid_moves[mv.idx()] {
-                    continue;
-                }
-
-                match self.head_on_col(game, snake_idx, mv) {
-                    HeadOnCol::PossibleCollision => continue,
-                    HeadOnCol::PossibleElimination | HeadOnCol::None => (),
-                }
-
-                best_move = Some(mv);
-                break;
-            }
-
-            for mv in rand_moves {
-                if !valid_moves[mv.idx()] {
-                    continue;
-                }
-
-                match self.head_on_col(game, snake_idx, mv) {
-                    HeadOnCol::PossibleCollision | HeadOnCol::None => continue,
-                    HeadOnCol::PossibleElimination => (),
-                }
-
-                best_move = Some(mv);
-                break;
-            }
         }
         best_move.unwrap_or(Move::Left)
     }

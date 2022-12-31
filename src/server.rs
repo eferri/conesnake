@@ -22,7 +22,8 @@ use std::{
 };
 
 pub struct Server {
-    pool: Arc<ThreadPool>,
+    server_pool: ThreadPool,
+    worker_pool: Arc<ThreadPool>,
     state: Arc<ServerState>,
 }
 
@@ -123,7 +124,8 @@ impl Server {
         };
 
         Server {
-            pool: Arc::new(ThreadPool::new(config.num_server_threads + num_threads)),
+            server_pool: ThreadPool::new(config.num_server_threads),
+            worker_pool: Arc::new(ThreadPool::new(num_threads)),
 
             state: Arc::new(ServerState {
                 config: config.clone(),
@@ -165,9 +167,9 @@ impl Server {
         for _ in 0..self.state.config.num_server_threads {
             let server = server.clone();
             let state = self.state.clone();
-            let pool = self.pool.clone();
+            let worker_pool = self.worker_pool.clone();
 
-            self.pool.execute(move || {
+            self.server_pool.execute(move || {
                 loop {
                     if state.done_flag.load(Ordering::Acquire) {
                         break;
@@ -205,7 +207,7 @@ impl Server {
                         }
                     }
 
-                    let response = get_response(state.clone(), pool.clone(), &mut request, start_time);
+                    let response = get_response(state.clone(), worker_pool.clone(), &mut request, start_time);
                     let code = response.status_code().0;
 
                     request.respond(response).unwrap();
