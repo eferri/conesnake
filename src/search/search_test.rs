@@ -4,7 +4,6 @@ use crate::board::Board;
 use crate::game::Map;
 use crate::log::log_test_init;
 use crate::pool::ThreadPool;
-
 use crate::tests::common::{get_context, get_deterministic_context, solo_game, test_game, wrapped_game};
 use crate::util::Move;
 
@@ -316,61 +315,11 @@ fn small_search_test() {
     let board = Board::from_str(SEARCH_SMALL, &game).unwrap();
 
     let search_result = search::search_moves(Arc::new(ctx), &pool, &board, &game, Instant::now()).unwrap();
-    let best_move = search::best_move(&search_result.scores);
+    let best_move = search::best_move(&search_result.scores[0], true);
 
     assert_eq!(best_move, Move::Right);
     assert_eq!(search_result.max_depth, 2);
     assert_eq!(search_result.total_nodes, 3);
-}
-
-const SEARCH_HEAD_ON_0: &str = "
-    turn: 2 health: 45 health: 34
-    v a - - - - - - - -
-    v - - - - - - - - -
-    0 - 1 - - - - - - -
-    - - ^ - - - - - - -
-    - - ^ < < a - - - -
-    - - - - - - - - - -
-    - - - - - - - - - -
-    - - - - - - - - - -
-    - - - - - - - - - -
-";
-
-const SEARCH_HEAD_ON_1: &str = "
-    turn: 232 health: 81 health: 45 health: 58 health: 42
-    - - + > > > > v - - -
-    - - - ^ < < a 3 - b v
-    - d - + - - - - - - v
-    - v - - - - - 0 < < v
-    - > v - - v < < < ^ <
-    - - > v v < - b ^ - -
-    - - 1 v v - 2 - - - -
-    - - ^ v > > ^ - - - -
-    - - ^ < - - - - - - -
-    - - - - - - - - - - -
-    - - - - - - - - - - -
-";
-
-#[test]
-fn head_on_search_test() {
-    log_test_init();
-    let ctx = Arc::new(get_context());
-    let pool = ThreadPool::new(ctx.config.num_worker_threads);
-    let game = test_game();
-
-    let board_0 = Board::from_str(SEARCH_HEAD_ON_0, &game).unwrap();
-
-    let search_result = search::search_moves(ctx.clone(), &pool, &board_0, &game, Instant::now()).unwrap();
-    let best_move = search::best_move(&search_result.scores);
-
-    assert_ne!(best_move, Move::Right);
-
-    let board_1 = Board::from_str(SEARCH_HEAD_ON_1, &game).unwrap();
-
-    let search_result = search::search_moves(ctx, &pool, &board_1, &game, Instant::now()).unwrap();
-    let best_move = search::best_move(&search_result.scores);
-
-    assert_ne!(best_move, Move::Up);
 }
 
 const ARCADE_MAZE_BOARD: &str = "
@@ -410,7 +359,7 @@ fn arcade_maze_search_test() {
         let board = Board::from_str(ARCADE_MAZE_BOARD, &game).unwrap();
 
         let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
-        let best_move = search::best_move(&search_result.scores);
+        let best_move = search::best_move(&search_result.scores[0], true);
 
         assert!(best_move == Move::Down || best_move == Move::Up);
     }

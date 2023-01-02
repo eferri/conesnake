@@ -67,7 +67,7 @@ record:
 	docker compose run --rm snake bash -c ' \
 		cargo build --profile=release-with-debug \
 		&& perf record --call-graph dwarf -F 5000 \
-			./target-snake/release-with-debug/profile'
+			./target-snake/release-with-debug/performance'
 
 .PHONY: report
 report:
@@ -84,8 +84,13 @@ report:
 bench:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& ./target-snake/release/profile'
+		&& ./target-snake/release/performance'
 
+.PHONY: optimize
+optimize:
+	docker compose run --rm snake bash -c ' \
+		cargo build --release \
+		&& python3 ./scripts/optimize.py'
 
 ASM_FUNC ?= "search_worker"
 

@@ -7,6 +7,7 @@ resource "aws_cloudwatch_metric_alarm" "conesnake" {
 
   alarm_actions             = [aws_sns_topic.conesnake.arn]
   insufficient_data_actions = [aws_sns_topic.conesnake.arn]
+  ok_actions                = [aws_sns_topic.conesnake.arn]
 
   metric_query {
     id          = "query"

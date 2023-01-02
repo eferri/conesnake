@@ -24,7 +24,7 @@ pub fn test_config() -> Config {
         worker_latency: 5,
         temperature: DEFAULT_TEMP,
         virtual_loss: DEFAULT_LOSS,
-        rave_equiv: 10384,
+        rave_equiv: DEFAULT_RAVE_EQUIV,
         rave_moves: DEFAULT_RAVE_MOVES,
     }
 }

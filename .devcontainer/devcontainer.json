@@ -19,7 +19,8 @@
         "hashicorp.terraform",
         "redhat.vscode-yaml",
         "ms-kubernetes-tools.vscode-kubernetes-tools",
-        "eamodio.gitlens"
+        "eamodio.gitlens",
+        "ms-python.python"
     ],
     "overrideCommand": true,
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",

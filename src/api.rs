@@ -92,7 +92,7 @@ pub struct IndexResp {
     pub version: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
 pub struct SearchScore {
     pub score: f64,
     pub games: i64,
@@ -103,7 +103,7 @@ pub type Scores = [SearchScore; 4];
 pub struct SearchStats {
     pub total_nodes: i64,
     pub max_depth: i32,
-    pub scores: Scores,
+    pub scores: Vec<Scores>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

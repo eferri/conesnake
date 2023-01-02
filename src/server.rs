@@ -308,19 +308,21 @@ fn get_response(
 
             match request.url() {
                 "/start" => {
-                    info!("game ID: {}", game_state.game.id);
-                    info!("rules: {:?}", game_state.game.ruleset.name);
-                    info!("map: {:?}", game_state.game.map);
-                    info!("timeout: {}", game_state.game.timeout);
-                    info!(
-                        "width: {}, height: {}, snakes: {}",
-                        game_width, game_height, game_snakes
-                    );
-                    info!(
-                        "food spawn chance: {}",
-                        game_state.game.ruleset.settings.food_spawn_chance
-                    );
-                    info!("min food: {}", game_state.game.ruleset.settings.minimum_food);
+                    if let Mode::Relay = state.config.mode {
+                        info!("game ID: {}", game_state.game.id);
+                        info!("rules: {:?}", game_state.game.ruleset.name);
+                        info!("map: {:?}", game_state.game.map);
+                        info!("timeout: {}", game_state.game.timeout);
+                        info!(
+                            "width: {}, height: {}, snakes: {}",
+                            game_width, game_height, game_snakes
+                        );
+                        info!(
+                            "food spawn chance: {}",
+                            game_state.game.ruleset.settings.food_spawn_chance
+                        );
+                        info!("min food: {}", game_state.game.ruleset.settings.minimum_food);
+                    }
                     StrResponse::from_string("{}")
                 }
                 "/move" => {
@@ -339,7 +341,9 @@ fn get_response(
                         return StrResponse::from_string("{}").with_status_code(StatusCode(409));
                     }
 
-                    info!("turn: {}", game_state.turn);
+                    if let Mode::Relay = state.config.mode {
+                        info!("turn: {}", game_state.turn);
+                    }
 
                     let parsed_board = Board::from_req(
                         &game,
@@ -355,12 +359,10 @@ fn get_response(
                             return StrResponse::from_string("{}").with_status_code(StatusCode(400));
                         }
                         Ok(board) => {
-                            info!("board:\n{}", board);
-
                             let (resp, status) = match state.config.mode {
                                 Mode::Worker => {
                                     let resp = worker_search(state, &pool, &board, &game, start_time);
-                                    let mv = search::best_move(&resp.scores);
+                                    let mv = search::best_move(&resp.scores, false);
 
                                     (
                                         MoveResp {
@@ -372,7 +374,8 @@ fn get_response(
                                 }
                                 Mode::Relay => {
                                     let resp = run_workers(state, &req_state, &pool, &game_state, start_time);
-                                    let mv = search::best_move(&resp.scores);
+                                    let mv = search::best_move(&resp.scores, true);
+                                    info!("board:\n{}", board);
                                     (MoveResp { mv, scores: None }, resp.status)
                                 }
                             };
@@ -414,7 +417,7 @@ fn worker_search(
             state.max_nodes.fetch_max(stats.total_nodes, Ordering::AcqRel);
 
             WorkerMoveResp {
-                scores: stats.scores,
+                scores: stats.scores[0],
                 status: 200,
             }
         }

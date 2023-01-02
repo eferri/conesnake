@@ -1,13 +1,13 @@
 use clap::{Parser, ValueEnum};
 use num_cpus;
 
-pub const DEFAULT_TEMP: f64 = 3.6;
-pub const DEFAULT_LOSS: f64 = 0.2;
+pub const DEFAULT_TEMP: f64 = 1.6;
+pub const DEFAULT_LOSS: f64 = 0.1;
 
 pub const DEFAULT_RAVE_EQUIV: i32 = 2048;
-pub const DEFAULT_RAVE_MOVES: i32 = 6;
+pub const DEFAULT_RAVE_MOVES: i32 = 3;
 
-#[derive(ValueEnum, Clone, Debug, PartialEq, Eq)]
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Mode {
     Worker,
     Relay,
@@ -47,10 +47,10 @@ pub struct Config {
     pub max_snakes: i32,
 
     // Latencies are round trip time
-    #[clap(long, default_value_t = 10)]
+    #[clap(long, default_value_t = 30)]
     pub latency: i32,
 
-    #[clap(long, default_value_t = 20)]
+    #[clap(long, default_value_t = 60)]
     pub worker_latency: i32,
 
     // Algorithm parameters

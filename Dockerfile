@@ -47,7 +47,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libunwind-dev \
     libnuma-dev \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install wg-meshconf
+    && pip install wg-meshconf scikit-optimize numpy==1.23.5
 
 # Build perf linked with libffd (binutils-dev) for better performance
 RUN curl -sSfL "https://github.com/torvalds/linux/archive/refs/tags/v${KERNAL_VER}.zip" -o linux.zip \
