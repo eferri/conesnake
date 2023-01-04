@@ -14,6 +14,18 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use clap::Parser;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+struct Results {
+    failures: i64,
+    loss: f64,
+    games: i64,
+    cases: i64,
+    median_nodes: i64,
+    mean_nodes: f64,
+    max_nodes: i64,
+}
 
 type TestCase<'a> = &'a [(usize, bool, Move)];
 
@@ -158,7 +170,7 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         - - - - - - - - - - -
         - - - - - - - - - - -
         - - - - - - - - - - -",
-        &[(0, true, Move::Down), (1, true, Move::Right)],
+        &[(0, true, Move::Down)],
         Rules::Standard,
         Map::Standard,
     ),
@@ -232,12 +244,118 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         Rules::Standard,
         Map::Standard,
     ),
+    (
+        "turn: 129 health: 95 health: 93 health: 72 health: 83
+        - - - b > > > > > > v
+        - - - - - - - - - - 0
+        - - - - - - b > > v -
+        - - - - 2 < v a - v -
+        - - - > > ^ v - - 3 -
+        - - - ^ < - > v - - -
+        - - - > ^ v < v - - +
+        - - - c - v ^ v - - -
+        - - - 1 v < ^ < - - -
+        - - - ^ < - - - - - -
+        - - - - - - - - - + -
+        ",
+        &[(0, true, Move::Left), (3, true, Move::Right)],
+        Rules::Standard,
+        Map::Standard,
+    ),
+    (
+        "turn: 74 health: 53 health: 97 health: 56 health: 100
+        - > > > 1 - - - - - -
+        - ^ < < a - - - - - -
+        - - - - - - - > 3 - -
+        - - - - - - - ^ - - -
+        - - d - - f > ^ - - -
+        - v < - - - - - - - -
+        - v + d > > 2 - - - -
+        - 0 - > ^ - - - - - -
+        - - - - - - - - - - -
+        - - - - - - - - - - -
+        - - - - - - - - - - -",
+        &[(0, true, Move::Right)],
+        Rules::Standard,
+        Map::Standard,
+    ),
+    (
+        // Maybe unstable
+        "turn: 204 health: 46 health: 84 health: 51 health: 80
+        - - - - 2 < < - - - -
+        - - - - > v ^ - d > v
+        - - + > ^ > ^ - v ^ v
+        - - - ^ - - - 0 v ^ v
+        - - - ^ - - - ^ v ^ v
+        - - > ^ - - - ^ < ^ v
+        - - c - 1 < < - - c 3
+        - - > > v > ^ - - - -
+        - - ^ < v ^ - - - - -
+        + - - c > ^ - - - - -
+        - - - - - - - - - - -",
+        &[(0, true, Move::Left), (3, true, Move::Left)],
+        Rules::Standard,
+        Map::Standard,
+    ),
+    (
+        "turn: 163 health: 13 health: 75 health: 17 health: 25
+        + - - - - 3 < < < < <
+        - - - - - - - - - - ^
+        - - - - - - - - - - ^
+        - - - v < a - - - - c
+        - 2 < < - - - - - - -
+        0 - - - - - 1 - - - -
+        ^ - - d - > ^ - - - -
+        ^ - - > v ^ - - - - -
+        ^ < - - > ^ - - - - -
+        > ^ - - - - - - - - -
+        ^ < a - - - - - - - -",
+        &[(0, true, Move::Right), (2, true, Move::Up)],
+        Rules::Standard,
+        Map::Standard,
+    ),
+    (
+        "turn: 173 health: 82 health: 94 health: 80
+        > > > 0 + - - - - - -
+        ^ < - - - - - b v - -
+        - c - - - - - - v - +
+        - - v < v < < v < - -
+        - - v ^ v - ^ < - - -
+        - - v c 1 - - - - - -
+        - + v - - - - - - - -
+        - - > > 2 - - - - - -
+        - - - - - - - - - - -
+        - - - - - - - - - - -
+        - - - - - - - - - - -
+        ",
+        &[(0, true, Move::Right)],
+        Rules::Standard,
+        Map::Standard,
+    ),
+    (
+        "turn: 280 health: 4 health: 76 health: 71
+        - + - - - - - - - - -
+        + - - - - - - - - - -
+        - - - - v < < < - - -
+        - - - v < - - ^ > > v
+        - - - > 1 > > ^ ^ < v
+        - - - - - ^ - - - c v
+        - - - - - c - - - - v
+        - - - > > > > 0 + - v
+        - b > ^ - - - - 2 < <
+        - - - - - - - - - - -
+        - - - - - - - - - - -
+        ",
+        &[(0, true, Move::Up)],
+        Rules::Standard,
+        Map::Standard,
+    ),
 ];
 
 fn main() -> Result<(), Error> {
     let mut cfg = Config::parse();
 
-    cfg.max_boards = 1000000;
+    cfg.max_boards = 800000;
     cfg.max_snakes = 4;
     cfg.max_width = 19;
     cfg.max_height = 21;
@@ -262,16 +380,14 @@ fn main() -> Result<(), Error> {
 
     let mut game = test_game();
 
-    let mut passes = 0;
-    let mut tests = 0;
-
     let mut total_node_res = Vec::new();
     let mut total_node_sum = 0;
-    let mut max_nodes = 0;
 
-    let num_runs = 1;
+    let mut results: Results = Default::default();
 
-    let total_tests = TESTS.len() * num_runs;
+    let num_runs = 6;
+
+    results.games = TESTS.len() as i64 * num_runs as i64;
 
     for run_idx in 0..num_runs {
         for (test_idx, (board_str, desired_moves, rules, map)) in TESTS.iter().enumerate() {
@@ -279,11 +395,7 @@ fn main() -> Result<(), Error> {
                 break;
             }
 
-            eprintln!(
-                "running search {} / {}",
-                run_idx * TESTS.len() + test_idx + 1,
-                total_tests
-            );
+            eprintln!("run {} search {} / {}", run_idx, test_idx, TESTS.len());
 
             game.ruleset = *rules;
             game.api.map = *map;
@@ -292,8 +404,8 @@ fn main() -> Result<(), Error> {
 
             let mut search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
 
-            if search_result.total_nodes > max_nodes {
-                max_nodes = search_result.total_nodes;
+            if search_result.total_nodes > results.max_nodes {
+                results.max_nodes = search_result.total_nodes;
             }
 
             total_node_res.push(search_result.total_nodes);
@@ -311,7 +423,7 @@ fn main() -> Result<(), Error> {
 
                 if !passed {
                     let mut failure_str = format!(
-                        "{}\nSnake {} Condition: mv{}{} Actual move: {}\nScores {:#?}",
+                        "{}\nSnake {} Condition: mv{}{} Actual move: {}\nScores {:#?}\n",
                         board,
                         snake_idx,
                         if *eq { "==" } else { "!=" },
@@ -321,31 +433,31 @@ fn main() -> Result<(), Error> {
                     );
 
                     if !board.valid_move(&game, *snake_idx, actual_move) {
-                        failure_str.push_str("Actual move was invalid!")
+                        failure_str.push_str("ERROR Actual move was invalid!")
                     }
 
                     eprintln!("{}", failure_str);
+                    results.failures += 1;
+
+                    results.loss += search_result.scores[*snake_idx][actual_move as usize].score
+                        - search_result.scores[*snake_idx][*mv as usize].score;
                 } else {
-                    passes += 1;
+                    results.loss -= 0.05;
                 }
-                tests += 1;
+
+                results.cases += 1;
             }
         }
     }
 
     total_node_res.sort();
 
-    let median_nodes = total_node_res[total_tests / 2];
-    let mean_nodes = total_node_sum as f64 / total_tests as f64;
+    let total_tests = TESTS.len() * num_runs;
 
-    println!(
-        "{{ \"games\": {}, \"cases\": {}, \"failures\": {}, \"median_nodes\": {}, \"mean_nodes\": {}}}",
-        TESTS.len() * num_runs,
-        tests,
-        tests - passes,
-        median_nodes,
-        mean_nodes
-    );
+    results.median_nodes = total_node_res[total_tests / 2];
+    results.mean_nodes = total_node_sum as f64 / total_tests as f64;
+
+    println!("{}", serde_json::to_string(&results).unwrap());
 
     Ok(())
 }

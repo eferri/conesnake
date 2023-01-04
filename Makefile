@@ -90,7 +90,7 @@ bench:
 optimize:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& python3 ./scripts/optimize.py'
+		&& python3 -u ./scripts/optimize.py 2>&1 | tee optimize.log'
 
 ASM_FUNC ?= "search_worker"
 

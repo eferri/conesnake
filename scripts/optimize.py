@@ -1,44 +1,95 @@
 import json
+import pprint
+import os
+import asyncio
+
 from itertools import chain
 
-from skopt import gp_minimize
 from skopt.space import Real, Integer
-from skopt.utils import use_named_args
-
-import subprocess
-
-search_space = [
-    Real(0.2, 8.0, name="temperature"),
-    Real(0.00001, 0.5, name="virtual-loss"),
-    Integer(1, 100000, name="rave-equiv"),
-    Integer(0, 64, name="rave-moves"),
-]
+from skopt import Optimizer
 
 
-@use_named_args(search_space)
-def run_search(**kwargs):
-    cfg_args = list(chain.from_iterable((f"--{key}", str(value)) for (key, value) in kwargs.items()))
+async def run_search(call, num_calls, **kwargs):
+    pretty = pprint.PrettyPrinter(indent=4)
 
-    args = ["./target-snake/release/performance"] + cfg_args
+    print(f"{pretty.pformat(kwargs)}\n")
 
-    print(f"Running with args: {args}")
+    msg = "\n-------------------------\n"
+    msg += f"gp_minimize call {call}/{num_calls}\n"
+    msg += "args:\n"
+    msg += pretty.pformat(kwargs)
 
-    ret_str = subprocess.run(
-        args=args,
-        stderr=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        check=True,
-        encoding="utf-8",
+    args = list(chain.from_iterable((
+        f"--{key}", str(value)
+    ) for (key, value) in kwargs.items()))
+
+    proc = await asyncio.create_subprocess_exec(
+        "./target-snake/release/performance",
+        *args,
+        stderr=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+
+    ret = json.loads(stdout)
+
+    msg += "\nresults:\n"
+    msg += pretty.pformat(ret)
+
+    call += 1
+
+    print(msg)
+
+    return ret["loss"]
+
+
+async def main():
+    pretty = pprint.PrettyPrinter(indent=4)
+
+    dimensions = [
+        Real(5.0, 16.0, name="temperature"),
+        # Real(0.001, 100.0, name="virtual-loss"),
+        Real(0.0, 1.0, name="base-reward"),
+        Real(0.0, 0.5, name="len-reward"),
+        Real(0.1, 1.0, name="elim-reward"),
+        Real(0.05, 1.0, name="head-elim-reward"),
+        Real(-1.0, 0.0, name="head-coll-reward"),
+        Integer(500, 100000, name="equiv")
+    ]
+
+    opt = Optimizer(
+        dimensions=dimensions,
     )
 
-    print(f"Results: {ret_str.stdout}")
+    num_parallel = os.cpu_count() // 8
 
-    ret = json.loads(ret_str.stdout)
+    num_calls = 100
+    calls = 0
 
-    return ret["failures"]
+    while calls < num_calls:
+        n_points = min(num_parallel, num_calls - calls)
+        x_list = opt.ask(n_points=n_points)
+        x_kwargs = [{dim.name: x[idx]
+                     for idx, dim in enumerate(dimensions)} for x in x_list]
+
+        print("\n*************************\n")
+        print("Starting evaluation jobs with args:\n")
+
+        y_list = await asyncio.gather(*[
+            run_search(calls + idx, num_calls, **search_kwargs) for idx, search_kwargs in enumerate(x_kwargs)
+        ])
+
+        opt.tell(x_list, y_list)
+        calls += num_parallel
+
+    min_loss_idx = opt.yi.index(min(opt.yi))
+    min_loss = opt.yi[min_loss_idx]
+
+    res = {dimensions[idx].name: x for idx,
+           x in enumerate(opt.Xi[min_loss_idx])}
+
+    print(f"Solution:\n{pretty.pformat(res)}\nmin_loss: {min_loss}")
 
 
 if __name__ == "__main__":
-    res = gp_minimize(run_search, search_space, n_calls=100, n_jobs=3)
-
-    print(res.x)
+    asyncio.run(main())

@@ -46,7 +46,7 @@ impl Move {
 
     pub fn num_perm(num_snakes: i32) -> u32 {
         // Equivalent to 4^(max_snakes)
-        1 << (2 * num_snakes)
+        1 << (2 * num_snakes as u32)
     }
 
     // Extract the move index from snake at index snake_idx,

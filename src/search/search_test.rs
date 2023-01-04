@@ -184,6 +184,7 @@ fn expand_node_test() {
 
     let mut state = ctx.thread_state[0].lock().unwrap();
     let mut root_state_guard = ctx.node_space[0].write().unwrap();
+    let num_root_alive = root_state_guard.board.num_alive_snakes();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str_dims(
@@ -200,7 +201,9 @@ fn expand_node_test() {
         root_state_guard.board = start_board;
         ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
-        search::expand_node(&ctx, &mut state, &mut root_state_guard, 0, &test_game());
+        while !root_state_guard.is_fully_expanded() {
+            search::expand_node(&ctx, &test_game(), &mut state, &mut root_state_guard, 0, num_root_alive);
+        }
 
         assert_eq!(root_state_guard.num_children as usize, expected_results.len());
 

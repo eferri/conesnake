@@ -1,6 +1,7 @@
 use crate::api::GameApi;
-use crate::board::Board;
-use crate::util::{Coord, Error};
+use crate::board::{Board, HeadOnCol};
+use crate::config::Config;
+use crate::util::{Coord, Error, Move};
 
 use serde::{Deserialize, Serialize};
 
@@ -88,15 +89,55 @@ impl Game {
         }
     }
 
-    pub fn over(&self, board: &Board) -> bool {
-        !board.snakes[0].alive() || board.num_alive_snakes() <= self.search_cutoff()
+    pub fn approx_score(&self, board: &Board, cfg: &Config, snake_idx: usize, root_num_alive: i32) -> f64 {
+        if !board.snakes[snake_idx].alive() {
+            if self.is_solo {
+                return board.turn as f64 / self.max_turn(board) as f64;
+            } else {
+                return 0.0;
+            }
+        }
+
+        let mut score = cfg.base_reward;
+
+        let our_len = board.snakes[snake_idx].body.len();
+        let num_alive = board.num_alive_snakes();
+
+        for s_idx in 0..board.num_snakes() as usize {
+            if s_idx == snake_idx {
+                continue;
+            }
+            if our_len > board.snakes[s_idx].body.len() {
+                score += cfg.len_reward;
+            }
+
+            score += (root_num_alive - num_alive) as f64 * cfg.elim_reward;
+        }
+
+        for mv_idx in 0..4 {
+            if !board.valid_move(self, snake_idx, Move::from_idx(mv_idx)) {
+                continue;
+            }
+
+            match board.head_on_col(self, snake_idx, Move::from_idx(mv_idx)) {
+                HeadOnCol::PossibleCollision => score += cfg.head_coll_reward,
+                HeadOnCol::PossibleElimination => score += cfg.head_elim_reward,
+                HeadOnCol::None => (),
+            }
+        }
+
+        score.clamp(0.0, 1.0)
     }
 
-    pub fn search_cutoff(&self) -> i32 {
+    pub fn over(&self, board: &Board) -> bool {
+        board.num_alive_snakes() < self.min_alive_snakes()
+    }
+
+    pub fn min_alive_snakes(&self) -> i32 {
         match (self.ruleset, self.is_solo) {
-            (_, true) => 0,
-            (Rules::Solo, _) => 0,
-            (Rules::Standard, false) => 1,
+            (_, true) => 1,
+            (Rules::Solo, _) => 1,
+            (Rules::Standard, false) => 2,
             _ => 1,
         }
     }

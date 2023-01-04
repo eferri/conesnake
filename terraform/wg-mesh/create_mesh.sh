@@ -21,8 +21,7 @@ do
     echo "Creating wg config for node $NODE_HOST"
 
     wg-meshconf addpeer \
-        --address "$NODE_ADDRESS/16" \
-        --allowedips "$NODE_ADDRESS/32" \
+        --address "$NODE_ADDRESS/32" \
         --listenport 59203 \
         --endpoint "$NODE_PRIV_IP" \
         --persistentkeepalive 15 \
@@ -39,8 +38,7 @@ do
     echo "Creating wg config for node $NODE_HOST"
 
     wg-meshconf addpeer \
-        --address "$NODE_ADDRESS/16" \
-        --allowedips "$NODE_ADDRESS/32" \
+        --address "$NODE_ADDRESS/32" \
         --listenport "$NODE_PORT" \
         --endpoint "$LOCAL_IP" \
         --persistentkeepalive 15 \
