@@ -11,7 +11,6 @@ SERVER_INSTALL_FILES="\
   ./k8s/cloud-provider-aws.yaml \
 "
 
-
 CLOUD_SSH_ARGS="-q -o StrictHostKeyChecking=no -i ~/.ssh/conesnake_ed25519"
 
 uninstall_k3s_server()
