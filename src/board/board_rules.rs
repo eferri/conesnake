@@ -477,6 +477,7 @@ impl Board {
 
     fn update_board(&mut self, game: &Game, food_buff: &mut Vec<Coord>, rng: &mut impl Rand) {
         let map = game.api.map;
+        let rules = game.ruleset;
 
         if let Map::Empty = map {
             return;
@@ -557,8 +558,8 @@ impl Board {
         }
 
         // royale logic, possibly shrink board
-        match map {
-            Map::Royale => (),
+        match (map, rules) {
+            (Map::Royale, _) | (_, Rules::Royale) => (),
             _ => return,
         }
 
