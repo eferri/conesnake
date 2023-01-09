@@ -183,8 +183,7 @@ fn expand_node_test() {
     ];
 
     let mut state = ctx.thread_state[0].lock().unwrap();
-    let mut root_state_guard = ctx.node_space[0].write().unwrap();
-    let num_root_alive = root_state_guard.board.num_alive_snakes();
+    let mut root_state_guard = ctx.node_space[0].state.write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str_dims(
@@ -202,7 +201,7 @@ fn expand_node_test() {
         ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
         while !root_state_guard.is_fully_expanded() {
-            search::expand_node(&ctx, &test_game(), &mut state, &mut root_state_guard, 0, num_root_alive);
+            search::expand_node(&ctx, &test_game(), &mut state, &mut root_state_guard, 0);
         }
 
         assert_eq!(root_state_guard.num_children as usize, expected_results.len());
@@ -228,7 +227,7 @@ fn expand_node_test() {
 
             // Ignore status of snakes that are dead, not encoded in string
             {
-                let mut state_guard = ctx.node_space[idx + 1].write().unwrap();
+                let mut state_guard = ctx.node_space[idx + 1].state.write().unwrap();
                 for snake_idx in 0..state_guard.board.num_snakes() as usize {
                     let snake = &mut state_guard.board.snakes[snake_idx];
                     if !snake.alive() {
@@ -237,7 +236,7 @@ fn expand_node_test() {
                 }
             }
             assert_eq!(
-                ctx.node_space[idx + 1].read().unwrap().board,
+                ctx.node_space[idx + 1].state.read().unwrap().board,
                 Board::from_str_dims(
                     board,
                     &game,

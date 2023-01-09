@@ -89,7 +89,15 @@ impl Game {
         }
     }
 
-    pub fn approx_score(&self, board: &Board, cfg: &Config, snake_idx: usize, root_num_alive: i32) -> f64 {
+    // Not currently used
+    pub fn approx_score(&self, board: &Board, _cfg: &Config, snake_idx: usize, root_num_alive: i32) -> f64 {
+        // TODO: replace if using
+        let base_reward = 0.0;
+        let len_reward = 0.0;
+        let elim_reward = 0.0;
+        let head_coll_reward = 0.0;
+        let head_elim_reward = 0.0;
+
         if !board.snakes[snake_idx].alive() {
             if self.is_solo {
                 return board.turn as f64 / self.max_turn(board) as f64;
@@ -98,7 +106,7 @@ impl Game {
             }
         }
 
-        let mut score = cfg.base_reward;
+        let mut score = base_reward;
 
         let our_len = board.snakes[snake_idx].body.len();
         let num_alive = board.num_alive_snakes();
@@ -108,10 +116,10 @@ impl Game {
                 continue;
             }
             if our_len > board.snakes[s_idx].body.len() {
-                score += cfg.len_reward;
+                score += len_reward;
             }
 
-            score += (root_num_alive - num_alive) as f64 * cfg.elim_reward;
+            score += (root_num_alive - num_alive) as f64 * elim_reward;
         }
 
         for mv_idx in 0..4 {
@@ -120,8 +128,8 @@ impl Game {
             }
 
             match board.head_on_col(self, snake_idx, Move::from_idx(mv_idx)) {
-                HeadOnCol::PossibleCollision => score += cfg.head_coll_reward,
-                HeadOnCol::PossibleElimination => score += cfg.head_elim_reward,
+                HeadOnCol::PossibleCollision => score += head_coll_reward,
+                HeadOnCol::PossibleElimination => score += head_elim_reward,
                 HeadOnCol::None => (),
             }
         }

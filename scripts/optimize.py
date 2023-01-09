@@ -47,14 +47,7 @@ async def main():
     pretty = pprint.PrettyPrinter(indent=4)
 
     dimensions = [
-        Real(5.0, 16.0, name="temperature"),
-        # Real(0.001, 100.0, name="virtual-loss"),
-        Real(0.0, 1.0, name="base-reward"),
-        Real(0.0, 0.5, name="len-reward"),
-        Real(0.1, 1.0, name="elim-reward"),
-        Real(0.05, 1.0, name="head-elim-reward"),
-        Real(-1.0, 0.0, name="head-coll-reward"),
-        Integer(500, 100000, name="equiv")
+        Real(0.5, 16.0, name="temperature"),
     ]
 
     opt = Optimizer(
