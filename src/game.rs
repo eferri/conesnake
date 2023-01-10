@@ -145,8 +145,7 @@ impl Game {
         match (self.ruleset, self.is_solo) {
             (_, true) => 1,
             (Rules::Solo, _) => 1,
-            (Rules::Standard, false) => 2,
-            _ => 1,
+            (_, false) => 2,
         }
     }
 }

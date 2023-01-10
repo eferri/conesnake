@@ -47,7 +47,7 @@ async def main():
     pretty = pprint.PrettyPrinter(indent=4)
 
     dimensions = [
-        Real(0.5, 16.0, name="temperature"),
+        Real(0.5, 32.0, name="temperature"),
     ]
 
     opt = Optimizer(

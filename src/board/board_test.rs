@@ -127,6 +127,16 @@ const BOARD_TAIL: &str = "
     2 - - - - -
 ";
 
+const BOARD_TAIL_HAZARD: &str = "
+    turn: 10 health: 45 health: 42 health: 42
+    * * * - - -
+    * * B > > 1
+    u E S - - -
+    u * n - - -
+    u * n < < a
+    U * * - - -
+";
+
 const BOARD_D: &str = "
     turn: 1 health: 42
     - - - - - -
@@ -362,14 +372,23 @@ pub fn move_test() {
 
 #[test]
 pub fn tail_test() {
-    let game = test_game();
+    let mut game = test_game();
 
     let board_tail = Board::from_str(BOARD_TAIL, &game).unwrap();
+    let board_hazard = Board::from_str(BOARD_TAIL_HAZARD, &game).unwrap();
 
     assert!(board_tail.valid_move(&game, 0, Move::Up));
 
     // Stacked, shouldn't be able to move into tail
     assert!(!board_tail.valid_move(&game, 0, Move::Left));
+
+    game.api.ruleset.settings.hazard_damage_per_turn = 10;
+    assert!(board_hazard.valid_move(&game, 0, Move::Up));
+    assert!(!board_hazard.valid_move(&game, 0, Move::Left));
+
+    game.api.ruleset.settings.hazard_damage_per_turn = 80;
+    assert!(!board_hazard.valid_move(&game, 0, Move::Up));
+    assert!(!board_hazard.valid_move(&game, 0, Move::Left));
 }
 
 #[test]

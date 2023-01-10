@@ -89,9 +89,15 @@ impl Board {
             | BoardSquare::SnakeHeadHazard(_)
             | BoardSquare::SnakeBody(_)
             | BoardSquare::SnakeBodyHazard(_) => false,
-            BoardSquare::SnakeTail(i) | BoardSquare::SnakeTailHazard(i) => {
+            BoardSquare::SnakeTail(i) => {
                 let idx = i as usize;
                 self.snake_tail(idx) != self.snakes[idx].body[self.snakes[idx].body.len() - 2]
+            }
+            BoardSquare::SnakeTailHazard(i) => {
+                let idx = i as usize;
+
+                (self.snakes[snake_idx].health - game.api.ruleset.settings.hazard_damage_per_turn) > 0
+                    && self.snake_tail(idx) != self.snakes[idx].body[self.snakes[idx].body.len() - 2]
             }
         }
     }

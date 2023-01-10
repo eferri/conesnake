@@ -3,7 +3,7 @@ use num_cpus;
 
 // Hyperparameters
 
-pub const DEFAULT_TEMP: f64 = 12.99;
+pub const DEFAULT_TEMP: f64 = 11.64;
 
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {

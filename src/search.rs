@@ -80,6 +80,7 @@ pub struct Node {
 struct NodeScoreCache {
     score: f64,
     games: i64,
+    variance_sum: f64,
     pruned: bool,
 }
 
@@ -202,8 +203,18 @@ impl NodeState {
         } else if mcts_scores.games == 0 || self.games == 0 {
             f64::MAX
         } else {
-            let uct_score = cfg.temperature * ((self.games as f64).ln() / mcts_scores.games as f64).sqrt();
-            (mcts_scores.score / mcts_scores.games as f64) + uct_score
+            let ln_parent_games = (self.games as f64).ln();
+
+            let variance = if mcts_scores.games < 2 {
+                0.0
+            } else {
+                (mcts_scores.variance_sum) / (mcts_scores.games - 1) as f64
+            };
+
+            let var_ucb = variance + (2.0 * ln_parent_games / mcts_scores.games as f64).sqrt();
+            let uct_score = ((0.25_f64.min(var_ucb) * ln_parent_games) / mcts_scores.games as f64).sqrt();
+
+            (mcts_scores.score / mcts_scores.games as f64) + cfg.temperature * uct_score
         }
     }
 }
@@ -357,6 +368,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             break 'main_loop;
         }
 
+        // Select leaf node for playout
         let mut curr_idx = 0;
         let mut playout_guard = None;
 
@@ -438,7 +450,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         }
         ctx.num_games.fetch_add(1, Ordering::Relaxed);
 
-        // Update rollout node score, get parent node for backprop
+        // Update rollout node score, get parent node for backpropagation
         let mut curr_move_idx;
         let new_depth;
 
@@ -478,8 +490,17 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
                 let cache = &mut state_guard.cache[snake_idx][snake_mv.idx()];
 
+                let old_score = cache.score;
+                let old_games = cache.games;
+
                 cache.score += snake_score;
                 cache.games += 1;
+
+                if old_games > 0 {
+                    let old_mean = old_score / old_games as f64;
+                    let new_mean = cache.score / cache.games as f64;
+                    cache.variance_sum += (snake_score - old_mean) * (snake_score - new_mean);
+                }
             }
 
             if curr_idx == 0 {
