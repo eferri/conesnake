@@ -63,7 +63,7 @@ $TEMP_DIR/k3s_install.sh server \\
   --disable servicelb \\
   --disable traefik \\
   --kube-proxy-arg="--proxy-mode=ipvs" \\
-  --kube-proxy-arg="--ipvs-scheduler=lc"
+  --kube-proxy-arg="--ipvs-scheduler=rr"
 
 rm -r $TEMP_DIR
 EOF
@@ -94,7 +94,7 @@ $TEMP_DIR/k3s_install.sh agent \\
   --token $K3S_TOKEN \\
   --flannel-iface conesnake \\
   --kube-proxy-arg="--proxy-mode=ipvs" \\
-  --kube-proxy-arg="--ipvs-scheduler=lc" \\
+  --kube-proxy-arg="--ipvs-scheduler=rr" \\
   --kubelet-arg="provider-id=aws:///\\
 \$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)/\\
 \$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
@@ -120,7 +120,7 @@ $TEMP_DIR/k3s_install.sh agent \\
   --token $K3S_TOKEN \\
   --flannel-iface conesnake \\
   --kube-proxy-arg="--proxy-mode=ipvs" \\
-  --kube-proxy-arg="--ipvs-scheduler=lc"
+  --kube-proxy-arg="--ipvs-scheduler=rr"
 
 rm -r $TEMP_DIR
 EOF
