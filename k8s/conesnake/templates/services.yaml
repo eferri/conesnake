@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ .Release.Name }}-relays"
+  name: "{{ .Release.Name }}-relay-external"
   labels:
     {{- include "common_labels" . | nindent 4 }}
 spec:
@@ -11,7 +11,21 @@ spec:
   - port: 8080
     targetPort: 8080
     nodePort: 30001
-    protocol: TCP
+  selector:
+    {{- include "common_labels" . | nindent 4 }}
+    app: relay
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-relay"
+  labels:
+    {{- include "common_labels" . | nindent 4 }}
+spec:
+  ports:
+  - port: 8080
+  clusterIP: None
   selector:
     {{- include "common_labels" . | nindent 4 }}
     app: relay
@@ -25,13 +39,12 @@ metadata:
   labels:
     {{- include "common_labels" $ | nindent 4 }}
 spec:
-  type: ClusterIP
-  clusterIP: "{{ $worker.service_ip }}"
   ports:
   - port: 8080
     targetPort: 8080
-    protocol: TCP
+  clusterIP: None
   selector:
     {{- include "common_labels" $ | nindent 4 }}
+    app: worker
     node: "worker-{{ $worker.hostname }}"
 {{- end }}

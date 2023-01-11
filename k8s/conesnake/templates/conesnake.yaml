@@ -6,6 +6,10 @@ envFrom:
 env:
 - name: RUST_BACKTRACE
   value: "1"
+- name: POD_NAME
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.name
 ports:
 - containerPort: 8080
   name: listen-port
@@ -31,7 +35,7 @@ livenessProbe:
 
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: "{{ .Release.Name }}-relay"
   labels:
@@ -41,11 +45,12 @@ spec:
     matchLabels:
       {{- include "common_labels" . | nindent 6 }}
       app: relay
-  replicas: 2
-  strategy:
+  replicas: {{ .Values.relay.parallel_reqs }}
+  serviceName: "{{ .Release.Name }}-relay"
+  podManagementPolicy: "Parallel"
+  updateStrategy:
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxUnavailable: 1
     type: RollingUpdate
   revisionHistoryLimit: 2
   template:
@@ -61,7 +66,7 @@ spec:
         mode: relay
       imagePullSecrets:
       - name: regcred
-      terminationGracePeriodSeconds: 2
+      terminationGracePeriodSeconds: 10
       containers:
       - name: "{{ .Release.Name }}-relay"
         {{- include "conesnake_common" . | nindent 8 }}
@@ -75,18 +80,21 @@ spec:
         - "--max-height={{ .Values.max_height }}"
         - "--max-snakes={{ .Values.max_snakes }}"
         - "--max-boards=0"
-        - "--num-relay-reqs={{ $.Values.relay.num_reqs }}"
+        - "--num-parallel-reqs={{ .Values.relay.parallel_reqs }}"
         - "--latency={{ .Values.relay.latency }}"
         - "--worker-latency={{ .Values.worker.latency }}"
         {{- range $worker := .Values.workers }}
-        - "--worker=http://{{ $worker.service_ip }}:8080,{{ $worker.parallel}}"
+        - "--worker-node={{ $worker.hostname }}"
+        {{- range $i := until ($worker.replicas | int) }}
+        - "--worker-pod=http://{{ $.Release.Name }}-worker-{{ $worker.hostname }}-{{ $i }}.{{ $.Release.Name }}-worker-{{ $worker.hostname }}.conesnake.svc.cluster.local:8080"
+        {{- end }}
         {{- end }}
         - "relay"
 
 {{ range $worker := .Values.workers }}
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: "{{ $.Release.Name }}-worker-{{ $worker.hostname }}"
   labels:
@@ -98,10 +106,11 @@ spec:
       app: "worker"
       node: "worker-{{ $worker.hostname }}"
   replicas: {{ $worker.replicas }}
-  strategy:
+  serviceName: "{{ $.Release.Name }}-worker-{{ $worker.hostname }}"
+  podManagementPolicy: "Parallel"
+  updateStrategy:
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxUnavailable: 1
     type: RollingUpdate
   revisionHistoryLimit: 2
   template:
@@ -117,7 +126,7 @@ spec:
       nodeName: "{{ $worker.hostname }}"
       imagePullSecrets:
       - name: regcred
-      terminationGracePeriodSeconds: 2
+      terminationGracePeriodSeconds: 10
       containers:
       - name: "{{ $.Release.Name }}-worker"
         {{- include "conesnake_common" $ | nindent 8 }}

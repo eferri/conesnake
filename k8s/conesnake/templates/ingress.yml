@@ -7,7 +7,7 @@ metadata:
     {{- include "common_labels" . | nindent 4 }}
 spec:
   serviceRef:
-    name: "{{ .Release.Name }}-relays"
+    name: "{{ .Release.Name }}-relay-external"
     port: 8080
   targetType: instance
   nodeSelector:

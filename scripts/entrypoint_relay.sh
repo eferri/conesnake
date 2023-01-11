@@ -13,7 +13,7 @@ ORIG_ARGS="$@"
 
 for i in "$@"; do
     case "$i" in
-        --worker)
+        --worker-pod)
             WORKER_URL=$(echo "$2" | awk -F, '{print $1}')
             shift
 

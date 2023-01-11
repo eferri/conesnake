@@ -1,36 +1,29 @@
-use conesnake::api;
+use conesnake::api::BattleState;
+use conesnake::api::MoveResp;
+use conesnake::log::log_test_init;
 use conesnake::server::Server;
 use conesnake::tests::common::get_config;
 use conesnake::util::Move;
 
-use env_logger::Env;
-
 use log::info;
+use tokio::task;
 
 use std::fs;
-use std::sync;
 use std::thread;
-use std::time;
+use std::time::Duration;
 
-fn init_test_logging() {
-    let env = Env::default()
-        .default_filter_or("info")
-        .default_write_style_or("always");
+#[tokio::test]
+async fn index_test() {
+    log_test_init();
 
-    env_logger::init_from_env(env);
-}
+    task::spawn(async move {
+        let mut config = get_config();
+        config.port = "4000".to_owned();
 
-#[test]
-fn index_test() {
-    init_test_logging();
+        Server::new(config).run().await
+    });
 
-    let mut config = get_config();
-    config.port = "4000".to_owned();
-
-    let server = sync::Arc::new(Server::new(config));
-    server.start_server();
-
-    let mut start_board: api::BattleState =
+    let mut start_board: BattleState =
         serde_json::from_str(&fs::read_to_string("tests/data/start_basic_game.json").unwrap()).unwrap();
 
     start_board.you.latency = "0".to_owned();
@@ -42,36 +35,45 @@ fn index_test() {
     let mut end_board = start_board.clone();
     end_board.turn = 2;
 
-    let max_wait = time::Duration::from_secs(1);
-    let mut total_dur = time::Duration::from_secs(0);
-    while !server.is_ready() && total_dur < max_wait {
-        let wait_dur = time::Duration::from_millis(100);
-        thread::sleep(wait_dur);
-        total_dur += wait_dur;
-    }
+    let mut total_dur = Duration::from_secs(0);
+    let wait_dur = Duration::from_millis(200);
+    thread::sleep(wait_dur);
+    total_dur += wait_dur;
 
     info!("server_test: /start");
 
-    ureq::post("http://127.0.0.1:4000/start")
-        .timeout(time::Duration::from_millis(500))
-        .send_string(&serde_json::to_string(&start_board).unwrap())
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(500))
+        .build()
+        .unwrap();
+
+    client
+        .post("http://localhost:4000/start")
+        .json(&start_board)
+        .send()
+        .await
         .unwrap();
 
     info!("server_test: /move");
 
-    let response = ureq::post("http://127.0.0.1:4000/move")
-        .timeout(time::Duration::from_millis(500))
-        .send_string(&serde_json::to_string(&move_1_board).unwrap())
+    let move_response = client
+        .post("http://localhost:4000/move")
+        .json(&move_1_board)
+        .send()
+        .await
+        .unwrap()
+        .json::<MoveResp>()
+        .await
         .unwrap();
-
-    let move_response: api::MoveResp = serde_json::from_str(&response.into_string().unwrap()).unwrap();
 
     assert!(move_response.mv == Move::Left || move_response.mv == Move::Up);
 
     info!("server_test: /end");
 
-    ureq::post("http://127.0.0.1:4000/end")
-        .timeout(time::Duration::from_millis(500))
-        .send_string(&serde_json::to_string(&end_board).unwrap())
+    client
+        .post("http://localhost:4000/end")
+        .json(&end_board)
+        .send()
+        .await
         .unwrap();
 }

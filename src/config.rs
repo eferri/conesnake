@@ -19,19 +19,19 @@ pub struct Config {
     pub mode: Mode,
 
     #[clap(long)]
-    pub worker: Vec<String>,
+    pub worker_node: Vec<String>,
+
+    #[clap(long)]
+    pub worker_pod: Vec<String>,
 
     #[clap(long, default_value = "8080")]
     pub port: String,
 
-    #[clap(long, default_value_t = 8)]
-    pub num_relay_reqs: usize,
+    #[clap(long, default_value_t = 1)]
+    pub num_parallel_reqs: usize,
 
     #[clap(long, default_value_t = num_cpus::get())]
     pub num_worker_threads: usize,
-
-    #[clap(long, default_value_t = 8)]
-    pub num_server_threads: usize,
 
     #[clap(long, default_value_t = 10000)]
     pub max_boards: usize,

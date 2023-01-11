@@ -99,10 +99,12 @@ impl Display for Move {
 pub enum Error {
     IoError(String),
     SerdeError(String),
+    ReqwestError(String),
     BadBoard(String),
     BadBoardReq(String),
     BadBoardStr(String),
     LockHeld(String),
+    WorkerError(String),
 }
 
 impl From<serde_json::Error> for Error {
@@ -117,15 +119,23 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<reqwest::Error> for Error {
+    fn from(e: reqwest::Error) -> Self {
+        Error::ReqwestError(e.to_string())
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             Error::IoError(s) => write!(f, "IoError: {}", s),
             Error::SerdeError(s) => write!(f, "SerdeError: {}", s),
+            Error::ReqwestError(s) => write!(f, "ReqwestError: {}", s),
             Error::BadBoard(s) => write!(f, "BadBoard: {}", s),
             Error::BadBoardReq(s) => write!(f, "BadBoardReq: {}", s),
             Error::BadBoardStr(s) => write!(f, "BadBoardStr: {}", s),
             Error::LockHeld(s) => write!(f, "LockHeld: {}", s),
+            Error::WorkerError(s) => write!(f, "WorkerError: {}", s),
         }
     }
 }

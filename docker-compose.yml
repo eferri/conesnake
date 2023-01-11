@@ -24,12 +24,14 @@ services:
         --max-width ${MAX_WIDTH:-11} \
         --max-height ${MAX_HEIGHT:-11} \
         --max-snakes ${MAX_SNAKES:-4} \
-        --worker http://worker-1:8081,1 \
-        --worker http://worker-2:8081,1 \
-        --worker http://worker-3:8081,1 \
+        --num-parallel-reqs 1 \
+        --worker-node worker \
+        --worker-pod http://worker-0:8081 \
+        --worker-pod http://worker-1:8081 \
+        --worker-pod http://worker-2:8081 \
         relay
 
-  worker-1: &worker
+  worker-0: &worker
     image: conesnake:latest-dev
     build:
       target: dev
@@ -42,6 +44,8 @@ services:
       - TARGET
     volumes:
       - ".:/app"
+    security_opt:
+      - seccomp:.devcontainer/seccomp-perf.json
     command: |
       scripts/entrypoint.sh \
         --port 8081 \
@@ -52,10 +56,10 @@ services:
         --max-snakes ${MAX_SNAKES:-4} \
         worker
 
-  worker-2:
+  worker-1:
     <<: *worker
 
-  worker-3:
+  worker-2:
     <<: *worker
 
   snork-flood: &snork

@@ -10,9 +10,7 @@ use log::info;
 pub fn test_config() -> Config {
     info!("test_config");
     Config {
-        num_relay_reqs: 1,
         num_worker_threads: 1,
-        num_server_threads: 1,
         max_boards: 5000,
         max_width: 19,
         max_height: 21,
@@ -26,9 +24,7 @@ pub fn test_config() -> Config {
 pub fn release_config() -> Config {
     info!("release_config");
     Config {
-        num_relay_reqs: 1,
         num_worker_threads: 8,
-        num_server_threads: 8,
         max_boards: 600000,
         max_width: 21,
         max_height: 21,
