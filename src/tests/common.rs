@@ -14,9 +14,8 @@ pub fn test_config() -> Config {
         max_boards: 5000,
         max_width: 19,
         max_height: 21,
-        max_snakes: 5,
+        max_snakes: 4,
         latency: 5,
-        worker_latency: 5,
         ..Default::default()
     }
 }

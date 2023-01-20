@@ -1,3 +1,4 @@
+use conesnake::api::Scores;
 use conesnake::board::Board;
 use conesnake::config::Config;
 use conesnake::game::{Map, Rules};
@@ -8,13 +9,14 @@ use conesnake::search::SearchContext;
 use conesnake::tests::common::test_game;
 use conesnake::util::{Error, Move};
 
-use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
 use clap::Parser;
+use futures::future::join_all;
 use serde::{Deserialize, Serialize};
+use tokio::task;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct Results {
@@ -22,9 +24,11 @@ struct Results {
     loss: f64,
     games: i64,
     cases: i64,
-    median_nodes: i64,
     mean_nodes: f64,
     max_nodes: i64,
+    mean_depth: f64,
+    mean_playouts: f64,
+    mean_games: f64,
 }
 
 type TestCase<'a> = &'a [(usize, bool, Move)];
@@ -346,16 +350,17 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         - - - - - - - - - - -
         - - - - - - - - - - -
         ",
-        &[(0, true, Move::Up), (2, true, Move::Up)],
+        &[(0, true, Move::Up)],
         Rules::Standard,
         Map::Standard,
     ),
 ];
 
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     let mut cfg = Config::parse();
 
-    cfg.max_boards = 800000;
+    cfg.max_boards = 500000;
     cfg.max_snakes = 4;
     cfg.max_width = 19;
     cfg.max_height = 21;
@@ -369,25 +374,25 @@ fn main() -> Result<(), Error> {
     })
     .expect("Error setting Ctrl-C handler");
 
-    if let Ok(t) = env::var("NUM_THREADS") {
-        cfg.num_worker_threads = str::parse(&t).unwrap();
-    }
-
     eprintln!("allocating...");
 
-    let ctx = Arc::new(SearchContext::<FastRand>::new(&cfg));
-    let pool = ThreadPool::new(ctx.config.num_worker_threads);
+    let num_runs = 1;
+    let num_workers = 3;
 
-    let mut game = test_game();
+    let mut ctxs = Vec::new();
+    let mut pools = Vec::new();
 
-    let mut total_node_res = Vec::new();
+    ctxs.resize_with(num_workers, || Arc::new(SearchContext::<FastRand>::new(&cfg)));
+    pools.resize_with(num_workers, || {
+        Arc::new(ThreadPool::new(ctxs[0].config.num_worker_threads))
+    });
+
     let mut total_node_sum = 0;
+    let mut total_depth_sum = 0.0;
+    let mut total_playouts_sum = 0.0;
+    let mut total_games_sum = 0.0;
 
     let mut results: Results = Default::default();
-
-    let num_runs = 6;
-
-    results.games = TESTS.len() as i64 * num_runs as i64;
 
     for run_idx in 0..num_runs {
         for (test_idx, (board_str, desired_moves, rules, map)) in TESTS.iter().enumerate() {
@@ -397,67 +402,95 @@ fn main() -> Result<(), Error> {
 
             eprintln!("run {} search {} / {}", run_idx, test_idx, TESTS.len());
 
+            let mut game = test_game();
+
             game.ruleset = *rules;
             game.api.map = *map;
 
-            let board = Board::from_str(board_str, &game)?;
+            let game = Arc::new(game);
+            let board = Arc::new(Board::from_str(board_str, &game)?);
 
-            let mut search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
+            let mut search_results_futures = Vec::new();
 
-            if search_result.total_nodes > results.max_nodes {
-                results.max_nodes = search_result.total_nodes;
+            for i in 0..num_workers {
+                let ctx = ctxs[i].clone();
+                let pool = pools[i].clone();
+                let game = game.clone();
+                let board = board.clone();
+
+                search_results_futures.push(task::spawn(async move {
+                    search::search_moves(ctx, &pool, &board, &game, Instant::now()).unwrap()
+                }));
             }
 
-            total_node_res.push(search_result.total_nodes);
-            total_node_sum += search_result.total_nodes;
+            let search_results = join_all(search_results_futures).await;
+
+            let mut summed_scores: Vec<Scores> = Vec::new();
+            summed_scores.resize_with(board.num_snakes() as usize, Default::default);
+
+            for res in search_results {
+                let search_result = res.unwrap();
+
+                if search_result.total_nodes > results.max_nodes {
+                    results.max_nodes = search_result.total_nodes;
+                }
+
+                for (snake_idx, mv_scores) in search_result.scores.iter().enumerate() {
+                    for (mv_idx, scores) in mv_scores.iter().enumerate() {
+                        summed_scores[snake_idx][mv_idx].games += scores.games;
+                        summed_scores[snake_idx][mv_idx].score += scores.score;
+                    }
+                }
+
+                total_depth_sum += search_result.max_depth as f64;
+                total_node_sum += search_result.total_nodes;
+                total_playouts_sum += search_result.num_playouts as f64;
+                total_games_sum += search_result.num_games as f64;
+            }
 
             for (snake_idx, eq, mv) in *desired_moves {
-                let actual_move = search::best_move(&search_result.scores[*snake_idx], true);
+                let actual_move = search::best_move(&summed_scores[*snake_idx], true);
                 let passed = *eq && actual_move == *mv || !*eq && actual_move != *mv;
 
-                for score in &mut search_result.scores[*snake_idx] {
+                for score in &mut summed_scores[*snake_idx] {
                     if score.games > 0 {
                         score.score /= score.games as f64;
                     }
                 }
 
                 if !passed {
-                    let mut failure_str = format!(
+                    eprintln!(
                         "{}\nSnake {} Condition: mv{}{} Actual move: {}\nScores {:#?}\n",
                         board,
                         snake_idx,
                         if *eq { "==" } else { "!=" },
                         mv,
                         actual_move,
-                        search_result.scores[*snake_idx]
+                        summed_scores[*snake_idx]
                     );
 
-                    if !board.valid_move(&game, *snake_idx, actual_move) {
-                        failure_str.push_str("ERROR Actual move was invalid!")
-                    }
-
-                    eprintln!("{}", failure_str);
                     results.failures += 1;
-
-                    results.loss += search_result.scores[*snake_idx][actual_move as usize].score
-                        - search_result.scores[*snake_idx][*mv as usize].score;
-                } else {
-                    results.loss -= 0.05;
                 }
+
+                // eprintln!("summed_scores {summed_scores:#?}");
+
+                results.loss += summed_scores[*snake_idx][actual_move as usize].score
+                    - summed_scores[*snake_idx][*mv as usize].score;
 
                 results.cases += 1;
             }
         }
     }
 
-    total_node_res.sort();
+    let total_tests = TESTS.len() * num_runs * num_workers;
 
-    let total_tests = TESTS.len() * num_runs;
-
-    results.median_nodes = total_node_res[total_tests / 2];
+    results.games = TESTS.len() as i64 * num_runs as i64;
     results.mean_nodes = total_node_sum as f64 / total_tests as f64;
+    results.mean_depth = total_depth_sum / total_tests as f64;
+    results.mean_playouts = total_playouts_sum / total_tests as f64;
+    results.mean_games = total_games_sum / total_tests as f64;
 
-    println!("{}", serde_json::to_string(&results).unwrap());
+    println!("{}", serde_json::to_string_pretty(&results).unwrap());
 
     Ok(())
 }

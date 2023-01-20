@@ -11,10 +11,10 @@
     "editor.formatOnSave": true,
     "editor.inlayHints.enabled": "offUnlessPressed",
     "debug.allowBreakpointsEverywhere": true,
+    "python.analysis.useLibraryCodeForTypes": false,
     "rust-analyzer.completion.autoimport.enable": true,
     "rust-analyzer.debug.engine": "vadimcn.vscode-lldb",
     "rust-analyzer.debug.openDebugPane": true,
-    "rust-analyzer.checkOnSave.command": "clippy",
     "rust-analyzer.lens.implementations.enable": false,
     "rust-analyzer.lens.debug.enable": false,
     "rust-analyzer.lens.run.enable": false,
@@ -33,6 +33,9 @@
         "Backpropagate",
         "playout"
     ],
+    "[yaml]": {
+        "editor.formatOnSave": false
+    },
     "[dockercompose]": {
         "editor.formatOnSave": false
     },

@@ -128,14 +128,14 @@ impl From<reqwest::Error> for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            Error::IoError(s) => write!(f, "IoError: {}", s),
-            Error::SerdeError(s) => write!(f, "SerdeError: {}", s),
-            Error::ReqwestError(s) => write!(f, "ReqwestError: {}", s),
-            Error::BadBoard(s) => write!(f, "BadBoard: {}", s),
-            Error::BadBoardReq(s) => write!(f, "BadBoardReq: {}", s),
-            Error::BadBoardStr(s) => write!(f, "BadBoardStr: {}", s),
-            Error::LockHeld(s) => write!(f, "LockHeld: {}", s),
-            Error::WorkerError(s) => write!(f, "WorkerError: {}", s),
+            Error::IoError(s) => write!(f, "IoError: {s}"),
+            Error::SerdeError(s) => write!(f, "SerdeError: {s}"),
+            Error::ReqwestError(s) => write!(f, "ReqwestError: {s}"),
+            Error::BadBoard(s) => write!(f, "BadBoard: {s}"),
+            Error::BadBoardReq(s) => write!(f, "BadBoardReq: {s}"),
+            Error::BadBoardStr(s) => write!(f, "BadBoardStr: {s}"),
+            Error::LockHeld(s) => write!(f, "LockHeld: {s}"),
+            Error::WorkerError(s) => write!(f, "WorkerError: {s}"),
         }
     }
 }
@@ -176,7 +176,7 @@ pub fn square_to_char(sqr: BoardSquare, num_stacked: i32, mv: Option<Move>) -> c
         (BoardSquare::SnakeBody(_), _, None) | (BoardSquare::SnakeBodyHazard(_), _, None) => {
             panic!("Body must have move")
         }
-        _ => panic!("Invalid args {:?} {:?} {:?}", sqr, num_stacked, mv),
+        _ => panic!("Invalid args {sqr:?} {num_stacked:?} {mv:?}"),
     }
 }
 
@@ -222,7 +222,7 @@ pub fn char_to_square(chr: char) -> (BoardSquare, i32, Option<Move>) {
     } else if (83..91).contains(&chr_byte) {
         (BoardSquare::SnakeHeadHazard(chr as u8 - 83), 0, None)
     } else {
-        panic!("Invalid board character {}", chr)
+        panic!("Invalid board character {chr}")
     }
 }
 

@@ -24,3 +24,4 @@ certs
 *.perf
 perf.data
 perf.data.*
+nohup.out

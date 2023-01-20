@@ -17,7 +17,7 @@ for i in "$@"; do
             SNAKE_URL="$2"
             shift
 
-            until curl --max-time 0.5 -sf -o /dev/null "$SNAKE_URL"; do
+            until curl --max-time 0.5 -sf -o /dev/null "$SNAKE_URL/ping"; do
                 echo "Waiting for snake $SNAKE_URL"
                 sleep 0.5
             done
@@ -28,4 +28,7 @@ for i in "$@"; do
         esac
 done
 
-exec battlesnake play $ORIG_ARGS
+battlesnake play $ORIG_ARGS
+
+exec 1>&-
+exec 2>&-

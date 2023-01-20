@@ -92,7 +92,7 @@ impl Server {
         let pod_name = match env::var("POD_NAME") {
             Ok(str) => str,
             Err(e) => {
-                warn!("Error retrieving POD_NAME: {}", e);
+                info!("Error retrieving POD_NAME: {}", e);
                 "test-0".to_owned()
             }
         };
@@ -206,7 +206,7 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
             let req_start = Instant::now();
             let res = state
                 .req_client
-                .get(&format!("{}/", worker))
+                .get(&format!("{worker}/"))
                 .timeout(Duration::from_millis(300))
                 .send()
                 .await;
@@ -382,7 +382,7 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
                 let req_start = Instant::now();
                 let move_resp = state
                     .req_client
-                    .post(&format!("{}/move", worker))
+                    .post(&format!("{worker}/move"))
                     .timeout(timeout_dur)
                     .json(&game_state)
                     .send()
@@ -392,7 +392,7 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
 
                 let req_dur = Instant::now() - req_start;
                 let server_latency = req_dur.as_micros() as i64;
-                let mut run_str = format!("\nWorker {} latency us {}\n", worker, server_latency);
+                let mut run_str = format!("\nWorker {worker} latency us {server_latency}\n");
 
                 let scores = move_resp.scores.unwrap();
 

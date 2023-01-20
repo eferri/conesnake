@@ -16,19 +16,21 @@ use std::{
 use deepsize::DeepSizeOf;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, DeepSizeOf)]
 pub struct Snake {
     pub health: i32,
     pub eliminated: bool,
+    pub head: Coord,
     pub body: VecDeque<Coord>,
 }
 
 impl Snake {
-    pub fn new(max_len: usize) -> Self {
+    pub fn new(max_board_size: usize) -> Self {
         Self {
             health: 0,
             eliminated: false,
-            body: VecDeque::with_capacity(max_len),
+            head: Default::default(),
+            body: VecDeque::with_capacity(max_board_size + 2),
         }
     }
 
@@ -38,6 +40,7 @@ impl Snake {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
+#[repr(u8)]
 pub enum BoardSquare {
     Empty,
     SnakeHead(u8),       // index of snake
@@ -51,14 +54,37 @@ pub enum BoardSquare {
     Hazard,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
+impl BoardSquare {
+    pub fn tag_val(&self) -> u16 {
+        // https://rust-lang.github.io/unsafe-code-guidelines/layout/enums.html#explicit-repr-annotation-without-c-compatibility
+        let sqr_ptr = self as *const BoardSquare as *const u8;
+        unsafe { *sqr_ptr as u16 }
+    }
+
+    pub fn idx_val(&self) -> u16 {
+        let sqr_ptr = self as *const BoardSquare as *const u8;
+        unsafe { *(sqr_ptr.offset(1)) as u16 }
+    }
+
+    pub fn from_raw(tag: u16, idx: u16) -> Self {
+        let mut sqr = BoardSquare::Empty;
+        let sqr_ptr = &mut sqr as *mut BoardSquare as *mut u8;
+        unsafe {
+            *sqr_ptr = tag as u8;
+            *sqr_ptr.offset(1) = idx as u8;
+        }
+        sqr
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, DeepSizeOf)]
 pub enum HeadOnCol {
     None,
     PossibleCollision,
     PossibleElimination,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, PartialEq, Eq, DeepSizeOf)]
 pub struct Board {
     pub width: i32,
     pub height: i32,
@@ -80,7 +106,8 @@ pub struct Board {
 impl Board {
     pub fn new(width: i32, height: i32, max_width: i32, max_height: i32, max_snakes: i32) -> Self {
         let max_board_size = (max_width * max_height) as usize;
-        Self {
+        let max_snakes = max_snakes as usize;
+        let mut board = Self {
             width,
             height,
             turn: 1,
@@ -91,9 +118,14 @@ impl Board {
             royale_min_y: 0,
             royale_max_y: 0,
             food: HashSet::with_capacity(max_board_size),
-            snakes: vec![Snake::new(max_board_size); max_snakes as usize],
+            snakes: Vec::with_capacity(max_snakes),
             board_mat: vec![BoardSquare::Empty; max_board_size],
-        }
+        };
+
+        // Don't use vec![] here so snake body capacity is reserved
+        board.snakes.resize_with(max_snakes, || Snake::new(max_board_size));
+
+        board
     }
 
     pub fn from_req(
@@ -216,9 +248,12 @@ impl Board {
             snake.health = other.health;
             snake.eliminated = other.eliminated;
 
+            snake.head = other.head;
+
             snake.body.clear();
             snake.body.extend(&other.body);
         }
+
         self.board_mat[..board_len].copy_from_slice(&other.board_mat[..board_len]);
     }
 
@@ -318,8 +353,13 @@ impl Board {
             self.snakes[self.num_snakes as usize].body.push_back(*coord);
         }
 
+        if !body.is_empty() {
+            self.snakes[self.num_snakes as usize].head = body[0];
+        }
+
         self.snakes[self.num_snakes as usize].health = health;
         self.snakes[self.num_snakes as usize].eliminated = false;
+
         self.num_snakes += 1;
     }
 
@@ -400,7 +440,7 @@ impl Board {
     }
 
     pub fn snake_head(&self, snake_idx: usize) -> Coord {
-        *self.snakes[snake_idx].body.front().unwrap()
+        self.snakes[snake_idx].head
     }
 
     pub fn snake_tail(&self, snake_idx: usize) -> Coord {

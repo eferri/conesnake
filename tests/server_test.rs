@@ -9,19 +9,17 @@ use log::info;
 use tokio::task;
 
 use std::fs;
-use std::thread;
 use std::time::Duration;
 
 #[tokio::test]
 async fn index_test() {
     log_test_init();
 
-    task::spawn(async move {
-        let mut config = get_config();
-        config.port = "4000".to_owned();
+    let mut config = get_config();
+    config.port = "4000".to_owned();
+    let server = Server::new(config);
 
-        Server::new(config).run().await
-    });
+    task::spawn(async move { server.run().await });
 
     let mut start_board: BattleState =
         serde_json::from_str(&fs::read_to_string("tests/data/start_basic_game.json").unwrap()).unwrap();
@@ -34,11 +32,6 @@ async fn index_test() {
 
     let mut end_board = start_board.clone();
     end_board.turn = 2;
-
-    let mut total_dur = Duration::from_secs(0);
-    let wait_dur = Duration::from_millis(200);
-    thread::sleep(wait_dur);
-    total_dur += wait_dur;
 
     info!("server_test: /start");
 

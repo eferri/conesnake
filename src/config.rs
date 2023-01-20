@@ -1,9 +1,8 @@
 use clap::{Parser, ValueEnum};
-use num_cpus;
 
 // Hyperparameters
 
-pub const DEFAULT_TEMP: f64 = 11.64;
+pub const DEFAULT_TEMP: f64 = 1.931;
 
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
@@ -30,7 +29,7 @@ pub struct Config {
     #[clap(long, default_value_t = 1)]
     pub num_parallel_reqs: usize,
 
-    #[clap(long, default_value_t = num_cpus::get())]
+    #[clap(long, default_value_t = 8)]
     pub num_worker_threads: usize,
 
     #[clap(long, default_value_t = 10000)]
@@ -48,9 +47,6 @@ pub struct Config {
     // Latencies are round trip time
     #[clap(long, default_value_t = 30)]
     pub latency: i32,
-
-    #[clap(long, default_value_t = 60)]
-    pub worker_latency: i32,
 
     // Algorithm parameters
     #[clap(long, default_value_t = DEFAULT_TEMP)]

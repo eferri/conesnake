@@ -34,7 +34,7 @@ prod-build:
 
 .PHONY: clean
 clean:
-	rm -f *.log .k8s/manifest.yaml *.perf perf.data perf.data.*
+	rm -f *.log .k8s/manifest.yaml *.perf perf.data perf.data.* optimize.log
 
 .PHONY: veryclean
 veryclean: clean
@@ -66,7 +66,7 @@ profile: record report
 record:
 	docker compose run --rm snake bash -c ' \
 		cargo build --profile=release-with-debug \
-		&& perf record --call-graph dwarf -F 5000 \
+		&& perf record --call-graph dwarf -F 10000 \
 			./target-snake/release-with-debug/performance'
 
 .PHONY: report
@@ -75,7 +75,7 @@ report:
 		perf report \
 			--stdio \
 			--stdio-color \
-			--percent-limit 1.0 \
+			--percent-limit 0.5 \
 			--show-nr-samples \
 			--show-cpu-utilization \
 			--call-graph srcline
@@ -84,7 +84,7 @@ report:
 bench:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& ./target-snake/release/performance'
+		&& ./target-snake/release/performance --num-worker-threads 8'
 
 .PHONY: optimize
 optimize:

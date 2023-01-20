@@ -344,8 +344,8 @@ fn gen_board_ref_test() {
             let ref_board = ref_gen.gen_ref_board(&game, &board, &moves);
 
             if gen_board != ref_board {
-                println!("\nmoves: {:?}\ninput board:\n{}", moves, board);
-                println!("gen_board:\n{}\nref_board:\n{}\n-----", gen_board, ref_board);
+                println!("\nmoves: {moves:?}\ninput board:\n{board}");
+                println!("gen_board:\n{gen_board}\nref_board:\n{ref_board}\n-----");
             }
             assert_eq!(gen_board, ref_board);
         }

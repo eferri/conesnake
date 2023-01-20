@@ -3,25 +3,32 @@
     "context": "..",
     "dockerFile": "../Dockerfile",
     "build": {
-        "target": "dev"
+        "target": "dev",
+        "args": {
+            "BUILDKIT_INLINE_CACHE": "0"
+        }
     },
-    "extensions": [
-        "tombonnike.vscode-status-bar-format-toggle",
-        "shardulm94.trailing-spaces",
-        "bungcip.better-toml",
-        "vadimcn.vscode-lldb",
-        "streetsidesoftware.code-spell-checker",
-        "rust-lang.rust-analyzer",
-        "golang.go",
-        "ms-vscode.cpptools",
-        "ms-azuretools.vscode-docker",
-        "twxs.cmake",
-        "hashicorp.terraform",
-        "redhat.vscode-yaml",
-        "ms-kubernetes-tools.vscode-kubernetes-tools",
-        "eamodio.gitlens",
-        "ms-python.python"
-    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "tombonnike.vscode-status-bar-format-toggle",
+                "shardulm94.trailing-spaces",
+                "bungcip.better-toml",
+                "vadimcn.vscode-lldb",
+                "streetsidesoftware.code-spell-checker",
+                "rust-lang.rust-analyzer",
+                "golang.go",
+                "ms-vscode.cpptools",
+                "ms-azuretools.vscode-docker",
+                "twxs.cmake",
+                "hashicorp.terraform",
+                "redhat.vscode-yaml",
+                "ms-kubernetes-tools.vscode-kubernetes-tools",
+                "eamodio.gitlens",
+                "ms-python.python"
+            ]
+        }
+    },
     "overrideCommand": true,
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
     "workspaceFolder": "/app",

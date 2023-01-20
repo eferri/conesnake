@@ -2,7 +2,6 @@ use super::*;
 
 use crate::game::{Game, Map, ARCADE_FOOD_COORDS};
 use crate::rand::Rand;
-use crate::util::{rand_move_arr, rand_rem_moves};
 
 use std::cmp::max;
 
@@ -10,73 +9,33 @@ impl Board {
     // Move heuristics applied to each move in random playout
 
     pub fn gen_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
-        let snake_head = self.snake_head(snake_idx);
-
-        let mut valid_moves = [false; 4];
+        let mut valid_moves = [Move::Left; 4];
         let mut best_move = None;
+        let mut num_valid = 0;
 
-        for (mv_idx, is_valid) in valid_moves.iter_mut().enumerate() {
+        for mv_idx in 0..4 {
             let mv = Move::from_idx(mv_idx);
-            *is_valid = self.valid_move(game, snake_idx, mv);
-        }
-
-        if game.is_solo {
-            let food_dest = self.closest_food(game, snake_idx);
-
-            let (mut mv_one, mut mv_two) = (None, None);
-            let mut food_dist = 0;
-
-            if let Some(coord) = food_dest {
-                (mv_one, mv_two) = self.coord_to_move(snake_head, coord, game.ruleset);
-
-                let (x, y) = self.abs_dist(snake_head, coord, game.ruleset);
-                food_dist = x + y;
-            }
-
-            let rand_moves = rand_rem_moves(rng, mv_one, mv_two);
-
-            for mv in rand_moves {
-                if !valid_moves[mv.idx()] {
-                    continue;
-                }
-
-                let food_thresh = 6;
-                let snake_health = self.snakes[snake_idx].health;
-
-                let dest = self.move_to_coord(snake_head, mv, game.ruleset);
-
-                // Don't eat food till we are low on health
-                if snake_health > food_thresh && self.at(dest) == BoardSquare::Food {
-                    continue;
-                }
-
-                // Move towards closest food only if we are running low on health
-                if (mv_one.is_some() && mv == mv_one.unwrap() || mv_two.is_some() && mv == mv_two.unwrap())
-                    && snake_health - food_dist > food_thresh
-                {
-                    continue;
-                }
-
-                best_move = Some(mv);
-                break;
-            }
-        } else {
-            let rand_moves = rand_move_arr(rng);
-
-            for mv in rand_moves {
-                if !valid_moves[mv.idx()] {
-                    continue;
-                }
-
-                best_move = Some(mv);
-                break;
+            let is_valid = self.valid_move(game, snake_idx, mv);
+            if is_valid {
+                valid_moves[num_valid as usize] = mv;
+                num_valid += 1;
             }
         }
+
+        #[allow(clippy::comparison_chain)]
+        if num_valid == 1 {
+            best_move = Some(valid_moves[0]);
+        } else if num_valid > 1 {
+            let mv_idx = rng.range(0, num_valid - 1);
+            best_move = Some(valid_moves[mv_idx as usize]);
+        }
+
         best_move.unwrap_or(Move::Left)
     }
 
     pub fn valid_move(&self, game: &Game, snake_idx: usize, mv: Move) -> bool {
-        let square = self.move_to_coord(self.snake_head(snake_idx), mv, game.ruleset);
+        let head = self.snake_head(snake_idx);
+        let square = self.move_to_coord(head, mv, game.ruleset);
         if !self.on_board(square) {
             return false;
         }
@@ -230,10 +189,11 @@ impl Board {
             let old_head = self.snake_head(idx);
             let new_head = self.move_to_coord(old_head, mv, game.ruleset);
 
-            self.snakes[idx].body.push_front(new_head);
-
             let old_tail = self.snakes[idx].body.pop_back().unwrap();
             let new_tail = self.snake_tail(idx);
+
+            self.snakes[idx].body.push_front(new_head);
+            self.snakes[idx].head = new_head;
 
             match (self.at(old_tail), self.at(new_tail)) {
                 (BoardSquare::SnakeTail(old_idx), BoardSquare::SnakeTail(new_idx))
@@ -280,8 +240,7 @@ impl Board {
                     self.set_at(old_tail, BoardSquare::SnakeTailHazard(old_idx));
                 }
                 (old_val, new_val) => panic!(
-                    "LOGIC ERROR: snake {} tails set to invalid BoardSquare:\nold: {:?}, new: {:?}\n{}",
-                    idx, old_val, new_val, self
+                    "LOGIC ERROR: snake {idx} tails set to invalid BoardSquare:\nold: {old_val:?}, new: {new_val:?}\n{self}"
                 ),
             }
         }
@@ -360,7 +319,7 @@ impl Board {
 
                         self.set_at(old_head, BoardSquare::SnakeBodyHazard(snake_idx));
                     }
-                    _ => panic!("LOGIC ERROR: snake {} head set to invalid BoardSquare:\n{}", idx, self),
+                    _ => panic!("LOGIC ERROR: snake {idx} head set to invalid BoardSquare:\n{self}"),
                 }
             }
 

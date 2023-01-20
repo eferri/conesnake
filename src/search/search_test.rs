@@ -364,5 +364,24 @@ fn arcade_maze_search_test() {
         let best_move = search::best_move(&search_result.scores[0], true);
 
         assert!(best_move == Move::Down || best_move == Move::Up);
+
+        // Ensure simd duct score produces same result as non-simd version
+        #[cfg(feature = "simd")]
+        {
+            let root_guard = ctx.node_space[0].state.read().unwrap();
+
+            for child_ptr in root_guard.children[0..root_guard.num_children as usize].iter() {
+                let mut duct_sum = 0.0;
+
+                for snake_idx in 0..root_guard.board.num_snakes() as usize {
+                    let mv = Move::extract(child_ptr.moves, snake_idx as u32);
+                    duct_sum += root_guard.duct_score(&ctx.config, snake_idx, mv)
+                }
+
+                let duct_sum_simd = root_guard.duct_scores_simd(&ctx.config, child_ptr.moves).sum();
+
+                assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-7);
+            }
+        }
     }
 }

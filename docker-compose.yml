@@ -11,9 +11,16 @@ services:
     environment:
       - RUST_BACKTRACE
       - TARGET
+      - TIMEOUT
       - NUM_THREADS
+      - NUM_WORKERS
+      - MAX_BOARDS
+      - MAX_WIDTH
+      - MAX_HEIGHT
+      - MAX_SNAKES
     volumes:
       - ".:/app"
+      - "/var/run/docker.sock:/var/run/docker.sock"
     ports:
       - "8080:8080"
     security_opt:
@@ -33,12 +40,6 @@ services:
 
   worker-0: &worker
     image: conesnake:latest-dev
-    build:
-      target: dev
-      args:
-        UID: ${UID}
-        GID: ${GID}
-        KERNEL_VER: ${KERNEL_VER}
     environment:
       - RUST_BACKTRACE
       - TARGET
@@ -103,12 +104,10 @@ services:
         --map standard \
         --foodSpawnChance 10 \
         --hazardDamagePerTurn 16 \
-        --name conesnake --url http://localhost:${LISTEN_PORT:-8080}
-        --name snork-flood --url http://localhost:8082
-        --name snork-tree --url http://localhost:8083
-        --name snork-mobility --url http://localhost:8084
-    depends_on:
-      - snake
+        --name conesnake --url http://localhost:${LISTEN_PORT:-8080} \
+        --name snork-flood --url http://localhost:8082 \
+        --name snork-tree --url http://localhost:8083 \
+        --name snork-mobility --url http://localhost:8084 \
 
   board:
     build:

@@ -23,7 +23,7 @@ impl Board {
                     found = true;
                     break;
                 }
-                _ => panic!("Snake body {} had unexpected form {}", curr_coord, self),
+                _ => panic!("Snake body {curr_coord} had unexpected form {self}"),
             };
 
             curr_coord = self.move_to_coord(curr_coord, next_mv, rules);
@@ -31,7 +31,7 @@ impl Board {
         }
 
         if !found {
-            panic!("Could not find snake given tail_idx {}", tail_idx);
+            panic!("Could not find snake given tail_idx {tail_idx}");
         }
 
         // Set index in snake squares, add body segments
@@ -66,7 +66,7 @@ impl Board {
                     self.snakes[snake_idx as usize].body.push_back(curr_coord);
                     break;
                 }
-                _ => panic!("Snake body was not contiguous or had unexpected form {}", self),
+                _ => panic!("Snake body was not contiguous or had unexpected form {self}"),
             };
 
             curr_coord = self.move_to_coord(curr_coord, next_mv, rules);
@@ -129,7 +129,7 @@ impl Board {
         for y in (0..self.height).rev() {
             for x in 0..self.width {
                 let square_char = char_array[(x + y * self.width) as usize];
-                write!(&mut board_str, "{} ", square_char).unwrap();
+                write!(&mut board_str, "{square_char} ").unwrap();
             }
             if y != 0 {
                 writeln!(&mut board_str).unwrap();
@@ -257,6 +257,9 @@ impl Board {
                     let head = board.coord_from_idx(*found_heads.get(&(i as u8)).unwrap());
                     board.snakes[i].body.push_back(head);
                 }
+            }
+            if !board.snakes[i].body.is_empty() {
+                board.snakes[i].head = *board.snakes[i].body.front().unwrap();
             }
         }
 

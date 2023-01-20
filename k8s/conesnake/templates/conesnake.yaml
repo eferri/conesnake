@@ -82,7 +82,6 @@ spec:
         - "--max-boards=0"
         - "--num-parallel-reqs={{ .Values.relay.parallel_reqs }}"
         - "--latency={{ .Values.relay.latency }}"
-        - "--worker-latency={{ .Values.worker.latency }}"
         {{- range $worker := .Values.workers }}
         - "--worker-node={{ $worker.hostname }}"
         {{- range $i := until ($worker.replicas | int) }}

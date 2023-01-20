@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     jq \
     python3 \
     python3-pip \
+    python3-autopep8 \
     binutils-dev \
     build-essential \
     pkg-config \
@@ -88,7 +89,7 @@ ENV PATH "/usr/local/go/bin:/home/rust/go/bin:/home/rust/.cargo/bin:${PATH}"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=1.66.1
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2023-01-29
 
 # Rust development tools
 RUN rustup component add rustfmt clippy \
