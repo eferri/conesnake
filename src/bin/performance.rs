@@ -418,8 +418,11 @@ async fn main() -> Result<(), Error> {
                 let game = game.clone();
                 let board = board.clone();
 
+                let mut config = ctx.config.clone();
+                config.set_temp(board.as_ref(), game.as_ref());
+
                 search_results_futures.push(task::spawn(async move {
-                    search::search_moves(ctx, &pool, &board, &game, Instant::now()).unwrap()
+                    search::search_moves(ctx, Arc::new(config), &pool, &board, &game, Instant::now()).unwrap()
                 }));
             }
 

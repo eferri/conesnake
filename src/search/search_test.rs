@@ -316,7 +316,11 @@ fn small_search_test() {
     let game = solo_game();
     let board = Board::from_str(SEARCH_SMALL, &game).unwrap();
 
-    let search_result = search::search_moves(Arc::new(ctx), &pool, &board, &game, Instant::now()).unwrap();
+    let mut config = ctx.config.clone();
+    config.set_temp(&board, &game);
+
+    let search_result =
+        search::search_moves(Arc::new(ctx), Arc::new(config), &pool, &board, &game, Instant::now()).unwrap();
     let best_move = search::best_move(&search_result.scores[0], true);
 
     assert_eq!(best_move, Move::Right);
@@ -360,7 +364,11 @@ fn arcade_maze_search_test() {
         game.api.map = Map::ArcadeMaze;
         let board = Board::from_str(ARCADE_MAZE_BOARD, &game).unwrap();
 
-        let search_result = search::search_moves(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
+        let mut config = ctx.config.clone();
+        config.set_temp(&board, &game);
+
+        let search_result =
+            search::search_moves(ctx.clone(), Arc::new(config), &pool, &board, &game, Instant::now()).unwrap();
         let best_move = search::best_move(&search_result.scores[0], true);
 
         assert!(best_move == Move::Down || best_move == Move::Up);

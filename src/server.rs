@@ -301,7 +301,18 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
 
     let resp = match state.config.mode {
         Mode::Worker => {
-            let search_res = search::search_moves(state.context.clone(), &state.worker_pool, &board, &game, start_time);
+            let mut config = state.config.clone();
+            config.set_temp(&board, &game);
+
+            let search_res = search::search_moves(
+                state.context.clone(),
+                Arc::new(config),
+                &state.worker_pool,
+                &board,
+                &game,
+                start_time,
+            );
+
             match search_res {
                 Ok(stats) => {
                     state.max_nodes.fetch_max(stats.total_nodes, Ordering::AcqRel);

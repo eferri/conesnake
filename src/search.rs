@@ -318,6 +318,7 @@ pub fn best_move(scores: &Scores, print_summary: bool) -> Move {
 
 pub fn search_moves<R: Rand>(
     ctx: Arc<SearchContext<R>>,
+    config: Arc<Config>,
     pool: &ThreadPool,
     board: &Board,
     game: &Game,
@@ -345,13 +346,14 @@ pub fn search_moves<R: Rand>(
 
     ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
-    for id in 0..ctx.config.num_worker_threads {
+    for id in 0..config.num_worker_threads {
         let ctx_cln = ctx.clone();
-        pool.execute(move || search_worker(ctx_cln, id));
+        let config = config.clone();
+        pool.execute(move || search_worker(ctx_cln, config, id));
     }
 
     let startup_dur = Instant::now() - start_time;
-    let search_us = (game.api.timeout - ctx.config.latency) as i64 * 1000;
+    let search_us = (game.api.timeout - config.latency) as i64 * 1000;
     let search_dur = Duration::from_micros(search_us as u64).saturating_sub(startup_dur);
 
     if !search_dur.is_zero() {
@@ -370,7 +372,7 @@ pub fn search_moves<R: Rand>(
 
     let root_guard = ctx.node_space[0].state.read().unwrap();
 
-    let mut scores = Vec::with_capacity(ctx.config.max_snakes as usize);
+    let mut scores = Vec::with_capacity(config.max_snakes as usize);
 
     for s_idx in 0..root_guard.board.num_snakes() as usize {
         let mut snake_scores: Scores = Default::default();
@@ -406,7 +408,7 @@ pub fn search_moves<R: Rand>(
     })
 }
 
-fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
+fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: usize) {
     let mut scratch_guard = ctx.thread_state[id].lock().unwrap();
 
     let game_guard = ctx.game.read().unwrap();
@@ -459,14 +461,14 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                     #[cfg(not(feature = "simd"))]
                     for snake_idx in 0..state_guard.board.num_snakes() {
                         let mv = Move::extract(child_ptr.moves, snake_idx as u32);
-                        let mv_duct_score = state_guard.duct_score(&ctx.config, snake_idx as usize, mv);
+                        let mv_duct_score = state_guard.duct_score(&config, snake_idx as usize, mv);
 
                         node_totals.total_score += mv_duct_score;
                     }
 
                     #[cfg(feature = "simd")]
                     {
-                        let duct_scores = state_guard.duct_scores_simd(&ctx.config, child_ptr.moves);
+                        let duct_scores = state_guard.duct_scores_simd(&config, child_ptr.moves);
 
                         node_totals.total_score += duct_scores.sum() as f64;
                     }
