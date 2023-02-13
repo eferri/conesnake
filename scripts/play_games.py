@@ -136,12 +136,13 @@ async def run_games(num_games=250, num_opponents=1, **kwargs):
     for i in range(num_games):
 
         print("\n-------------------------\n")
-        print(f"game {i}/{num_games}")
+        print(f"game {i + 1}/{num_games}")
         print(f"wins {wins}")
         print(f"draws {draws}")
+        print(f"losses {i + 1 - wins - draws}")
 
         rules = await start_rules(
-            ["conesnake"] + [f"oponent-{i}" for i in range(num_opponents)]
+            ["conesnake"] + [f"oponent-{j}" for j in range(num_opponents)]
         )
 
         rules_output = await asyncio.gather(
@@ -176,15 +177,10 @@ async def run_games(num_games=250, num_opponents=1, **kwargs):
     return (num_games - wins) / num_games
 
 
-async def optimize(compare_changes=False):
-    if compare_changes:
-        dimensions = [
-            Integer(0, 1, name="compare"),
-        ]
-    else:
-        dimensions = [
-            Real(0.7, 6.0, name="temperature"),
-        ]
+async def optimize():
+    dimensions = [
+        Real(0.7, 6.0, name="temperature"),
+    ]
 
     opt = Optimizer(
         dimensions=dimensions,
@@ -201,14 +197,14 @@ async def optimize(compare_changes=False):
         print("\n*************************\n")
         print("Starting evaluation jobs with args:\n")
 
-        args = {dim.name: x[idx] for idx, dim in enumerate(dimensions)}
+        kargs = {dim.name: x[idx] for idx, dim in enumerate(dimensions)}
 
-        print(f"{pretty.pformat(args)}\n")
-        print(f"gp_minimize call {calls}/{num_calls}")
+        print(f"{pretty.pformat(kargs)}\n")
+        print(f"game {calls}/{num_calls}")
         print("args:")
         print(pretty.pformat(x))
 
-        y = await run_games(**args)
+        y = await run_games(**kargs)
 
         print("\nloss rate:")
         print(pretty.pformat(y))
@@ -238,7 +234,7 @@ async def main():
         case "optimize":
             await optimize()
         case "compare":
-            await optimize(compare_changes=True)
+            await run_games(num_games=10000, compare=1)
         case _:
             raise ValueError(f"invalid mode {args.mode}")
 

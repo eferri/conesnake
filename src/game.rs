@@ -91,12 +91,11 @@ impl Game {
 
     // Not currently used
     pub fn approx_score(&self, board: &Board, _cfg: &Config, snake_idx: usize, root_num_alive: i32) -> f64 {
-        // TODO: replace if using
-        let base_reward = 0.0;
-        let len_reward = 0.0;
-        let elim_reward = 0.0;
-        let head_coll_reward = 0.0;
-        let head_elim_reward = 0.0;
+        let base_reward = 0.2;
+        let len_reward = 0.05;
+        let elim_reward = 0.1;
+        let head_coll_reward = -0.2;
+        let head_elim_reward = 0.1;
 
         if !board.snakes[snake_idx].alive() {
             if self.is_solo {

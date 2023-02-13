@@ -1,5 +1,6 @@
 use super::*;
 
+use crate::config::Config;
 use crate::game::{Game, Map, ARCADE_FOOD_COORDS};
 use crate::rand::Rand;
 
@@ -8,10 +9,20 @@ use std::cmp::max;
 impl Board {
     // Move heuristics applied to each move in random playout
 
-    pub fn gen_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
-        let mut valid_moves = [Move::Left; 4];
+    pub fn gen_move(&self, cfg: &Config, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
         let mut best_move = None;
+
+        let mut valid_moves = [Move::Left; 4];
+
+        let mut neutral_moves = [Move::Left; 4];
+        let mut good_moves = [Move::Left; 4];
+        let mut bad_moves = [Move::Left; 4];
+
         let mut num_valid = 0;
+
+        let mut num_neutral = 0;
+        let mut num_good = 0;
+        let mut num_bad = 0;
 
         for mv_idx in 0..4 {
             let mv = Move::from_idx(mv_idx);
@@ -19,15 +30,50 @@ impl Board {
             if is_valid {
                 valid_moves[num_valid as usize] = mv;
                 num_valid += 1;
+                if cfg.compare == 1 {
+                    match self.head_on_col(game, snake_idx, mv) {
+                        HeadOnCol::None => {
+                            neutral_moves[num_neutral as usize] = mv;
+                            num_neutral += 1;
+                        }
+                        HeadOnCol::PossibleCollision => {
+                            bad_moves[num_bad as usize] = mv;
+                            num_bad += 1;
+                        }
+                        HeadOnCol::PossibleElimination => {
+                            good_moves[num_good as usize] = mv;
+                            num_good += 1;
+                        }
+                    }
+                }
             }
         }
 
         #[allow(clippy::comparison_chain)]
-        if num_valid == 1 {
-            best_move = Some(valid_moves[0]);
-        } else if num_valid > 1 {
-            let mv_idx = rng.range(0, num_valid - 1);
-            best_move = Some(valid_moves[mv_idx as usize]);
+        if cfg.compare == 1 {
+            if num_good == 1 {
+                best_move = Some(good_moves[0])
+            } else if num_good > 1 {
+                let mv_idx = rng.range(0, num_good - 1);
+                best_move = Some(good_moves[mv_idx as usize]);
+            } else if num_neutral == 1 {
+                best_move = Some(neutral_moves[0]);
+            } else if num_neutral > 1 {
+                let mv_idx = rng.range(0, num_neutral - 1);
+                best_move = Some(neutral_moves[mv_idx as usize]);
+            } else if num_bad == 1 {
+                best_move = Some(bad_moves[0]);
+            } else if num_bad > 1 {
+                let mv_idx = rng.range(0, num_bad - 1);
+                best_move = Some(bad_moves[mv_idx as usize]);
+            }
+        } else {
+            if num_valid == 1 {
+                best_move = Some(valid_moves[0]);
+            } else if num_valid > 1 {
+                let mv_idx = rng.range(0, num_valid - 1);
+                best_move = Some(valid_moves[mv_idx as usize]);
+            }
         }
 
         best_move.unwrap_or(Move::Left)

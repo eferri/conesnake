@@ -285,7 +285,7 @@ fn playout_test() {
     scratch_guard.play_scores.clear();
     scratch_guard.board = start_board;
 
-    search::playout_game(&ctx, &mut scratch_guard, &game);
+    search::playout_game(&ctx.config, &mut scratch_guard, &game);
 
     assert!(scratch_guard.play_scores.len() == 2);
     check_scores(&scratch_guard.play_scores, &[1.0, 0.0]);
@@ -294,7 +294,7 @@ fn playout_test() {
     scratch_guard.play_scores.clear();
     scratch_guard.board = start_board;
 
-    search::playout_game(&ctx, &mut scratch_guard, &game);
+    search::playout_game(&ctx.config, &mut scratch_guard, &game);
 
     assert!(scratch_guard.play_scores.len() == 2);
     check_scores(&scratch_guard.play_scores, &[1.0, 0.0]);

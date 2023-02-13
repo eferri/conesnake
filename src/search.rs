@@ -240,15 +240,15 @@ impl NodeState {
             }
         }
 
-        let results = f32x4::from_slice_aligned(&results);
+        let results = f32x4::from_slice_unaligned(&results);
 
         if op_mask.none() {
             return results;
         }
 
-        let variance_sums = f32x4::from_slice_aligned(&variance_sums);
-        let games = f32x4::from_slice_aligned(&games);
-        let scores = f32x4::from_slice_aligned(&scores);
+        let variance_sums = f32x4::from_slice_unaligned(&variance_sums);
+        let games = f32x4::from_slice_unaligned(&games);
+        let scores = f32x4::from_slice_unaligned(&scores);
 
         let ln_parent_games = (self.games as f32).ln();
 
@@ -501,7 +501,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
         // Perform rollout
         let is_terminal = {
             let _playout_guard = playout_guard;
-            playout_game(&ctx, &mut scratch_guard, game)
+            playout_game(&config, &mut scratch_guard, game)
         };
 
         if !is_terminal {
@@ -573,7 +573,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
     ctx.done_barrier.wait();
 }
 
-fn playout_game<R: Rand>(_ctx: &SearchContext<R>, state: &mut ThreadContext<R>, game: &Game) -> bool {
+fn playout_game<R: Rand>(cfg: &Config, state: &mut ThreadContext<R>, game: &Game) -> bool {
     let mut terminal = true;
     let mut playout_moves: u32 = 0;
 
@@ -585,7 +585,11 @@ fn playout_game<R: Rand>(_ctx: &SearchContext<R>, state: &mut ThreadContext<R>, 
                 continue;
             }
 
-            playout_moves = Move::set_move(playout_moves, s as u32, state.board.gen_move(game, s, &mut state.rng));
+            playout_moves = Move::set_move(
+                playout_moves,
+                s as u32,
+                state.board.gen_move(cfg, game, s, &mut state.rng),
+            );
         }
 
         state
