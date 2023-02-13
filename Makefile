@@ -86,11 +86,17 @@ bench:
 		cargo build --release \
 		&& ./target-snake/release/performance --num-worker-threads 8'
 
+.PHONY: compare
+compare:
+	docker compose run --rm snake bash -c ' \
+		cargo build --release \
+		&& python3 -u ./scripts/play_games.py --mode compare 2>&1 | tee compare.log'
+
 .PHONY: optimize
 optimize:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& python3 -u ./scripts/optimize.py 2>&1 | tee optimize.log'
+		&& python3 -u ./scripts/play_games.py --mode optimize 2>&1 | tee optimize.log'
 
 ASM_FUNC ?= "search_worker"
 

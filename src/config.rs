@@ -51,6 +51,9 @@ pub struct Config {
     #[clap(long, default_value_t = 30)]
     pub latency: i32,
 
+    #[clap(long, default_value_t = 0)]
+    pub compare: i32,
+
     // Algorithm parameters
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
