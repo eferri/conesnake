@@ -84,8 +84,10 @@ impl Game {
             board.turn as f64 / self.max_turn(board) as f64
         } else if board.snakes[snake_idx].alive() {
             1.0
-        } else {
+        } else if board.snakes[..board.num_snakes() as usize].iter().all(|x| !x.alive()) {
             0.0
+        } else {
+            -1.0
         }
     }
 
@@ -133,7 +135,7 @@ impl Game {
             }
         }
 
-        score.clamp(0.0, 1.0)
+        score.clamp(-1.0, 1.0)
     }
 
     pub fn over(&self, board: &Board) -> bool {

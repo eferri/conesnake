@@ -5,7 +5,7 @@ use clap::{Parser, ValueEnum};
 
 // Hyperparameters
 
-pub const DEFAULT_TEMP: f64 = 1.9;
+pub const DEFAULT_TEMP: f64 = 2.0;
 
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
@@ -51,25 +51,28 @@ pub struct Config {
     #[clap(long, default_value_t = 30)]
     pub latency: i32,
 
-    #[clap(long, default_value_t = 0)]
-    pub compare: i32,
+    #[clap(long, default_value_t = false)]
+    pub compare: bool,
 
     // Algorithm parameters
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
+
+    #[clap(long, default_value_t = true)]
+    pub strong_playout: bool,
 }
 
 impl Config {
     pub fn set_temp(&mut self, board: &Board, game: &Game) {
         match (board.num_alive_snakes(), game.ruleset) {
             (_, Rules::Solo) => self.temperature = DEFAULT_TEMP,
-            (_, Rules::Constrictor) => self.temperature = 6.36,
-            (2, Rules::Standard) => self.temperature = 2.0,
-            (2, Rules::Royale) => self.temperature = 2.0,
-            (2, Rules::Wrapped) => self.temperature = 1.5,
-            (_, Rules::Standard) => self.temperature = 3.0,
-            (_, Rules::Royale) => self.temperature = 3.0,
-            (_, Rules::Wrapped) => self.temperature = 2.5,
+            (_, Rules::Constrictor) => self.temperature = DEFAULT_TEMP * 3.0 + 0.5,
+            (2, Rules::Standard) => self.temperature = DEFAULT_TEMP,
+            (2, Rules::Royale) => self.temperature = DEFAULT_TEMP,
+            (2, Rules::Wrapped) => self.temperature = DEFAULT_TEMP,
+            (_, Rules::Standard) => self.temperature = DEFAULT_TEMP + 1.0,
+            (_, Rules::Royale) => self.temperature = DEFAULT_TEMP + 1.0,
+            (_, Rules::Wrapped) => self.temperature = DEFAULT_TEMP + 1.0,
         }
     }
 }

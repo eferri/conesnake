@@ -106,9 +106,14 @@ async def print_stream(name, stream, out_fd=sys.stdout):
 
 
 async def run_games(num_games=250, num_opponents=1, **kwargs):
-    opt_args = list(itertools.chain.from_iterable((
-        f"--{key}", str(value)
-    ) for (key, value) in kwargs.items()))
+    opt_args = []
+    for key, value in kwargs.items():
+        if isinstance(value, bool):
+            opt_args.append((f"--{key}",))
+        else:
+            opt_args.append((f"--{key}", str(value)))
+
+    opt_args = list(itertools.chain.from_iterable(opt_args))
 
     wins = 0
     draws = 0
@@ -180,6 +185,7 @@ async def run_games(num_games=250, num_opponents=1, **kwargs):
 async def optimize():
     dimensions = [
         Real(0.7, 6.0, name="temperature"),
+        Integer(0, 1, name="strong-playout"),
     ]
 
     opt = Optimizer(
@@ -197,14 +203,19 @@ async def optimize():
         print("\n*************************\n")
         print("Starting evaluation jobs with args:\n")
 
-        kargs = {dim.name: x[idx] for idx, dim in enumerate(dimensions)}
+        kwargs = {}
+        for idx, dim in enumerate(dimensions):
+            if isinstance(dim, Integer) and dim.bounds == (0, 1):
+                kwargs[dim.name] = bool(x[idx])
+            else:
+                kwargs[dim.name] = x[idx]
 
-        print(f"{pretty.pformat(kargs)}\n")
+        print(f"{pretty.pformat(kwargs)}\n")
         print(f"game {calls}/{num_calls}")
         print("args:")
         print(pretty.pformat(x))
 
-        y = await run_games(**kargs)
+        y = await run_games(**kwargs)
 
         print("\nloss rate:")
         print(pretty.pformat(y))
@@ -234,7 +245,7 @@ async def main():
         case "optimize":
             await optimize()
         case "compare":
-            await run_games(num_games=10000, compare=1)
+            await run_games(num_games=10000, compare=True)
         case _:
             raise ValueError(f"invalid mode {args.mode}")
 

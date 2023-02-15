@@ -30,7 +30,7 @@ impl Board {
             if is_valid {
                 valid_moves[num_valid as usize] = mv;
                 num_valid += 1;
-                if cfg.compare == 1 {
+                if cfg.strong_playout {
                     match self.head_on_col(game, snake_idx, mv) {
                         HeadOnCol::None => {
                             neutral_moves[num_neutral as usize] = mv;
@@ -49,8 +49,7 @@ impl Board {
             }
         }
 
-        #[allow(clippy::comparison_chain)]
-        if cfg.compare == 1 {
+        if cfg.strong_playout {
             if num_good == 1 {
                 best_move = Some(good_moves[0])
             } else if num_good > 1 {

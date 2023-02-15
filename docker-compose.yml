@@ -102,7 +102,7 @@ services:
         --width 11 --height 11 \
         --gametype standard \
         --map standard \
-        --foodSpawnChance 10 \
+        --foodSpawnChance 15 \
         --hazardDamagePerTurn 16 \
         --name conesnake --url http://localhost:${LISTEN_PORT:-8080} \
         --name snork-flood --url http://localhost:8082 \

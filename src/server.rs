@@ -270,11 +270,11 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
         || state.config.max_height < game_height
         || state.config.max_snakes < game_snakes
     {
-        warn!(
+        error!(
             "Server not configured for w: {} h: {} max_snakes: {}",
             game_width, game_height, game_snakes
         );
-        warn!(
+        error!(
             "Current settings are max_width: {} max_height: {} max_snakes: {}",
             state.config.max_width, state.config.max_height, state.config.max_snakes
         );
