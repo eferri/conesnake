@@ -1,5 +1,5 @@
 use crate::api::{Scores, SearchStats};
-use crate::board::Board;
+use crate::board::{Board, HeadOnCol};
 use crate::config::Config;
 use crate::game::Game;
 use crate::pool::ThreadPool;
@@ -266,17 +266,24 @@ impl NodeState {
     }
 }
 
-pub fn best_move(scores: &Scores, print_summary: bool) -> Move {
+pub fn best_move(
+    board: &Board,
+    game: &Game,
+    cfg: &Config,
+    snake_idx: usize,
+    scores: &[Scores],
+    print_summary: bool,
+) -> Move {
     let mut best_move_score = Move::Left;
     let mut best_move_games = Move::Left;
-    let mut best_score = 0.0;
+    let mut best_score = -1.0;
     let mut most_games = 0;
 
     let mut search_str = "".to_owned();
 
-    for (mv_idx, stats) in scores.iter().enumerate() {
+    for (mv_idx, stats) in scores[snake_idx].iter().enumerate() {
         let final_score = if stats.games == 0 {
-            0.0
+            -1.0
         } else {
             stats.score / stats.games as f64
         };
@@ -289,8 +296,19 @@ pub fn best_move(scores: &Scores, print_summary: bool) -> Move {
         ));
 
         if final_score > best_score {
-            best_move_score = Move::from_idx(mv_idx);
-            best_score = final_score;
+            let potential_move = Move::from_idx(mv_idx);
+
+            match board.head_on_col(game, snake_idx, potential_move) {
+                HeadOnCol::None | HeadOnCol::PossibleElimination => {
+                    best_move_score = potential_move;
+                    best_score = final_score;
+                }
+                HeadOnCol::PossibleCollision if (final_score - best_score) > cfg.head_on_thresh => {
+                    best_move_score = potential_move;
+                    best_score = final_score;
+                }
+                HeadOnCol::PossibleCollision => (),
+            }
         }
 
         if stats.games > most_games {
@@ -300,7 +318,7 @@ pub fn best_move(scores: &Scores, print_summary: bool) -> Move {
     }
 
     // Only use the game count if we are trapped
-    let best_move = if best_score == 0.0 {
+    let best_move = if best_score == -1.0 {
         best_move_games
     } else {
         best_move_score

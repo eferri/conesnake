@@ -2,8 +2,10 @@ from skopt import Optimizer
 from skopt.space import Real, Integer
 import os
 import sys
+import time
 import pprint
 import asyncio
+import aiohttp
 import itertools
 import argparse
 
@@ -69,7 +71,7 @@ async def start_snake(index, opt_args=None):
             stdout=asyncio.subprocess.PIPE,
         )]
 
-    return snake_handle, worker_handles
+    return snake_handle, worker_handles, snake_port
 
 
 async def start_rules(snakes):
@@ -105,7 +107,15 @@ async def print_stream(name, stream, out_fd=sys.stdout):
     return "".join(output)
 
 
-async def run_games(num_games=250, num_opponents=1, **kwargs):
+async def get_status(session, url):
+    try:
+        async with session.get(url) as response:
+            return response.status
+    except aiohttp.client_exceptions.ClientConnectorError:
+        return 500
+
+
+async def run_games(num_games=100, num_opponents=2, **kwargs):
     opt_args = []
     for key, value in kwargs.items():
         if isinstance(value, bool):
@@ -119,18 +129,22 @@ async def run_games(num_games=250, num_opponents=1, **kwargs):
     draws = 0
 
     wait_handles = []
+    snake_ports = []
 
-    conesnake, conesnake_workers = await start_snake(0, opt_args)
+    conesnake, conesnake_workers, conesnake_port = await start_snake(0, opt_args)
+
+    snake_ports.append(conesnake_port)
 
     wait_handles += [("conesnake", conesnake)]
     wait_handles += [(f"conesnake-worker-{i}", w)
                      for i, w in enumerate(conesnake_workers)]
 
     for i in range(num_opponents):
-        oponent, oponent_workers = await start_snake(i + 1)
+        oponent, oponent_workers, oponent_port = await start_snake(i + 1)
         wait_handles += [(f"oponent-{i}", oponent)]
         wait_handles += [(f"oponent-{i}-worker-{j}", w)
                          for j, w in enumerate(oponent_workers)]
+        snake_ports.append(oponent_port)
 
     # Print output of snake tasks
     for name, h in wait_handles:
@@ -138,13 +152,27 @@ async def run_games(num_games=250, num_opponents=1, **kwargs):
         asyncio.create_task(print_stream(
             f"{name}-err", h.stderr, sys.stderr)),
 
-    for i in range(num_games):
+    # Wait for snakes to be ready
+    while True:
+        snake_futures = []
+        async with aiohttp.ClientSession() as session:
+            for snake_url in [f"http://127.0.0.1:{port}/ping" for port in snake_ports]:
+                snake_futures.append(get_status(session, snake_url))
 
+            statuses = await asyncio.gather(*snake_futures)
+
+            if all([s == 200 for s in statuses]):
+                break
+            else:
+                time.sleep(0.5)
+
+    for i in range(num_games):
         print("\n-------------------------\n")
         print(f"game {i + 1}/{num_games}")
         print(f"wins {wins}")
         print(f"draws {draws}")
-        print(f"losses {i + 1 - wins - draws}")
+        print(f"losses {i - wins - draws}")
+        print()
 
         rules = await start_rules(
             ["conesnake"] + [f"oponent-{j}" for j in range(num_opponents)]
@@ -184,7 +212,9 @@ async def run_games(num_games=250, num_opponents=1, **kwargs):
 
 async def optimize():
     dimensions = [
-        Real(0.7, 6.0, name="temperature"),
+        Real(0.7, 5.0, name="temperature"),
+        Real(0.0, 3.0, name="multi-snake-addition"),
+        Real(0.0, 0.5, name="head-on-thresh"),
         Integer(0, 1, name="strong-playout"),
     ]
 
@@ -211,9 +241,10 @@ async def optimize():
                 kwargs[dim.name] = x[idx]
 
         print(f"{pretty.pformat(kwargs)}\n")
-        print(f"game {calls}/{num_calls}")
+        print(f"evaluation {calls + 1}/{num_calls}")
         print("args:")
         print(pretty.pformat(x))
+        print()
 
         y = await run_games(**kwargs)
 

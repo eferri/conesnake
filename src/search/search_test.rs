@@ -318,10 +318,11 @@ fn small_search_test() {
 
     let mut config = ctx.config.clone();
     config.set_temp(&board, &game);
+    let config = Arc::new(config);
 
     let search_result =
-        search::search_moves(Arc::new(ctx), Arc::new(config), &pool, &board, &game, Instant::now()).unwrap();
-    let best_move = search::best_move(&search_result.scores[0], true);
+        search::search_moves(Arc::new(ctx), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
+    let best_move = search::best_move(&board, &game, &config, 0, &search_result.scores, true);
 
     assert_eq!(best_move, Move::Right);
     assert_eq!(search_result.max_depth, 2);
@@ -366,10 +367,11 @@ fn arcade_maze_search_test() {
 
         let mut config = ctx.config.clone();
         config.set_temp(&board, &game);
+        let config = Arc::new(config);
 
         let search_result =
-            search::search_moves(ctx.clone(), Arc::new(config), &pool, &board, &game, Instant::now()).unwrap();
-        let best_move = search::best_move(&search_result.scores[0], true);
+            search::search_moves(ctx.clone(), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
+        let best_move = search::best_move(&board, &game, &config, 0, &search_result.scores, true);
 
         assert!(best_move == Move::Down || best_move == Move::Up);
 

@@ -452,7 +452,7 @@ async fn main() -> Result<(), Error> {
             }
 
             for (snake_idx, eq, mv) in *desired_moves {
-                let actual_move = search::best_move(&summed_scores[*snake_idx], true);
+                let actual_move = search::best_move(&board, &game, &cfg, *snake_idx, &summed_scores, true);
                 let passed = *eq && actual_move == *mv || !*eq && actual_move != *mv;
 
                 for score in &mut summed_scores[*snake_idx] {

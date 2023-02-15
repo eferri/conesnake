@@ -58,6 +58,15 @@ pub struct Config {
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
 
+    #[clap(long, default_value_t = 1.0)]
+    pub multi_snake_addition: f64,
+
+    #[clap(long, default_value_t = 3.0)]
+    pub constrictor_mult: f64,
+
+    #[clap(long, default_value_t = 0.1)]
+    pub head_on_thresh: f64,
+
     #[clap(long, default_value_t = true)]
     pub strong_playout: bool,
 }
@@ -65,14 +74,14 @@ pub struct Config {
 impl Config {
     pub fn set_temp(&mut self, board: &Board, game: &Game) {
         match (board.num_alive_snakes(), game.ruleset) {
-            (_, Rules::Solo) => self.temperature = DEFAULT_TEMP,
-            (_, Rules::Constrictor) => self.temperature = DEFAULT_TEMP * 3.0 + 0.5,
-            (2, Rules::Standard) => self.temperature = DEFAULT_TEMP,
-            (2, Rules::Royale) => self.temperature = DEFAULT_TEMP,
-            (2, Rules::Wrapped) => self.temperature = DEFAULT_TEMP,
-            (_, Rules::Standard) => self.temperature = DEFAULT_TEMP + 1.0,
-            (_, Rules::Royale) => self.temperature = DEFAULT_TEMP + 1.0,
-            (_, Rules::Wrapped) => self.temperature = DEFAULT_TEMP + 1.0,
+            (_, Rules::Solo) => self.temperature = self.temperature,
+            (_, Rules::Constrictor) => self.temperature = self.temperature * self.constrictor_mult,
+            (2, Rules::Standard) => self.temperature = self.temperature,
+            (2, Rules::Royale) => self.temperature = self.temperature,
+            (2, Rules::Wrapped) => self.temperature = self.temperature,
+            (_, Rules::Standard) => self.temperature = self.temperature + self.multi_snake_addition,
+            (_, Rules::Royale) => self.temperature = self.temperature + self.multi_snake_addition,
+            (_, Rules::Wrapped) => self.temperature = self.temperature + self.multi_snake_addition,
         }
     }
 }

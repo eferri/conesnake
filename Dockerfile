@@ -51,7 +51,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     && pip install \
     wg-meshconf==2.5.1 \
     scikit-optimize==0.9.0 \
-    numpy==1.23.5
+    numpy==1.23.5 \
+    aiohttp==3.8.4
 
 # Build perf linked with libffd (binutils-dev) for better performance
 RUN curl -sSfL "https://github.com/torvalds/linux/archive/refs/tags/v${KERNAL_VER}.zip" -o linux.zip \
