@@ -1,5 +1,7 @@
+import matplotlib.pyplot as plt
 from skopt import Optimizer
 from skopt.space import Real, Integer
+from skopt.plots import plot_convergence, plot_regret, plot_evaluations
 import os
 import sys
 import time
@@ -33,7 +35,7 @@ async def start_snake(index, opt_args=None):
         "--worker-node", "127.0.0.1",
         "--worker-pod", f"http://127.0.0.1:{snake_port + 1}",
         "--worker-pod", f"http://127.0.0.1:{snake_port + 2}",
-        "--latency", "30",
+        "--latency", "10",
         "relay",
     ]
 
@@ -52,7 +54,7 @@ async def start_snake(index, opt_args=None):
         "--max-width", max_width,
         "--max-height", max_height,
         "--max-snakes", max_snakes,
-        "--latency", "50",
+        "--latency", "10",
         "worker",
     ]
     worker_args = worker_args + opt_args if opt_args else worker_args
@@ -74,13 +76,13 @@ async def start_snake(index, opt_args=None):
     return snake_handle, worker_handles, snake_port
 
 
-async def start_rules(snakes):
+async def start_rules(snakes, game_type="standard", map="standard"):
     rules_args = [
-        "--timeout", os.environ["TIMEOUT"],
-        "--width", os.environ["MAX_WIDTH"],
-        "--height", os.environ["MAX_HEIGHT"],
-        "--gametype", "standard",
-        "--map", "standard",
+        "--timeout", "200",
+        "--width", "11",
+        "--height", "11",
+        "--gametype", game_type,
+        "--map", map,
         "--foodSpawnChance", "15",
     ] + list(itertools.chain.from_iterable([
         "--name", s, "--url", f"http://127.0.0.1:{BASE_PORT + i*(NUM_WORKERS + 1)}"
@@ -115,7 +117,7 @@ async def get_status(session, url):
         return 500
 
 
-async def run_games(num_games=100, num_opponents=2, **kwargs):
+async def run_games(num_games=300, num_opponents=2, **kwargs):
     opt_args = []
     for key, value in kwargs.items():
         if isinstance(value, bool):
@@ -205,29 +207,37 @@ async def run_games(num_games=100, num_opponents=2, **kwargs):
     for _, h in wait_handles:
         await h.wait()
 
-    print(f"final: wins {wins} draws {draws}")
+    losses = num_games - wins - draws
 
-    return (num_games - wins) / num_games
+    print(f"final: wins {wins} draws {draws} losses {losses}")
+
+    return (losses - wins) / num_games
 
 
 async def optimize():
     dimensions = [
-        Real(0.7, 5.0, name="temperature"),
-        Real(0.0, 3.0, name="multi-snake-addition"),
-        Real(0.0, 0.5, name="head-on-thresh"),
-        Integer(0, 1, name="strong-playout"),
+        Real(1.2, 4.0, name="temperature"),
+        Real(0.0, 1.0, name="head-on-thresh"),
+        # Integer(0, 1, name="strong-playout"),
     ]
 
     opt = Optimizer(
         dimensions=dimensions,
+        base_estimator="GP",
+        acq_func="gp_hedge",
+        acq_optimizer="auto",
+        initial_point_generator="grid",
+        n_initial_points=8,
+        random_state=0,
     )
+
+    opt_result = None
 
     pretty = pprint.PrettyPrinter(indent=4)
 
     num_calls = 100
-    calls = 0
 
-    while calls < num_calls:
+    for call in range(num_calls):
         x = opt.ask()
 
         print("\n*************************\n")
@@ -241,7 +251,7 @@ async def optimize():
                 kwargs[dim.name] = x[idx]
 
         print(f"{pretty.pformat(kwargs)}\n")
-        print(f"evaluation {calls + 1}/{num_calls}")
+        print(f"evaluation {call + 1}/{num_calls}")
         print("args:")
         print(pretty.pformat(x))
         print()
@@ -251,8 +261,18 @@ async def optimize():
         print("\nloss rate:")
         print(pretty.pformat(y))
 
-        opt.tell(x, y)
-        calls += 1
+        opt_result = opt.tell(x, y)
+
+        plot_convergence(opt_result)
+        plt.savefig("convergence.png")
+        plt.clf()
+        plot_regret(opt_result)
+        plt.savefig("regret.png")
+        plt.clf()
+        plot_evaluations(opt_result, dimensions=[
+                         dim.name for dim in dimensions])
+        plt.savefig("evaluation.png")
+        plt.clf()
 
     min_loss_idx = opt.yi.index(min(opt.yi))
     min_loss = opt.yi[min_loss_idx]

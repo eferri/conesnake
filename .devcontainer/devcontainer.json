@@ -11,21 +11,19 @@
     "customizations": {
         "vscode": {
             "extensions": [
-                "tombonnike.vscode-status-bar-format-toggle",
-                "shardulm94.trailing-spaces",
-                "bungcip.better-toml",
-                "vadimcn.vscode-lldb",
-                "streetsidesoftware.code-spell-checker",
                 "rust-lang.rust-analyzer",
                 "golang.go",
+                "ms-python.python",
                 "ms-vscode.cpptools",
                 "ms-azuretools.vscode-docker",
-                "twxs.cmake",
                 "hashicorp.terraform",
                 "redhat.vscode-yaml",
                 "ms-kubernetes-tools.vscode-kubernetes-tools",
                 "eamodio.gitlens",
-                "ms-python.python"
+                "shardulm94.trailing-spaces",
+                "bungcip.better-toml",
+                "vadimcn.vscode-lldb",
+                "streetsidesoftware.code-spell-checker"
             ]
         }
     },

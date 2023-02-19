@@ -34,7 +34,14 @@ prod-build:
 
 .PHONY: clean
 clean:
-	rm -f *.log .k8s/manifest.yaml *.perf perf.data perf.data.* optimize.log
+	rm -f \
+		*.log \
+		.k8s/manifest.yaml \
+		*.perf \
+		perf.data \
+		perf.data.* \
+		*.png \
+		*.out
 
 .PHONY: veryclean
 veryclean: clean

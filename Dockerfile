@@ -47,12 +47,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libaudit-dev \
     libunwind-dev \
     libnuma-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install \
-    wg-meshconf==2.5.1 \
-    scikit-optimize==0.9.0 \
-    numpy==1.23.5 \
-    aiohttp==3.8.4
+    && rm -rf /var/lib/apt/lists/*
 
 # Build perf linked with libffd (binutils-dev) for better performance
 RUN curl -sSfL "https://github.com/torvalds/linux/archive/refs/tags/v${KERNAL_VER}.zip" -o linux.zip \
@@ -93,7 +88,7 @@ ENV PATH "/usr/local/go/bin:/home/rust/go/bin:/home/rust/.cargo/bin:${PATH}"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2023-02-14
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2023-02-18
 
 # Rust development tools
 RUN rustup component add rustfmt clippy \
@@ -108,6 +103,14 @@ RUN go install github.com/ramya-rao-a/go-outline@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \
     && go install honnef.co/go/tools/cmd/staticcheck@latest \
     && go install golang.org/x/tools/gopls@latest
+
+# Python development tools
+RUN python3 -m pip install --user \
+    wg-meshconf==2.5.1 \
+    scikit-optimize[plots]==0.9.0 \
+    numpy==1.23.5 \
+    aiohttp==3.8.4 \
+    matplotlib==3.7.0
 
 # Cache rules dependencies
 COPY submodules/rules/go.mod submodules/rules/go.sum ./

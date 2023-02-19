@@ -18,6 +18,7 @@ certs
 *.tar
 *.tar.gz
 *.svg
+*.png
 *.log
 *.pb
 *.gpg

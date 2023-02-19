@@ -6,6 +6,8 @@ use clap::{Parser, ValueEnum};
 // Hyperparameters
 
 pub const DEFAULT_TEMP: f64 = 2.0;
+pub const DEFAULT_HEADON_THRESH: f64 = 0.5;
+pub const DEFAULT_CONSTRICTOR_MULT: f64 = 2.0;
 
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
@@ -58,13 +60,10 @@ pub struct Config {
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
 
-    #[clap(long, default_value_t = 1.0)]
-    pub multi_snake_addition: f64,
-
-    #[clap(long, default_value_t = 3.0)]
+    #[clap(long, default_value_t = DEFAULT_CONSTRICTOR_MULT)]
     pub constrictor_mult: f64,
 
-    #[clap(long, default_value_t = 0.1)]
+    #[clap(long, default_value_t = DEFAULT_HEADON_THRESH)]
     pub head_on_thresh: f64,
 
     #[clap(long, default_value_t = true)]
@@ -76,12 +75,9 @@ impl Config {
         match (board.num_alive_snakes(), game.ruleset) {
             (_, Rules::Solo) => self.temperature = self.temperature,
             (_, Rules::Constrictor) => self.temperature = self.temperature * self.constrictor_mult,
-            (2, Rules::Standard) => self.temperature = self.temperature,
-            (2, Rules::Royale) => self.temperature = self.temperature,
-            (2, Rules::Wrapped) => self.temperature = self.temperature,
-            (_, Rules::Standard) => self.temperature = self.temperature + self.multi_snake_addition,
-            (_, Rules::Royale) => self.temperature = self.temperature + self.multi_snake_addition,
-            (_, Rules::Wrapped) => self.temperature = self.temperature + self.multi_snake_addition,
+            (_, Rules::Standard) => self.temperature = self.temperature,
+            (_, Rules::Royale) => self.temperature = self.temperature,
+            (_, Rules::Wrapped) => self.temperature = self.temperature,
         }
     }
 }
