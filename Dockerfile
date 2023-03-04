@@ -75,7 +75,7 @@ RUN curl -sSfL "https://dl.k8s.io/release/v1.26.1/bin/linux/${DOCKER_ARCH}/kubec
     && cp kubectl /usr/local/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.3.8/terraform_1.3.8_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.3.9/terraform_1.3.9_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /usr/local/bin \
@@ -88,7 +88,7 @@ ENV PATH "/usr/local/go/bin:/home/rust/go/bin:/home/rust/.cargo/bin:${PATH}"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2023-02-18
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2023-03-04
 
 # Rust development tools
 RUN rustup component add rustfmt clippy \

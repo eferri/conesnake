@@ -5,31 +5,35 @@ use crate::rand::{FastRand, MaxRand};
 use crate::search::SearchContext;
 use crate::util::Coord;
 
+use clap::Parser;
 use log::info;
 
 pub fn test_config() -> Config {
     info!("test_config");
-    Config {
-        num_worker_threads: 1,
-        max_boards: 5000,
-        max_width: 19,
-        max_height: 21,
-        max_snakes: 4,
-        latency: 5,
-        ..Default::default()
-    }
+    // Ensure clap defaults are used
+    let mut config = Config::parse_from(&["".to_owned()]);
+
+    config.num_worker_threads = 1;
+    config.max_boards = 10000;
+    config.max_width = 19;
+    config.max_height = 21;
+    config.max_snakes = 4;
+    config.latency = 5;
+
+    config
 }
 
 pub fn release_config() -> Config {
     info!("release_config");
-    Config {
-        num_worker_threads: 8,
-        max_boards: 600000,
-        max_width: 21,
-        max_height: 21,
-        max_snakes: 4,
-        ..Default::default()
-    }
+    let mut config = Config::parse_from(&["".to_owned()]);
+
+    config.num_worker_threads = 8;
+    config.max_boards = 350000;
+    config.max_width = 21;
+    config.max_height = 21;
+    config.max_snakes = 4;
+
+    config
 }
 
 pub fn get_context() -> SearchContext<FastRand> {

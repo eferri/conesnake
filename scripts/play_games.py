@@ -41,6 +41,8 @@ async def start_snake(index, opt_args=None):
 
     snake_args = snake_args + opt_args if opt_args else snake_args
 
+    print("/target-snake/release/conesnake" + " ".join(snake_args))
+
     snake_handle = await asyncio.create_subprocess_exec(
         "./target-snake/release/conesnake",
         *snake_args,
@@ -65,6 +67,8 @@ async def start_snake(index, opt_args=None):
         worker_i_args = [
             "--port", f"{snake_port + i + 1}"
         ] + worker_args
+
+        print("/target-snake/release/conesnake" + " ".join(snake_args))
 
         worker_handles += [await asyncio.create_subprocess_exec(
             "./target-snake/release/conesnake",
@@ -117,7 +121,7 @@ async def get_status(session, url):
         return 500
 
 
-async def run_games(num_games=300, num_opponents=2, **kwargs):
+async def run_games(num_games=500, num_opponents=2, **kwargs):
     opt_args = []
     for key, value in kwargs.items():
         if isinstance(value, bool):
@@ -211,14 +215,17 @@ async def run_games(num_games=300, num_opponents=2, **kwargs):
 
     print(f"final: wins {wins} draws {draws} losses {losses}")
 
-    return (losses - wins) / num_games
+    return (num_games - wins) / num_games
 
 
 async def optimize():
     dimensions = [
-        Real(1.2, 4.0, name="temperature"),
-        Real(0.0, 1.0, name="head-on-thresh"),
-        # Integer(0, 1, name="strong-playout"),
+        Real(1.7, 2.5, name="temperature"),
+        Real(1.0, 50.0, name="win-val"),
+        Real(-50.0, -1.0, name="loss-val"),
+        Real(-50.0, 0.0, name="tie-val"),
+        Integer(0, 1, name="strong-playout"),
+        Integer(1, 100, name="min-playouts"),
     ]
 
     opt = Optimizer(
@@ -235,7 +242,7 @@ async def optimize():
 
     pretty = pprint.PrettyPrinter(indent=4)
 
-    num_calls = 100
+    num_calls = 500
 
     for call in range(num_calls):
         x = opt.ask()

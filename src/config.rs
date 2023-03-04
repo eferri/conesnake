@@ -6,8 +6,11 @@ use clap::{Parser, ValueEnum};
 // Hyperparameters
 
 pub const DEFAULT_TEMP: f64 = 2.0;
-pub const DEFAULT_HEADON_THRESH: f64 = 0.5;
-pub const DEFAULT_CONSTRICTOR_MULT: f64 = 2.0;
+pub const DEFAULT_CONSTRICTOR_TEMP: f64 = 4.0;
+pub const DEFAULT_MIN_PLAYOUTS: i64 = 10;
+pub const DEFAULT_WIN_VAL: f64 = 1.0;
+pub const DEFAULT_LOSS_VAL: f64 = -10.0;
+pub const DEFAULT_TIE_VAL: f64 = -9.0;
 
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
@@ -60,11 +63,20 @@ pub struct Config {
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
 
-    #[clap(long, default_value_t = DEFAULT_CONSTRICTOR_MULT)]
-    pub constrictor_mult: f64,
+    #[clap(long, default_value_t = DEFAULT_CONSTRICTOR_TEMP)]
+    pub constrictor_temp: f64,
 
-    #[clap(long, default_value_t = DEFAULT_HEADON_THRESH)]
-    pub head_on_thresh: f64,
+    #[clap(long, default_value_t = DEFAULT_MIN_PLAYOUTS)]
+    pub min_playouts: i64,
+
+    #[clap(long, allow_negative_numbers = true, default_value_t = DEFAULT_WIN_VAL)]
+    pub win_val: f64,
+
+    #[clap(long, allow_negative_numbers = true, default_value_t = DEFAULT_LOSS_VAL)]
+    pub loss_val: f64,
+
+    #[clap(long, allow_negative_numbers = true, default_value_t = DEFAULT_TIE_VAL)]
+    pub tie_val: f64,
 
     #[clap(long, default_value_t = true)]
     pub strong_playout: bool,
@@ -74,7 +86,7 @@ impl Config {
     pub fn set_temp(&mut self, board: &Board, game: &Game) {
         match (board.num_alive_snakes(), game.ruleset) {
             (_, Rules::Solo) => self.temperature = self.temperature,
-            (_, Rules::Constrictor) => self.temperature = self.temperature * self.constrictor_mult,
+            (_, Rules::Constrictor) => self.temperature = self.constrictor_temp,
             (_, Rules::Standard) => self.temperature = self.temperature,
             (_, Rules::Royale) => self.temperature = self.temperature,
             (_, Rules::Wrapped) => self.temperature = self.temperature,

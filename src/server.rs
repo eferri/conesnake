@@ -319,7 +319,7 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
                     state.max_nodes.fetch_max(stats.total_nodes, Ordering::AcqRel);
                     let max = state.max_nodes.load(Ordering::Acquire);
                     info!("max nodes expanded: {}", max);
-                    let mv = search::best_move(&board, &game, &config, 0, &stats.scores, false);
+                    let mv = search::best_move(&config, 0, &stats.scores, false);
 
                     (
                         StatusCode::OK,
@@ -346,7 +346,7 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
             let worker_res = run_workers(state.clone(), &game_state, start_time).await;
             match worker_res {
                 Ok(scores) => {
-                    let mv = search::best_move(&board, &game, &state.config, 0, &[scores], true);
+                    let mv = search::best_move(&state.config, 0, &[scores], true);
                     info!("board:\n{}", board);
                     (StatusCode::OK, Json(MoveResp { mv, scores: None }))
                 }

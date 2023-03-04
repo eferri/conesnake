@@ -1,5 +1,5 @@
 use crate::api::{Scores, SearchStats};
-use crate::board::{Board, HeadOnCol};
+use crate::board::Board;
 use crate::config::Config;
 use crate::game::Game;
 use crate::pool::ThreadPool;
@@ -30,6 +30,7 @@ pub struct SearchContext<R: Rand> {
     total_nodes: AtomicI64,
     num_games: AtomicI64,
     num_playouts: AtomicI64,
+    playout_ns: AtomicI64,
 }
 
 // Thread-local search resources, pre-allocated
@@ -127,6 +128,7 @@ impl<R: Rand> SearchContext<R> {
             total_nodes: AtomicI64::new(0),
             num_games: AtomicI64::new(0),
             num_playouts: AtomicI64::new(0),
+            playout_ns: AtomicI64::new(0),
         }
     }
 
@@ -135,6 +137,7 @@ impl<R: Rand> SearchContext<R> {
         self.num_games.store(0, Ordering::Release);
         self.num_playouts.store(0, Ordering::Release);
         self.search_timeout.store(false, Ordering::Release);
+        self.playout_ns.store(0, Ordering::Release);
     }
 }
 
@@ -200,7 +203,7 @@ impl NodeState {
     pub fn duct_score(&self, cfg: &Config, snake_idx: usize, mv: Move) -> f64 {
         let mcts_scores = &self.cache[snake_idx][mv.idx()];
 
-        if mcts_scores.games == 0 || self.games == 0 {
+        if mcts_scores.games < cfg.min_playouts || (self.games as i64) < cfg.min_playouts {
             f64::MAX
         } else {
             let ln_parent_games = (self.games as f64).ln();
@@ -230,7 +233,7 @@ impl NodeState {
             let mv = Move::extract(mvs, snake_idx as u32);
             let mcts_scores = &self.cache[snake_idx][mv.idx()];
 
-            if mcts_scores.games == 0 || self.games == 0 {
+            if mcts_scores.games < cfg.min_playouts || (self.games as i64) < cfg.min_playouts {
                 results[snake_idx] = f32::MAX
             } else {
                 op_mask = op_mask.replace(snake_idx, true);
@@ -266,59 +269,41 @@ impl NodeState {
     }
 }
 
-pub fn best_move(
-    board: &Board,
-    game: &Game,
-    cfg: &Config,
-    snake_idx: usize,
-    scores: &[Scores],
-    print_summary: bool,
-) -> Move {
+pub fn best_move(cfg: &Config, snake_idx: usize, scores: &[Scores], print_summary: bool) -> Move {
     let mut best_move_score = Move::Left;
     let mut best_move_games = Move::Left;
-    let mut best_score = -1.0;
+    let mut best_score = cfg.loss_val;
     let mut most_games = 0;
 
     let mut search_str = "".to_owned();
 
     for (mv_idx, stats) in scores[snake_idx].iter().enumerate() {
         let final_score = if stats.games == 0 {
-            -1.0
+            cfg.loss_val
         } else {
             stats.score / stats.games as f64
         };
 
+        let mv = Move::from_idx(mv_idx);
+
         search_str.push_str(&format!(
             "\nSearch move: {:<6} score: {:.8}  games: {}",
-            Move::from_idx(mv_idx),
-            final_score,
-            stats.games
+            mv, final_score, stats.games
         ));
 
         if final_score > best_score {
-            let potential_move = Move::from_idx(mv_idx);
-
-            match board.head_on_col(game, snake_idx, potential_move) {
-                HeadOnCol::None | HeadOnCol::PossibleElimination => {
-                    best_move_score = potential_move;
-                    best_score = final_score;
-                }
-                HeadOnCol::PossibleCollision if (final_score - best_score) > cfg.head_on_thresh => {
-                    best_move_score = potential_move;
-                    best_score = final_score;
-                }
-                HeadOnCol::PossibleCollision => (),
-            }
+            best_move_score = mv;
+            best_score = final_score;
         }
 
         if stats.games > most_games {
-            best_move_games = Move::from_idx(mv_idx);
+            best_move_games = mv;
             most_games = stats.games;
         }
     }
 
     // Only use the game count if we are trapped
-    let best_move = if best_score == -1.0 {
+    let best_move = if best_score == cfg.loss_val {
         best_move_games
     } else {
         best_move_score
@@ -410,12 +395,15 @@ pub fn search_moves<R: Rand>(
     let num_games = ctx.num_games.load(Ordering::Relaxed);
     let num_playouts = ctx.num_playouts.load(Ordering::Relaxed);
     let num_terminal = num_games - num_playouts;
+    let playout_ns = ctx.playout_ns.load(Ordering::Relaxed);
+    let avg_playout_us = (playout_ns as f64 / num_playouts as f64) / (1000.0);
 
     info!("search max depth: {}", max_depth);
     info!("search total nodes: {}", total_nodes);
     info!("search num games: {}", num_games);
     info!("search num playouts: {}", num_playouts);
     info!("search num terminal: {}", num_terminal);
+    info!("Average playout us: {}", avg_playout_us);
 
     Ok(SearchStats {
         total_nodes,
@@ -517,13 +505,16 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
         scratch_guard.play_scores.clear();
 
         // Perform rollout
+        let start_time = Instant::now();
         let is_terminal = {
             let _playout_guard = playout_guard;
             playout_game(&config, &mut scratch_guard, game)
         };
+        let dur_ns = (Instant::now() - start_time).as_nanos() as i64;
 
         if !is_terminal {
             ctx.num_playouts.fetch_add(1, Ordering::Relaxed);
+            ctx.playout_ns.fetch_add(dur_ns, Ordering::Relaxed);
         }
         ctx.num_games.fetch_add(1, Ordering::Relaxed);
 
@@ -616,7 +607,7 @@ fn playout_game<R: Rand>(cfg: &Config, state: &mut ThreadContext<R>, game: &Game
     }
 
     for snake_idx in 0..state.board.num_snakes() as usize {
-        let score = game.score(&state.board, snake_idx);
+        let score = game.score(&state.board, cfg, snake_idx);
         state.play_scores.push(score);
     }
     terminal

@@ -1,72 +1,162 @@
-use conesnake::api::BattleState;
 use conesnake::api::MoveResp;
+use conesnake::board::Board;
+use conesnake::config::Mode;
+use conesnake::game::{Map, Rules};
 use conesnake::log::log_test_init;
 use conesnake::server::Server;
-use conesnake::tests::common::get_config;
+use conesnake::tests::common::{get_config, test_game};
 use conesnake::util::Move;
 
+use futures::future::join_all;
 use log::info;
-use tokio::task;
+use nix::sys::signal;
+use pretty_assertions::{assert_eq, assert_ne};
+use tokio::{task, time};
 
-use std::fs;
 use std::time::Duration;
 
-#[tokio::test]
-async fn index_test() {
+type TestCase<'a> = &'a [(bool, Move)];
+
+const TESTS: &[(&str, TestCase, Rules, Map)] = &[(
+    // This board was causing the search to over-prioritize the tie that is possible
+    // When 0 moves down here. In practice this is extremely unlikely, so should be ignored
+    "
+    turn: 107 health: 66 health: 97 health: 85
+    - - - - - - - - - - -
+    - - - - - - - - - - -
+    - - - - - - - - - - -
+    - - - - - - 1 < - - -
+    - - - v < - - ^ < - -
+    - - - v ^ d - > ^ > 0
+    - - - v ^ < - ^ - ^ +
+    - - - > v - - ^ - ^ <
+    - - - - > 2 - ^ - - ^
+    - - - - - b > ^ - b ^
+    - - - - - - + - - - -
+",
+    &[(true, Move::Up)],
+    Rules::Standard,
+    Map::Standard,
+)];
+
+#[tokio::test(flavor = "multi_thread")]
+async fn server_test() {
     log_test_init();
 
-    let mut config = get_config();
-    config.port = "4000".to_owned();
-    let server = Server::new(config);
+    let base_port = 4000;
 
-    task::spawn(async move { server.run().await });
+    let base_config = get_config();
+    let mut relay_config = base_config.clone();
 
-    let mut start_board: BattleState =
-        serde_json::from_str(&fs::read_to_string("tests/data/start_basic_game.json").unwrap()).unwrap();
+    let num_workers = 3;
+    let mut worker_addrs = Vec::new();
+    let mut join_handles = Vec::new();
 
-    start_board.you.latency = "0".to_owned();
-    start_board.board.snakes[0].latency = "0".to_owned();
+    for i in 0..num_workers {
+        let mut worker_config = base_config.clone();
+        worker_config.mode = Mode::Worker;
 
-    let mut move_1_board = start_board.clone();
-    move_1_board.turn = 1;
+        let port = base_port + i + 1;
 
-    let mut end_board = start_board.clone();
-    end_board.turn = 2;
+        worker_config.port = port.to_string();
+        worker_addrs.push(format!("http://localhost:{port}").to_owned());
 
-    info!("server_test: /start");
+        join_handles.push(task::spawn(async move {
+            let worker = Server::new(worker_config);
+            worker.run().await
+        }));
+    }
+
+    relay_config.worker_node = vec!["localhost".to_owned()];
+    relay_config.worker_pod = worker_addrs;
+    relay_config.port = base_port.to_string();
+    relay_config.mode = Mode::Relay;
+    relay_config.num_parallel_reqs = 1;
+
+    join_handles.push(task::spawn(async move {
+        let relay = Server::new(relay_config);
+        relay.run().await
+    }));
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(500))
         .build()
         .unwrap();
 
-    client
-        .post("http://localhost:4000/start")
-        .json(&start_board)
-        .send()
-        .await
-        .unwrap();
+    // Wait for server to be ready
+    loop {
+        let mut futures = Vec::new();
+        for i in 0..num_workers + 1 {
+            futures.push(client.get(format!("http://localhost:{}/ping", base_port + i)).send());
+        }
 
-    info!("server_test: /move");
+        let resps = join_all(futures).await;
 
-    let move_response = client
-        .post("http://localhost:4000/move")
-        .json(&move_1_board)
-        .send()
-        .await
-        .unwrap()
-        .json::<MoveResp>()
-        .await
-        .unwrap();
+        if resps.iter().any(|x| x.is_err() || x.as_ref().unwrap().status() != 200) {
+            time::sleep(Duration::from_millis(500)).await;
+            continue;
+        } else {
+            break;
+        }
+    }
 
-    assert!(move_response.mv == Move::Left || move_response.mv == Move::Up);
+    info!("All server tasks ready");
 
-    info!("server_test: /end");
+    for (board_str, desired_moves, rules, map) in TESTS.iter() {
+        let mut game = test_game();
+        game.ruleset = *rules;
+        game.api.map = *map;
 
-    client
-        .post("http://localhost:4000/end")
-        .json(&end_board)
-        .send()
-        .await
-        .unwrap();
+        let mut board = Board::from_str(&board_str, &game).unwrap().to_req(&game).unwrap();
+
+        board.you.latency = "0".to_owned();
+        board.board.snakes[0].latency = "0".to_owned();
+
+        let mut move_board = board.clone();
+        move_board.turn = 1;
+
+        let mut end_board = board.clone();
+        end_board.turn = 2;
+
+        info!("server_test: /start");
+
+        client
+            .post(format!("http://localhost:{base_port}/start"))
+            .json(&board)
+            .send()
+            .await
+            .unwrap();
+
+        info!("server_test: /move");
+
+        let move_response = client
+            .post(format!("http://localhost:{base_port}/move"))
+            .json(&move_board)
+            .send()
+            .await
+            .unwrap()
+            .json::<MoveResp>()
+            .await
+            .unwrap();
+
+        for (eq, mv) in *desired_moves {
+            if *eq {
+                assert_eq!(*mv, move_response.mv);
+            } else {
+                assert_ne!(*mv, move_response.mv);
+            }
+        }
+
+        info!("server_test: /end");
+
+        client
+            .post(format!("http://localhost:{base_port}/end"))
+            .json(&end_board)
+            .send()
+            .await
+            .unwrap();
+    }
+
+    signal::raise(signal::SIGTERM).unwrap();
+    join_all(join_handles).await;
 }

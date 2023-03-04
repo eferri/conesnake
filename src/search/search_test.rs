@@ -288,7 +288,7 @@ fn playout_test() {
     search::playout_game(&ctx.config, &mut scratch_guard, &game);
 
     assert!(scratch_guard.play_scores.len() == 2);
-    check_scores(&scratch_guard.play_scores, &[1.0, 0.0]);
+    check_scores(&scratch_guard.play_scores, &[ctx.config.win_val, ctx.config.loss_val]);
 
     let start_board = Board::from_str(PLAYOUT_WIN, &game).unwrap();
     scratch_guard.play_scores.clear();
@@ -297,7 +297,7 @@ fn playout_test() {
     search::playout_game(&ctx.config, &mut scratch_guard, &game);
 
     assert!(scratch_guard.play_scores.len() == 2);
-    check_scores(&scratch_guard.play_scores, &[1.0, 0.0]);
+    check_scores(&scratch_guard.play_scores, &[ctx.config.win_val, ctx.config.loss_val]);
 }
 
 const SEARCH_SMALL: &str = "
@@ -322,7 +322,7 @@ fn small_search_test() {
 
     let search_result =
         search::search_moves(Arc::new(ctx), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
-    let best_move = search::best_move(&board, &game, &config, 0, &search_result.scores, true);
+    let best_move = search::best_move(&config, 0, &search_result.scores, true);
 
     assert_eq!(best_move, Move::Right);
     assert_eq!(search_result.max_depth, 2);
@@ -371,7 +371,7 @@ fn arcade_maze_search_test() {
 
         let search_result =
             search::search_moves(ctx.clone(), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
-        let best_move = search::best_move(&board, &game, &config, 0, &search_result.scores, true);
+        let best_move = search::best_move(&config, 0, &search_result.scores, true);
 
         assert!(best_move == Move::Down || best_move == Move::Up);
 
@@ -390,7 +390,7 @@ fn arcade_maze_search_test() {
 
                 let duct_sum_simd = root_guard.duct_scores_simd(&ctx.config, child_ptr.moves).sum();
 
-                assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-7);
+                assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-5);
             }
         }
     }

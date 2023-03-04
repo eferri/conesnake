@@ -79,15 +79,15 @@ impl Game {
         (board.len() - 3) * 100
     }
 
-    pub fn score(&self, board: &Board, snake_idx: usize) -> f64 {
+    pub fn score(&self, board: &Board, cfg: &Config, snake_idx: usize) -> f64 {
         if self.is_solo {
             board.turn as f64 / self.max_turn(board) as f64
         } else if board.snakes[snake_idx].alive() {
-            1.0
-        } else if board.snakes[..board.num_snakes() as usize].iter().all(|x| !x.alive()) {
-            0.0
+            cfg.win_val
+        } else if board.num_snakes() > 1 && board.snakes[..board.num_snakes() as usize].iter().all(|x| !x.alive()) {
+            cfg.tie_val
         } else {
-            -1.0
+            cfg.loss_val
         }
     }
 
