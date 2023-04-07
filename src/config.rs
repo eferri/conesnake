@@ -5,12 +5,12 @@ use clap::{Parser, ValueEnum};
 
 // Hyperparameters
 
-pub const DEFAULT_TEMP: f64 = 2.0;
+pub const DEFAULT_TEMP: f64 = 2.3;
 pub const DEFAULT_CONSTRICTOR_TEMP: f64 = 4.0;
-pub const DEFAULT_MIN_PLAYOUTS: i64 = 10;
-pub const DEFAULT_WIN_VAL: f64 = 1.0;
-pub const DEFAULT_LOSS_VAL: f64 = -10.0;
-pub const DEFAULT_TIE_VAL: f64 = -9.0;
+pub const DEFAULT_MIN_PLAYOUTS: i64 = 9;
+pub const DEFAULT_WIN_VAL: f64 = 18.0;
+pub const DEFAULT_LOSS_VAL: f64 = -28.5;
+pub const DEFAULT_TIE_VAL: f64 = -20.0;
 
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
@@ -84,12 +84,8 @@ pub struct Config {
 
 impl Config {
     pub fn set_temp(&mut self, board: &Board, game: &Game) {
-        match (board.num_alive_snakes(), game.ruleset) {
-            (_, Rules::Solo) => self.temperature = self.temperature,
-            (_, Rules::Constrictor) => self.temperature = self.constrictor_temp,
-            (_, Rules::Standard) => self.temperature = self.temperature,
-            (_, Rules::Royale) => self.temperature = self.temperature,
-            (_, Rules::Wrapped) => self.temperature = self.temperature,
+        if let (_, Rules::Constrictor) = (board.num_alive_snakes(), game.ruleset) {
+            self.temperature = self.constrictor_temp;
         }
     }
 }

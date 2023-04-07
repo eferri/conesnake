@@ -30,7 +30,7 @@ jobs:
           command: docker compose run --rm snake cargo build --tests
       - run:
           name: lint
-          command: docker compose run --rm snake cargo clippy
+          command: make lint
       - save_cache:
           name: save cache
           key: cache-{{ checksum "Cargo.lock" }}

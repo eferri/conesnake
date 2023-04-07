@@ -66,13 +66,11 @@ impl Board {
                 let mv_idx = rng.range(0, num_bad - 1);
                 best_move = Some(bad_moves[mv_idx as usize]);
             }
-        } else {
-            if num_valid == 1 {
-                best_move = Some(valid_moves[0]);
-            } else if num_valid > 1 {
-                let mv_idx = rng.range(0, num_valid - 1);
-                best_move = Some(valid_moves[mv_idx as usize]);
-            }
+        } else if num_valid == 1 {
+            best_move = Some(valid_moves[0]);
+        } else if num_valid > 1 {
+            let mv_idx = rng.range(0, num_valid - 1);
+            best_move = Some(valid_moves[mv_idx as usize]);
         }
 
         best_move.unwrap_or(Move::Left)

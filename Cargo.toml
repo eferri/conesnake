@@ -12,11 +12,11 @@ name = "performance"
 path = "./src/bin/performance.rs"
 
 [dependencies]
-axum = "0.6.10"
+axum = "0.6"
 futures = "0.3"
 reqwest = { version = "0.11", features = ["json"] }
 ctrlc = {version = "3.2", features = ["termination"] }
-tokio = { version = "1.26", features = ["full"] }
+tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tower-http = { version = "0.4", features = ["trace"] }
@@ -25,7 +25,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 packed_simd_2 = "0.3"
 rand = { version = "0.8", features = ["small_rng", "simd_support"] }
-clap = { version = "4.1", features = ["derive"] }
+clap = { version = "4.2", features = ["derive"] }
 log = "0.4"
 env_logger = "0.10"
 deepsize = "0.2"

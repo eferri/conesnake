@@ -10,6 +10,7 @@ SSH_ARGS="-q -i ~/.ssh/conesnake_ed25519"
 CLOUD_HOSTS="$(echo "$CLOUD_NODES" | jq -r 'keys[]')"
 LOCAL_HOSTS="$(echo "$LOCAL_NODES" | jq -r 'keys[]')"
 
+
 wg-meshconf init
 
 # First configure with remote endpoints set to private IPs for cloud nodes

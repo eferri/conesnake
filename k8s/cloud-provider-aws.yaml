@@ -6,7 +6,7 @@ metadata:
 spec:
   chart: aws-load-balancer-controller
   repo: https://aws.github.io/eks-charts
-  version: 1.4.6
+  version: 1.4.8
   targetNamespace: kube-system
   bootstrap: true
   valuesContent: |-
@@ -14,8 +14,8 @@ spec:
     defaultTags:
       deployment: "conesnake"
     image:
-      repository: amazon/aws-alb-ingress-controller
-      tag: v2.4.4
+      repository: public.ecr.aws/eks/aws-load-balancer-controller
+      tag: v2.4.7
       pullPolicy: IfNotPresent
     nodeSelector:
       mode: relay

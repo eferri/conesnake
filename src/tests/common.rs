@@ -11,7 +11,7 @@ use log::info;
 pub fn test_config() -> Config {
     info!("test_config");
     // Ensure clap defaults are used
-    let mut config = Config::parse_from(&["".to_owned()]);
+    let mut config = Config::parse_from(["".to_owned()]);
 
     config.num_worker_threads = 1;
     config.max_boards = 10000;
@@ -25,7 +25,7 @@ pub fn test_config() -> Config {
 
 pub fn release_config() -> Config {
     info!("release_config");
-    let mut config = Config::parse_from(&["".to_owned()]);
+    let mut config = Config::parse_from(["".to_owned()]);
 
     config.num_worker_threads = 8;
     config.max_boards = 350000;

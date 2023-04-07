@@ -47,10 +47,14 @@ clean:
 veryclean: clean
 	rm -rf target* build* \
 		.cargo/registry \
-		.cargo/package-cache \
+		.cargo/.package-cache \
 		*.tfstate*
 
 # Cargo
+
+.PHONY: lint
+lint:
+	docker compose run --rm snake cargo clippy
 
 .PHONY: test
 test:

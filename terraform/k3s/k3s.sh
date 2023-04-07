@@ -13,6 +13,7 @@ SERVER_INSTALL_FILES="\
 
 CLOUD_SSH_ARGS="-q -o StrictHostKeyChecking=no -i ~/.ssh/conesnake_ed25519"
 
+
 uninstall_k3s_server()
 {
   echo "Uninstalling k3s server $HOST..."
