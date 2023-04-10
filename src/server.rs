@@ -207,7 +207,7 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
             let res = state
                 .req_client
                 .get(&format!("{worker}/"))
-                .timeout(Duration::from_millis(300))
+                .timeout(Duration::from_millis(600))
                 .send()
                 .await;
 
