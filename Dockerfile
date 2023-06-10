@@ -1,9 +1,9 @@
-FROM ubuntu:jammy-20230308 as base
+FROM ubuntu:jammy-20230522 as base
 
 ARG UID=1000
 ARG GID=1000
 ARG DOCKER_ARCH=amd64
-ARG KERNAL_VER=5.19
+ARG KERNAL_VER=6.2
 
 WORKDIR /app
 
@@ -58,11 +58,11 @@ RUN curl -sSfL "https://github.com/torvalds/linux/archive/refs/tags/v${KERNAL_VE
     && rm -rf ./linux*
 
 # Install golang
-RUN curl -sSfL "https://go.dev/dl/go1.20.3.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
+RUN curl -sSfL "https://go.dev/dl/go1.20.5.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
     && tar -C /usr/local -xf go.tar.gz
 
 # Install helm
-RUN curl -sSfL "https://get.helm.sh/helm-v3.11.2-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
+RUN curl -sSfL "https://get.helm.sh/helm-v3.12.0-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
     && tar -xf helm.tar.gz \
     && cp ./linux-${DOCKER_ARCH}/helm . \
     && chmod +x helm \
@@ -70,12 +70,12 @@ RUN curl -sSfL "https://get.helm.sh/helm-v3.11.2-linux-${DOCKER_ARCH}.tar.gz" -o
     && rm -rf ./*
 
 # Install kubectl
-RUN curl -sSfL "https://dl.k8s.io/release/v1.26.3/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
+RUN curl -sSfL "https://dl.k8s.io/release/v1.27.2/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
     && chmod +x ./kubectl \
     && cp kubectl /usr/local/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.4.4/terraform_1.4.4_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.4.6/terraform_1.4.6_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /usr/local/bin \
@@ -88,7 +88,7 @@ ENV PATH "/home/rust/.local/bin:/usr/local/go/bin:/home/rust/go/bin:/home/rust/.
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2023-04-07
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2023-06-10
 
 # Rust development tools
 RUN rustup component add rustfmt clippy \

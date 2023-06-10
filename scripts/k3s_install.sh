@@ -372,6 +372,45 @@ get_release_version() {
     info "Using ${VERSION_K3S} as release"
 }
 
+# --- get k3s-selinux version ---
+get_k3s_selinux_version() {
+    available_version="k3s-selinux-1.2-2.${rpm_target}.noarch.rpm"
+    info "Finding available k3s-selinux versions"
+    
+    # run verify_downloader in case it binary installation was skipped
+    verify_downloader curl || verify_downloader wget || fatal 'Can not find curl or wget for downloading files'
+
+    case $DOWNLOADER in
+        curl)
+            DOWNLOADER_OPTS="-s"
+            ;;
+        wget)
+            DOWNLOADER_OPTS="-q -O -"
+            ;;
+        *)
+            fatal "Incorrect downloader executable '$DOWNLOADER'"
+            ;;
+    esac
+    for i in {1..3}; do
+        set +e
+        if [ "${rpm_channel}" = "testing" ]; then
+            version=$(timeout 5 ${DOWNLOADER} ${DOWNLOADER_OPTS} https://api.github.com/repos/k3s-io/k3s-selinux/releases |  grep browser_download_url | awk '{ print $2 }' | grep -oE "[^\/]+${rpm_target}\.noarch\.rpm" | head -n 1)
+        else
+            version=$(timeout 5 ${DOWNLOADER} ${DOWNLOADER_OPTS} https://api.github.com/repos/k3s-io/k3s-selinux/releases/latest |  grep browser_download_url | awk '{ print $2 }' | grep -oE "[^\/]+${rpm_target}\.noarch\.rpm")
+        fi
+        set -e
+        if [ "${version}" != "" ]; then
+            break
+        fi
+        sleep 1
+    done
+    if [ "${version}" == "" ]; then
+        warn "Failed to get available versions of k3s-selinux..defaulting to ${available_version}"
+        return
+    fi
+    available_version=${version}
+}
+
 # --- download from github url ---
 download() {
     [ $# -eq 2 ] || fatal 'download needs exactly 2 arguments'
@@ -475,17 +514,21 @@ setup_selinux() {
             rpm_site_infix=slemicro
             package_installer=zypper
         fi
-    elif [ "${VERSION_ID%%.*}" = "7" ]; then
-        rpm_target=el7
-        rpm_site_infix=centos/7
-        package_installer=yum
     elif [ "${ID_LIKE:-}" = coreos ] || [ "${VARIANT_ID:-}" = coreos ]; then
         rpm_target=coreos
         rpm_site_infix=coreos
         package_installer=rpm-ostree
-    else
+    elif [ "${VERSION_ID%%.*}" = "7" ]; then
+        rpm_target=el7
+        rpm_site_infix=centos/7
+        package_installer=yum
+    elif [ "${VERSION_ID%%.*}" = "8" ] || [ "${VERSION_ID%%.*}" -gt "36" ]; then
         rpm_target=el8
         rpm_site_infix=centos/8
+        package_installer=yum
+    else
+        rpm_target=el9
+        rpm_site_infix=centos/9
         package_installer=yum
     fi
 
@@ -497,12 +540,6 @@ setup_selinux() {
         package_installer=dnf
     fi
 
-    if [ "${rpm_channel}" = "testing" ]; then
-        available_version=$(curl -s https://api.github.com/repos/k3s-io/k3s-selinux/releases |  grep -oP '(?<="browser_download_url": ")[^"]*' | grep -oE "[^\/]+${rpm_target}\.noarch\.rpm" | head -n 1)
-    else
-        available_version=$(curl -s https://api.github.com/repos/k3s-io/k3s-selinux/releases/latest |  grep -oP '(?<="browser_download_url": ")[^"]*' | grep -oE "[^\/]+${rpm_target}\.noarch\.rpm" )
-    fi
-
     policy_hint="please install:
     ${package_installer} install -y container-selinux
     ${package_installer} install -y https://${rpm_site}/k3s/${rpm_channel}/common/${rpm_site_infix}/noarch/${available_version}
@@ -511,6 +548,7 @@ setup_selinux() {
     if [ "$INSTALL_K3S_SKIP_SELINUX_RPM" = true ] || can_skip_download_selinux || [ ! -d /usr/share/selinux ]; then
         info "Skipping installation of SELinux RPM"
     else
+        get_k3s_selinux_version
         install_selinux_rpm ${rpm_site} ${rpm_channel} ${rpm_target} ${rpm_site_infix}
     fi
 
@@ -524,7 +562,7 @@ setup_selinux() {
             $policy_error "Failed to apply container_runtime_exec_t to ${BIN_DIR}/k3s, ${policy_hint}"
         fi
     elif [ ! -f /usr/share/selinux/packages/k3s.pp ]; then
-        if [ -x /usr/sbin/transactional-update ]; then
+        if [ -x /usr/sbin/transactional-update ] || [ "${ID_LIKE:-}" = coreos ] || [ "${VARIANT_ID:-}" = coreos ]; then
             warn "Please reboot your machine to activate the changes and avoid data loss."
         else
             $policy_error "Failed to find the k3s-selinux policy, ${policy_hint}"
@@ -558,9 +596,12 @@ EOF
         sle)
             rpm_installer="zypper --gpg-auto-import-keys"
             if [ "${TRANSACTIONAL_UPDATE=false}" != "true" ] && [ -x /usr/sbin/transactional-update ]; then
+                transactional_update_run="transactional-update --no-selfupdate -d run"
                 rpm_installer="transactional-update --no-selfupdate -d run ${rpm_installer}"
                 : "${INSTALL_K3S_SKIP_START:=true}"
             fi
+            # create the /var/lib/rpm-state in SLE systems to fix the prein selinux macro
+            ${transactional_update_run} mkdir -p /var/lib/rpm-state
             ;;
         coreos)
             rpm_installer="rpm-ostree"
@@ -574,12 +615,40 @@ EOF
         if [ "${rpm_installer}" = "yum" ] && [ -x /usr/bin/dnf ]; then
             rpm_installer=dnf
         fi
+	    if rpm -q --quiet k3s-selinux; then 
+            # remove k3s-selinux module before upgrade to allow container-selinux to upgrade safely
+            if check_available_upgrades container-selinux ${3} && check_available_upgrades k3s-selinux ${3}; then
+                MODULE_PRIORITY=$($SUDO semodule --list=full | grep k3s | cut -f1 -d" ")
+                if [ -n "${MODULE_PRIORITY}" ]; then
+                    $SUDO semodule -X $MODULE_PRIORITY -r k3s || true
+                fi
+            fi
+        fi
         # shellcheck disable=SC2086
         $SUDO ${rpm_installer} install -y "k3s-selinux"
     fi
     return
 }
 
+check_available_upgrades() {
+    set +e
+    case ${2} in
+        sle)
+            available_upgrades=$($SUDO zypper -q -t -s 11 se -s -u --type package $1 | tail -n 1 | grep -v "No matching" | awk '{print $3}')
+            ;;
+        coreos)
+            # currently rpm-ostree does not support search functionality https://github.com/coreos/rpm-ostree/issues/1877
+            ;;
+        *)
+            available_upgrades=$($SUDO yum -q --refresh list $1 --upgrades | tail -n 1 | awk '{print $2}')
+            ;;
+    esac
+    set -e
+    if [ -n "${available_upgrades}" ]; then
+        return 0
+    fi
+    return 1
+}
 # --- download and verify k3s ---
 download_and_verify() {
     if can_skip_download_binary; then
@@ -863,8 +932,8 @@ respawn_delay=5
 respawn_max=0
 
 set -o allexport
-if [ -f /etc/environment ]; then sourcex /etc/environment; fi
-if [ -f ${FILE_K3S_ENV} ]; then sourcex ${FILE_K3S_ENV}; fi
+if [ -f /etc/environment ]; then . /etc/environment; fi
+if [ -f ${FILE_K3S_ENV} ]; then . ${FILE_K3S_ENV}; fi
 set +o allexport
 EOF
     $SUDO chmod 0755 ${FILE_K3S_SERVICE}
@@ -931,6 +1000,15 @@ service_enable_and_start() {
     if [ "${PRE_INSTALL_HASHES}" = "${POST_INSTALL_HASHES}" ] && [ "${INSTALL_K3S_FORCE_RESTART}" != true ]; then
         info 'No change detected so skipping service start'
         return
+    fi
+
+    if command -v iptables-save 1> /dev/null && command -v iptables-restore 1> /dev/null
+    then
+	    $SUDO iptables-save | grep -v KUBE- | grep -iv flannel | $SUDO iptables-restore
+    fi
+    if command -v ip6tables-save 1> /dev/null && command -v ip6tables-restore 1> /dev/null
+    then
+	    $SUDO ip6tables-save | grep -v KUBE- | grep -iv flannel | $SUDO ip6tables-restore
     fi
 
     [ "${HAS_SYSTEMD}" = true ] && systemd_start
