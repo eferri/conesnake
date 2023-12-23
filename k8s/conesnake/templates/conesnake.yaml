@@ -64,6 +64,11 @@ spec:
       serviceAccountName: "{{ .Release.Name }}-sa-get-pods"
       nodeSelector:
         mode: relay
+      tolerations:
+      - key: "AppPodsOnly"
+        operator: "Equal"
+        value: "true"
+        effect: "NoExecute"
       imagePullSecrets:
       - name: regcred
       terminationGracePeriodSeconds: 10
@@ -123,6 +128,11 @@ spec:
     spec:
       serviceAccountName: "{{ $.Release.Name }}-sa-get-pods"
       nodeName: "{{ $worker.hostname }}"
+      tolerations:
+      - key: "AppPodsOnly"
+        operator: "Equal"
+        value: "true"
+        effect: "NoExecute"
       imagePullSecrets:
       - name: regcred
       terminationGracePeriodSeconds: 10

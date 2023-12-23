@@ -2,12 +2,7 @@
 set -eu
 
 
-INSTALL_FILES="\
-  ./scripts/k3s_install.sh \
-"
-
 SERVER_INSTALL_FILES="\
-  $INSTALL_FILES \
   ./k8s/cloud-provider-aws.yaml \
 "
 
@@ -52,8 +47,7 @@ install_k3s_primary_server()
 set -eu
 sudo mkdir -p /var/lib/rancher/k3s/server/manifests
 sudo cp $TEMP_DIR/*.yaml /var/lib/rancher/k3s/server/manifests/
-chmod +x $TEMP_DIR/k3s_install.sh
-$TEMP_DIR/k3s_install.sh server \\
+curl -sfL https://get.k3s.io | sh -s - server \\
   --cluster-init \\
   --node-taint CriticalAddonsOnly=true:NoExecute \\
   --node-label mode=server \\
@@ -83,11 +77,13 @@ install_k3s_relay()
 
   TEMP_DIR="$(ssh $CLOUD_SSH_ARGS ubuntu@$PUBLIC_IP mktemp -d)"
 
-  scp $CLOUD_SSH_ARGS $INSTALL_FILES "ubuntu@$PUBLIC_IP":"$TEMP_DIR"
   ssh $CLOUD_SSH_ARGS "ubuntu@$PUBLIC_IP" 'sh -s' <<EOF
 set -eu
-chmod +x $TEMP_DIR/k3s_install.sh
-$TEMP_DIR/k3s_install.sh agent \\
+
+TOKEN="\$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+
+curl -sfL https://get.k3s.io | sh -s - agent \\
+  --node-taint AppPodsOnly=true:NoExecute \\
   --node-label mode=relay \\
   --node-name $HOST \\
   --node-ip $INTERNAL_IP \\
@@ -97,8 +93,8 @@ $TEMP_DIR/k3s_install.sh agent \\
   --kube-proxy-arg="--proxy-mode=ipvs" \\
   --kube-proxy-arg="--ipvs-scheduler=rr" \\
   --kubelet-arg="provider-id=aws:///\\
-\$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)/\\
-\$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
+\$(curl -s -H "X-aws-ec2-metadata-token: \$TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)/\\
+\$(curl -s -H "X-aws-ec2-metadata-token: \$TOKEN" http://169.254.169.254/latest/meta-data/instance-id)"
 
 rm -r $TEMP_DIR
 EOF
@@ -109,11 +105,10 @@ install_k3s_worker()
 {
   echo "Installing k3s agent for worker node..."
   TEMP_DIR="$(ssh -q $HOST mktemp -d)"
-  scp -q $INSTALL_FILES "$HOST":"$TEMP_DIR"
   ssh -q "$HOST" 'sh -s' <<EOF
 set -eu
-chmod +x $TEMP_DIR/k3s_install.sh
-$TEMP_DIR/k3s_install.sh agent \\
+curl -sfL https://get.k3s.io | sh -s - agent \\
+  --node-taint AppPodsOnly=true:NoExecute \\
   --node-label mode=worker \\
   --node-name $HOST \\
   --node-ip $INTERNAL_IP \\
@@ -152,7 +147,7 @@ OP="$1"
 MODE="$2"
 
 case "${OP} ${MODE}" in
-  "destroy primary"|"destroy replica")
+  "destroy primary")
     uninstall_k3s_server
     ;;
   "destroy worker")
@@ -162,14 +157,17 @@ case "${OP} ${MODE}" in
     uninstall_k3s_relay
     ;;
   "create primary")
+    uninstall_k3s_server
     install_k3s_primary_server
     install_config
     ;;
   "create worker")
+    uninstall_k3s_worker
     get_token
     install_k3s_worker
     ;;
   "create relay")
+    uninstall_k3s_relay
     get_token
     install_k3s_relay
     ;;

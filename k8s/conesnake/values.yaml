@@ -4,12 +4,12 @@ max_height: 21
 max_snakes: 4
 
 relay:
-  mem: "100Mi"
-  latency: 30
+  mem: "50Mi"
+  latency: 100
   parallel_reqs: 4
 
 worker:
-  mem: "2736Mi"
+  mem: "4500Mi"
   boards: 500000
-  latency: 90
+  latency: 50
   num_threads: 8

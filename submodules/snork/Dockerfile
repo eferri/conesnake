@@ -1,4 +1,4 @@
-FROM rust:1.66.0-bullseye
+FROM rust:1.75.0-bookworm
 
 ARG UID=1000
 ARG GID=1000

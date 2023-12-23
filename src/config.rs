@@ -7,10 +7,10 @@ use clap::{Parser, ValueEnum};
 
 pub const DEFAULT_TEMP: f64 = 2.3;
 pub const DEFAULT_CONSTRICTOR_TEMP: f64 = 4.0;
-pub const DEFAULT_MIN_PLAYOUTS: i64 = 9;
-pub const DEFAULT_WIN_VAL: f64 = 18.0;
-pub const DEFAULT_LOSS_VAL: f64 = -28.5;
-pub const DEFAULT_TIE_VAL: f64 = -20.0;
+pub const DEFAULT_MIN_PLAYOUTS: i64 = 1;
+pub const DEFAULT_WIN_VAL: f64 = 1.0;
+pub const DEFAULT_LOSS_VAL: f64 = 0.0;
+pub const DEFAULT_TIE_VAL: f64 = 0.0;
 
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {

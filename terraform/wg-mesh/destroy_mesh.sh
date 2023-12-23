@@ -14,9 +14,18 @@ do
 
     NODE_PUBLIC_IP="$(echo "$CLOUD_NODES" | jq -r '.["'$NODE_HOST'"]["public_ip"]')"
 
-    ssh $SSH_ARGS "ubuntu@$NODE_PUBLIC_IP" 'sh -s' <<EOF
+    while ! ssh $SSH_ARGS -o StrictHostKeyChecking=no "ubuntu@$NODE_PUBLIC_IP" echo 'server_alive'
+    do
+        echo "Waiting for server..."
+        sleep 1
+    done
+
+    # Give ec2 instance time to start
+    sleep 10
+
+    ssh $SSH_ARGS -o StrictHostKeyChecking=no "ubuntu@$NODE_PUBLIC_IP" 'sh -s' <<EOF
 set -eu
-sudo systemctl disable --now wg-quick@conesnake.service
+sudo systemctl disable --now wg-quick@conesnake.service || true
 sudo wg-quick down conesnake || true
 sudo rm -f /etc/wireguard/conesnake.conf
 EOF
@@ -30,7 +39,7 @@ do
 
     ssh "$NODE_HOST" 'sh -s' <<EOF
 set -eu
-sudo systemctl disable --now wg-quick@conesnake.service
+sudo systemctl disable --now wg-quick@conesnake.service || true
 sudo wg-quick down conesnake || true
 sudo rm -f /etc/wireguard/conesnake.conf
 EOF

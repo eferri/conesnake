@@ -303,7 +303,7 @@ async def main():
         case "optimize":
             await optimize()
         case "compare":
-            await run_games(num_games=10000, compare=True)
+            await run_games(num_games=100, compare=True)
         case _:
             raise ValueError(f"invalid mode {args.mode}")
 

@@ -2,10 +2,15 @@
 serviceAccountName: "{{ .Release.Name }}-sa-ecr-creds"
 nodeSelector:
   mode: relay
+tolerations:
+- key: "AppPodsOnly"
+  operator: "Equal"
+  value: "true"
+  effect: "NoExecute"
 restartPolicy: Never
 initContainers:
 - name: "{{ .Release.Name }}-ecr-get-token"
-  image: bitnami/aws-cli:2.7.22
+  image: bitnami/aws-cli:2.15.2
   imagePullPolicy: IfNotPresent
   resources:
     requests:
@@ -26,7 +31,7 @@ initContainers:
     name: "{{ .Release.Name }}-aws-data"
 containers:
 - name: "{{ .Release.Name }}-ecr-secret-refresh"
-  image: bitnami/kubectl:1.24.3
+  image: bitnami/kubectl:1.28.4
   imagePullPolicy: IfNotPresent
   resources:
     requests:

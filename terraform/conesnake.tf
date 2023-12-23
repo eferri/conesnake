@@ -17,6 +17,30 @@ resource "aws_ecr_repository" "conesnake" {
   force_delete         = true
 }
 
+
+resource "aws_ecr_lifecycle_policy" "foopolicy" {
+  repository = aws_ecr_repository.conesnake.name
+
+  policy = <<EOF
+{
+  "rules": [
+    {
+      "rulePriority": 1,
+      "description": "delete untagged images",
+      "selection": {
+        "tagStatus": "untagged",
+        "countType": "imageCountMoreThan",
+        "countNumber": 1
+      },
+      "action": {
+        "type": "expire"
+      }
+    }
+  ]
+}
+EOF
+}
+
 # VPC
 
 resource "aws_vpc" "conesnake" {
@@ -252,7 +276,7 @@ resource "aws_lb_target_group" "conesnake" {
     timeout             = 2
     healthy_threshold   = 2
     unhealthy_threshold = 2
-    path                = "/"
+    path                = "/ping"
     matcher             = "200"
   }
 
@@ -274,11 +298,10 @@ resource "aws_key_pair" "conesnake" {
 module "conesnake_relay" {
   source                 = "./node"
   node_name              = "relay"
-  node_type              = "t2.micro"
+  node_type              = "t3a.micro"
   vpc_id                 = aws_vpc.conesnake.id
   subnet_id              = aws_subnet.conesnake["a"].id
   container_node         = true
-  target_group_arn       = aws_lb_target_group.conesnake.arn
   instance_profile_name  = aws_iam_instance_profile.conesnake.name
   base_security_group_id = aws_security_group.conesnake_base.id
   alb_security_group_id  = aws_security_group.conesnake_alb.id

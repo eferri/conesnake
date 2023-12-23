@@ -7,7 +7,6 @@ services:
       args:
         UID: ${UID}
         GID: ${GID}
-        KERNEL_VER: ${KERNEL_VER}
     environment:
       - RUST_BACKTRACE
       - TARGET
@@ -19,11 +18,10 @@ services:
       - MAX_SNAKES
     volumes:
       - ".:/app"
-      - "/var/run/docker.sock:/var/run/docker.sock"
     ports:
       - "8080:8080"
-    security_opt:
-      - seccomp:.devcontainer/seccomp-perf.json
+    cap_add:
+      - CAP_PERFMON
     command: |
       scripts/entrypoint_relay.sh \
         --max-boards 0 \
@@ -44,8 +42,8 @@ services:
       - TARGET
     volumes:
       - ".:/app"
-    security_opt:
-      - seccomp:.devcontainer/seccomp-perf.json
+    cap_add:
+      - CAP_PERFMON
     command: |
       scripts/entrypoint.sh \
         --port 8081 \
@@ -96,7 +94,7 @@ services:
     command: |
       scripts/entrypoint_rules.sh \
         --browser \
-        --board-url http://localhost:3000 \
+        --board-url http://localhost:5173 \
         --timeout 500 \
         --width 11 --height 11 \
         --gametype standard \
@@ -111,8 +109,7 @@ services:
   board:
     build:
       context: submodules/board
-      target: build
     ports:
-      - "3000:3000"
+      - "5173:5173"
     command: |
-      npm run start
+      npm run dev

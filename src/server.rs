@@ -13,13 +13,13 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router, Server as AxumServer,
+    serve, Json, Router,
 };
 use deepsize::DeepSizeOf;
 use futures::future;
 use log::{error, info, warn};
 use reqwest::Client;
-use tokio::{select, signal};
+use tokio::{net::TcpListener, select, signal};
 use tower_http::trace::TraceLayer;
 
 use std::{
@@ -132,10 +132,11 @@ impl Server {
 
         let addr = SocketAddr::from(([0, 0, 0, 0], self.state.config.port.parse().unwrap()));
 
+        let listener = TcpListener::bind(&addr).await.unwrap();
+
         info!("Starting conesnake");
 
-        AxumServer::bind(&addr)
-            .serve(app.into_make_service())
+        serve(listener, app)
             .with_graceful_shutdown(async {
                 let ctrl_c = signal::ctrl_c();
 
@@ -390,6 +391,8 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
                 if timeout_dur.is_zero() {
                     return Err(Error::WorkerError("Zero timeout duration".to_owned()));
                 }
+
+                info!("Worker request timeout is {} us", timeout_dur.as_micros());
 
                 let req_start = Instant::now();
                 let move_resp = state

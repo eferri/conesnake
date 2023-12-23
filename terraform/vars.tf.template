@@ -1,15 +1,15 @@
 variable "primary_host" {
-  type = string
+  type    = string
   default = ""
 }
 
 variable "local_ip" {
-  type = string
+  type    = string
   default = ""
 }
 
 variable "ssh_public_key" {
-  type = string
+  type    = string
   default = ""
 }
 
@@ -29,21 +29,21 @@ variable "region" {
 }
 
 variable "local_nodes" {
-  type = map(object{
+  type = map(object({
     external_ip = string
     internal_ip = string
-    port = string
-    primary = bool
-    run_agent = bool
+    port        = string
+    primary     = bool
+    run_agent   = bool
   }))
 
   default = {
     host = {
-      external_ip = "",
-      internal_ip = "",
-      port = "",
-      primary = false
-      run_agent = false
+      external_ip = "192.168.1.100",
+      internal_ip = "10.9.0.0",
+      port        = "59203",
+      primary     = true
+      run_agent   = true
     }
   }
 }

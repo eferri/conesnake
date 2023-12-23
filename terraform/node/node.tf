@@ -14,11 +14,6 @@ variable "container_node" {
   type = bool
 }
 
-variable "target_group_arn" {
-  type    = string
-  default = ""
-}
-
 variable "vpc_id" {
   type = string
 }
@@ -46,13 +41,13 @@ variable "deployment" {
 
 locals {
   # Ubuntu 22.04 server us-west-2
-  ubuntu_ami = "ami-03f8756d29f0b5f21"
+  ubuntu_ami = "ami-008fe2fc65df48dac"
 }
 
 
 resource "aws_eip" "conesnake_primary" {
   network_interface = aws_network_interface.conesnake.id
-  vpc               = true
+  domain            = "vpc"
 
   tags = {
     app = var.deployment
@@ -103,6 +98,11 @@ resource "aws_instance" "conesnake" {
 
   credit_specification {
     cpu_credits = "unlimited"
+  }
+
+  metadata_options {
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
   }
 
   tags = {

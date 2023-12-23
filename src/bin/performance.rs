@@ -284,24 +284,6 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         Map::Standard,
     ),
     (
-        // Maybe unstable
-        "turn: 204 health: 46 health: 84 health: 51 health: 80
-        - - - - 2 < < - - - -
-        - - - - > v ^ - d > v
-        - - + > ^ > ^ - v ^ v
-        - - - ^ - - - 0 v ^ v
-        - - - ^ - - - ^ v ^ v
-        - - > ^ - - - ^ < ^ v
-        - - c - 1 < < - - c 3
-        - - > > v > ^ - - - -
-        - - ^ < v ^ - - - - -
-        + - - c > ^ - - - - -
-        - - - - - - - - - - -",
-        &[(0, true, Move::Left), (3, true, Move::Left)],
-        Rules::Standard,
-        Map::Standard,
-    ),
-    (
         "turn: 163 health: 13 health: 75 health: 17 health: 25
         + - - - - 3 < < < < <
         - - - - - - - - - - ^
@@ -354,6 +336,42 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         Rules::Standard,
         Map::Standard,
     ),
+    (
+        "turn: 33 health: 83 health: 94 health: 90 health: 99
+         - - - - - - - - - - -
+         - - - - - - - - - - -
+         - - - - - - - - - - -
+         - - - v < a - - - v <
+         - - - v - 2 < < < 1 ^
+         - - - > 0 + > > ^ - c
+         - - - - - - c - - - -
+         - - - d - - - - - - -
+         - - - > v - - - - - -
+         - - - - v - - - - - -
+         - - - - > 3 - - - - -
+        ",
+        &[(0, true, Move::Down), (2, false, Move::Up)],
+        Rules::Standard,
+        Map::Standard,
+    ),
+    (
+        "turn: 171 health: 68 health: 87 
+        - - - - - - - - - - -
+        + > > > 0 - + - - - -
+        - ^ - - - + - - - - -
+        - ^ - - 1 - - - - - -
+        - ^ - - ^ < - - - - -
+        - ^ - - - ^ - + - - -
+        > ^ - - + ^ - - - d -
+        ^ a - - - ^ - - - v -
+        - - - - - ^ < < < < -
+        - - - - - - - + - - -
+        - - - - - - - - - - -
+        ",
+        &[(0, false, Move::Down), (1, true, Move::Up)],
+        Rules::Standard,
+        Map::Standard,
+    ),
 ];
 
 #[tokio::main]
@@ -400,7 +418,7 @@ async fn main() -> Result<(), Error> {
                 break;
             }
 
-            eprintln!("run {} search {} / {}", run_idx, test_idx, TESTS.len());
+            eprintln!("run {} search {} / {}", run_idx, test_idx, TESTS.len() - 1);
 
             let mut game = test_game();
 

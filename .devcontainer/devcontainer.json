@@ -31,7 +31,7 @@
     "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
     "workspaceFolder": "/app",
     "mounts": [
-        "source=${localEnv:HOME}/.kube,target=/home/rust/.kube,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.kube,target=/home/conesnake/.kube,type=bind,consistency=cached"
     ],
     "runArgs": [
         "--rm",

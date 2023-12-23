@@ -9,7 +9,7 @@ use crate::util::{Coord, Error, Move};
 use deepsize::DeepSizeOf;
 use log::{error, info, warn};
 #[cfg(feature = "simd")]
-use packed_simd_2::{f32x4, m32x4};
+use packed_simd::{f32x4, m32x4};
 
 use std::sync::{atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering, Arc, Barrier};
 use std::sync::{Mutex, RwLock};
