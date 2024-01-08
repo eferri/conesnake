@@ -66,7 +66,7 @@ RUN curl -sSfL "https://github.com/torvalds/linux/archive/refs/tags/v6.6.zip" -o
     && rm -rf ./linux*
 
 # Install golang
-RUN curl -sSfL "https://go.dev/dl/go1.21.5.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
+RUN curl -sSfL "https://go.dev/dl/go1.21.6.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
     && tar -C /usr/local -xf go.tar.gz
 
 # Install helm
@@ -78,7 +78,7 @@ RUN curl -sSfL "https://get.helm.sh/helm-v3.13.3-linux-${DOCKER_ARCH}.tar.gz" -o
     && rm -rf ./*
 
 # Install kubectl
-RUN curl -sSfL "https://dl.k8s.io/release/v1.28.4/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
+RUN curl -sSfL "https://dl.k8s.io/release/v1.29.0/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
     && chmod +x ./kubectl \
     && cp kubectl /usr/local/bin
 
@@ -96,7 +96,7 @@ ENV PATH "/home/conesnake/.local/bin:/usr/local/go/bin:/home/conesnake/go/bin:/h
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2023-12-29
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2024-01-13
 
 # Rust development tools
 RUN rustup component add rustfmt clippy \

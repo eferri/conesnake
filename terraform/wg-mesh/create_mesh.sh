@@ -73,18 +73,9 @@ do
     ssh $SSH_ARGS "ubuntu@$NODE_PUBLIC_IP" 'sh -s' <<EOF
 set -eu
 sudo apt-get update
-DEBIAN_FRONTEND='noninteractive' sudo apt-get upgrade -y
-DEBIAN_FRONTEND='noninteractive' sudo apt-get install --no-install-recommends -y wireguard ipvsadm
+DEBIAN_FRONTEND='noninteractive' sudo apt-get install --no-install-recommends -y wireguard
 sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
 sudo sysctl -p /etc/sysctl.conf
-cat <<EOFSH | sudo tee /etc/modules-load.d/ipvs.conf
-ip_vs_rr
-ip_vs_wrr
-ip_vs_sh
-ip_vs_lc
-ip_vs
-EOFSH
-sudo systemctl restart systemd-modules-load.service
 sudo mkdir -p /etc/wireguard
 sudo cp $TEMP_DIR/$NODE_HOST.conf /etc/wireguard/conesnake.conf
 sudo chmod 600 /etc/wireguard/conesnake.conf

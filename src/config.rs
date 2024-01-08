@@ -38,7 +38,7 @@ pub struct Config {
     pub num_parallel_reqs: usize,
 
     #[clap(long, default_value_t = 8)]
-    pub num_worker_threads: usize,
+    pub num_threads: usize,
 
     #[clap(long, default_value_t = 10000)]
     pub max_boards: usize,

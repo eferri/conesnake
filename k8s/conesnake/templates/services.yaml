@@ -9,42 +9,26 @@ spec:
   type: NodePort
   ports:
   - port: 8080
-    targetPort: 8080
     nodePort: 30001
   selector:
     {{- include "common_labels" . | nindent 4 }}
     app: relay
 
+{{- range $i, $worker := .Values.workers }}
+{{- range $j := until ($worker.replicas | int) }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ .Release.Name }}-relay"
-  labels:
-    {{- include "common_labels" . | nindent 4 }}
-spec:
-  ports:
-  - port: 8080
-  clusterIP: None
-  selector:
-    {{- include "common_labels" . | nindent 4 }}
-    app: relay
-
-{{- range $worker := .Values.workers }}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: "{{ $.Release.Name }}-worker-{{ $worker.hostname }}"
+  name: "{{ $.Release.Name }}-worker-{{ $worker.hostname }}-{{ $j }}"
   labels:
     {{- include "common_labels" $ | nindent 4 }}
 spec:
   ports:
   - port: 8080
-    targetPort: 8080
-  clusterIP: None
+  clusterIP: "10.43.{{ add 100 $i }}.{{ $j }}"
   selector:
     {{- include "common_labels" $ | nindent 4 }}
-    app: worker
-    node: "worker-{{ $worker.hostname }}"
+    statefulset.kubernetes.io/pod-name: "{{ $.Release.Name }}-worker-{{ $worker.hostname }}-{{ $j }}"
+{{- end }}
 {{- end }}

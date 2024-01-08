@@ -47,7 +47,7 @@ services:
     command: |
       scripts/entrypoint.sh \
         --port 8081 \
-        --num-worker-threads ${NUM_THREADS:-4} \
+        --num-threads ${NUM_THREADS:-4} \
         --max-boards ${MAX_BOARDS:-10000} \
         --max-width ${MAX_WIDTH:-11} \
         --max-height ${MAX_HEIGHT:-11} \

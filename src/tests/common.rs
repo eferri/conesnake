@@ -13,7 +13,7 @@ pub fn test_config() -> Config {
     // Ensure clap defaults are used
     let mut config = Config::parse_from(["".to_owned()]);
 
-    config.num_worker_threads = 1;
+    config.num_threads = 1;
     config.max_boards = 10000;
     config.max_width = 19;
     config.max_height = 21;
@@ -27,7 +27,7 @@ pub fn release_config() -> Config {
     info!("release_config");
     let mut config = Config::parse_from(["".to_owned()]);
 
-    config.num_worker_threads = 8;
+    config.num_threads = 8;
     config.max_boards = 350000;
     config.max_width = 21;
     config.max_height = 21;

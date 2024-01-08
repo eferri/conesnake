@@ -5,11 +5,11 @@ max_snakes: 4
 
 relay:
   mem: "50Mi"
-  latency: 100
+  latency: 200
   parallel_reqs: 4
 
 worker:
   mem: "4500Mi"
   boards: 500000
-  latency: 50
+  latency: 40
   num_threads: 8

@@ -19,7 +19,7 @@ use deepsize::DeepSizeOf;
 use futures::future;
 use log::{error, info, warn};
 use reqwest::Client;
-use tokio::{net::TcpListener, select, signal};
+use tokio::{net::TcpListener, select, signal, time};
 use tower_http::trace::TraceLayer;
 
 use std::{
@@ -111,7 +111,7 @@ impl Server {
                 worker_map,
                 index,
                 req_client: Client::new(),
-                worker_pool: ThreadPool::new(config.num_worker_threads),
+                worker_pool: ThreadPool::new(config.num_threads),
                 max_nodes: AtomicI64::new(0),
                 context: Arc::new(SearchContext::new(&config)),
             }),
@@ -228,7 +228,15 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
         })
     }
 
-    let ping_res = future::join_all(ping_futures).await;
+    let timeout_dur = Duration::from_millis(700 as u64);
+
+    let ping_res = match time::timeout(timeout_dur, future::join_all(ping_futures)).await {
+        Ok(res) => res,
+        Err(_) => {
+            error!("Ping request hang");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
     if ping_res.iter().any(|x| *x) {
         StatusCode::OK
@@ -388,10 +396,6 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
                 let current_dur = Instant::now() - start_time;
                 let timeout_dur = Duration::from_millis(delay_ms as u64).saturating_sub(current_dur);
 
-                if timeout_dur.is_zero() {
-                    return Err(Error::WorkerError("Zero timeout duration".to_owned()));
-                }
-
                 info!("Worker request timeout is {} us", timeout_dur.as_micros());
 
                 let req_start = Instant::now();
@@ -428,7 +432,13 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
         }
     }
 
-    let worker_res = future::join_all(worker_futures).await;
+    let err_timeout_dur = Duration::from_millis(delay_ms as u64 + 5);
+
+    let worker_res: Vec<Result<Scores, Error>> =
+        match time::timeout(err_timeout_dur, future::join_all(worker_futures)).await {
+            Ok(res) => res,
+            Err(_) => return Err(Error::RequestError("Worker move request hang".to_owned())),
+        };
 
     let mut total_scores: Scores = Default::default();
 
@@ -439,7 +449,7 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
     }
 
     if worker_res.iter().all(|x| x.is_err()) {
-        return Err(Error::ReqwestError("All worker requests failed".to_owned()));
+        return Err(Error::RequestError("All worker requests failed".to_owned()));
     }
 
     for scores in worker_res.iter().flatten() {

@@ -10,10 +10,6 @@ variable "subnet_id" {
   type = string
 }
 
-variable "container_node" {
-  type = bool
-}
-
 variable "vpc_id" {
   type = string
 }
@@ -68,7 +64,7 @@ resource "aws_network_interface_sg_attachment" "conesnake_base" {
 }
 
 resource "aws_network_interface_sg_attachment" "conesnake_alb" {
-  count                = var.container_node ? 1 : 0
+  count                = 1
   security_group_id    = var.alb_security_group_id
   network_interface_id = aws_network_interface.conesnake.id
 }

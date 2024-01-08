@@ -103,8 +103,8 @@ impl<R: Rand> SearchContext<R> {
             Node::new(Board::new(0, 0, config.max_width, config.max_height, config.max_snakes))
         });
 
-        let mut thread_state = Vec::with_capacity(config.num_worker_threads);
-        thread_state.resize_with(config.num_worker_threads, || {
+        let mut thread_state = Vec::with_capacity(config.num_threads);
+        thread_state.resize_with(config.num_threads, || {
             Mutex::new(ThreadContext {
                 rng: R::new(),
                 board: Board::new(0, 0, config.max_width, config.max_height, config.max_snakes),
@@ -124,7 +124,7 @@ impl<R: Rand> SearchContext<R> {
             thread_state,
 
             search_timeout: AtomicBool::new(false),
-            done_barrier: Barrier::new(config.num_worker_threads + 1),
+            done_barrier: Barrier::new(config.num_threads + 1),
             total_nodes: AtomicI64::new(0),
             num_games: AtomicI64::new(0),
             num_playouts: AtomicI64::new(0),
@@ -349,7 +349,7 @@ pub fn search_moves<R: Rand>(
 
     ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
-    for id in 0..config.num_worker_threads {
+    for id in 0..config.num_threads {
         let ctx_cln = ctx.clone();
         let config = config.clone();
         pool.execute(move || search_worker(ctx_cln, config, id));

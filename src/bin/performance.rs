@@ -401,9 +401,7 @@ async fn main() -> Result<(), Error> {
     let mut pools = Vec::new();
 
     ctxs.resize_with(num_workers, || Arc::new(SearchContext::<FastRand>::new(&cfg)));
-    pools.resize_with(num_workers, || {
-        Arc::new(ThreadPool::new(ctxs[0].config.num_worker_threads))
-    });
+    pools.resize_with(num_workers, || Arc::new(ThreadPool::new(ctxs[0].config.num_threads)));
 
     let mut total_node_sum = 0;
     let mut total_depth_sum = 0.0;

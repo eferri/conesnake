@@ -311,7 +311,7 @@ const SEARCH_SMALL: &str = "
 fn small_search_test() {
     log_test_init();
     let ctx = get_deterministic_context();
-    let pool = ThreadPool::new(ctx.config.num_worker_threads);
+    let pool = ThreadPool::new(ctx.config.num_threads);
 
     let game = solo_game();
     let board = Board::from_str(SEARCH_SMALL, &game).unwrap();
@@ -358,7 +358,7 @@ const ARCADE_MAZE_BOARD: &str = "
 fn arcade_maze_search_test() {
     log_test_init();
     let ctx = Arc::new(get_context());
-    let pool = ThreadPool::new(ctx.config.num_worker_threads);
+    let pool = ThreadPool::new(ctx.config.num_threads);
 
     for _ in 0..4 {
         let mut game = wrapped_game();

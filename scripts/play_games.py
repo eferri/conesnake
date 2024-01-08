@@ -51,7 +51,7 @@ async def start_snake(index, opt_args=None):
     )
 
     worker_args = [
-        "--num-worker-threads", num_threads,
+        "--num-threads", num_threads,
         "--max-boards", max_boards,
         "--max-width", max_width,
         "--max-height", max_height,

@@ -1,5 +1,7 @@
 locals {
   deployment = "conesnake"
+  http_port  = 31757
+  https_port = 31767
 }
 
 resource "aws_iam_instance_profile" "conesnake" {
@@ -78,8 +80,7 @@ resource "aws_subnet" "conesnake" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name                     = local.deployment
-    "kubernetes.io/role/elb" = "1"
+    Name = local.deployment
   }
 }
 
@@ -110,8 +111,16 @@ resource "aws_security_group" "alb" {
 
   ingress {
     description = "https"
-    from_port   = 59213
-    to_port     = 59213
+    from_port   = local.https_port
+    to_port     = local.https_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "http"
+    from_port   = local.http_port
+    to_port     = local.http_port
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -163,7 +172,6 @@ resource "aws_security_group" "conesnake_base" {
   }
 }
 
-
 resource "aws_security_group" "conesnake_alb" {
   name        = "conesnake_alb"
   description = "conesnake_alb"
@@ -181,7 +189,6 @@ resource "aws_security_group" "conesnake_alb" {
     app = local.deployment
   }
 }
-
 
 # Infrastructure
 
@@ -251,12 +258,23 @@ resource "aws_lb" "conesnake" {
   }
 }
 
-resource "aws_lb_listener" "conesnake" {
+resource "aws_lb_listener" "conesnake_https" {
   load_balancer_arn = aws_lb.conesnake.arn
-  port              = 59213
+  port              = local.https_port
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
   certificate_arn   = aws_acm_certificate.conesnake.arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.conesnake.arn
+  }
+}
+
+resource "aws_lb_listener" "conesnake_http" {
+  load_balancer_arn = aws_lb.conesnake.arn
+  port              = local.http_port
+  protocol          = "HTTP"
 
   default_action {
     type             = "forward"
@@ -270,6 +288,8 @@ resource "aws_lb_target_group" "conesnake" {
   protocol    = "HTTP"
   vpc_id      = aws_vpc.conesnake.id
   target_type = "instance"
+
+  load_balancing_algorithm_type = "least_outstanding_requests"
 
   health_check {
     interval            = "10"
@@ -301,14 +321,12 @@ module "conesnake_relay" {
   node_type              = "t3a.micro"
   vpc_id                 = aws_vpc.conesnake.id
   subnet_id              = aws_subnet.conesnake["a"].id
-  container_node         = true
   instance_profile_name  = aws_iam_instance_profile.conesnake.name
   base_security_group_id = aws_security_group.conesnake_base.id
   alb_security_group_id  = aws_security_group.conesnake_alb.id
   key_pair_name          = aws_key_pair.conesnake.key_name
   deployment             = local.deployment
 }
-
 
 output "conesnake_target_group_arn" {
   value = aws_lb_target_group.conesnake.arn

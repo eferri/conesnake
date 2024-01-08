@@ -47,7 +47,8 @@ veryclean: clean
 	rm -rf target* build* \
 		.cargo/registry \
 		.cargo/.package-cache \
-		*.tfstate*
+		.cargo/.package-cache-mutate \
+		terraform/.terraform
 
 # Cargo
 
@@ -94,7 +95,7 @@ report:
 bench:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& ./target-snake/release/performance --num-worker-threads 8'
+		&& ./target-snake/release/performance --num-threads 8'
 
 .PHONY: compare
 compare:
@@ -157,34 +158,34 @@ terraform-apply:
 
 .PHONY: terraform-init
 terraform-init:
-	docker compose run --rm -w /app/terraform \
+	docker compose run --rm \
 		-v "$(HOME)/.aws:/home/conesnake/.aws" \
 		snake \
-	terraform init -upgrade -migrate-state
+	terraform -chdir=terraform init -upgrade -migrate-state
 
 .PHONY: terraform-destroy
 terraform-destroy:
-	docker compose run --rm -w /app/terraform \
+	docker compose run --rm \
 		-v "$(HOME)/.aws:/home/conesnake/.aws" \
 		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \
-	terraform destroy
+	terraform -chdir=terraform destroy
 
 .PHONY: terraform-output-secret
 terraform-output-secret:
-	docker compose run --rm -w /app/terraform \
+	docker compose run --rm \
 		-v "$(HOME)/.aws:/home/conesnake/.aws" \
 		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \
-	terraform output -raw conesnake_secret_access_key | base64 --decode | gpg --decrypt
+	terraform -chdir=terraform output -raw conesnake_secret_access_key | base64 --decode | gpg --decrypt
 
 .PHONY: terraform-destroy-wg
 terraform-destroy-wg:
-	docker compose run --rm -w /app/terraform \
+	docker compose run --rm \
 		-v "$(HOME)/.aws:/home/conesnake/.aws" \
 		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \
-	terraform destroy -target null_resource.wg_mesh
+	terraform -chdir=terraform destroy -target null_resource.wg_mesh

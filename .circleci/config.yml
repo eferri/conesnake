@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   test:
     machine:
-      image: "ubuntu-2204:2022.07.1"
+      image: "ubuntu-2204:2023.10.1"
       docker_layer_caching: true
     resource_class: medium
     steps:
@@ -42,7 +42,7 @@ jobs:
           command: make test
 
 workflows:
-  test-deploy:
+  test:
     jobs:
       - test:
           filters:
