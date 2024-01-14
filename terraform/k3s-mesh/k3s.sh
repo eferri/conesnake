@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-SERVER_INSTALL_FILES="\
-  ./k8s/cloud-provider-aws.yaml \
+SERVER_INSTALL_FILES=" \
+  ./traefik-config.yaml \
 "
 
 INSTALL_K3S_VERSION="v1.29.0+k3s1"
@@ -54,14 +54,10 @@ export INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION
 
 curl -sfL https://get.k3s.io | sh -s - server \\
   --cluster-init \\
-  --node-taint CriticalAddonsOnly=true:NoExecute \\
   --node-label mode=server \\
   --node-name $HOST \\
   --node-ip $INTERNAL_IP \\
-  --flannel-iface conesnake \\
-  --disable-cloud-controller \\
-  --disable servicelb \\
-  --disable traefik
+  --flannel-iface conesnake
 
 rm -r $TEMP_DIR
 EOF
@@ -80,20 +76,16 @@ install_k3s_relay()
   ssh $CLOUD_SSH_ARGS "ubuntu@$PUBLIC_IP" 'sh -s' <<EOF
 set -eu
 
-TOKEN="\$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
 export INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION
 
 curl -sfL https://get.k3s.io | sh -s - agent \\
-  --node-taint AppPodsOnly=true:NoExecute \\
   --node-label mode=relay \\
+  --node-label svccontroller.k3s.cattle.io/enablelb=true \\
   --node-name $HOST \\
   --node-ip $INTERNAL_IP \\
   --server "https://$PRIMARY_INTERNAL_IP:6443" \\
   --token $K3S_TOKEN \\
-  --flannel-iface conesnake \\
-  --kubelet-arg="provider-id=aws:///\\
-\$(curl -s -H "X-aws-ec2-metadata-token: \$TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)/\\
-\$(curl -s -H "X-aws-ec2-metadata-token: \$TOKEN" http://169.254.169.254/latest/meta-data/instance-id)"
+  --flannel-iface conesnake
 
 EOF
 }

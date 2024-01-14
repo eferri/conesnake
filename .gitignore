@@ -8,9 +8,9 @@ certs
 **/manifest.yaml
 
 
-**/values.secrets.yaml
+**/values-secrets.yaml
 **/*.key
-**/vars.tf
+**/vars-secrets.tf
 **/*.tfstate*
 **/.terraform
 

@@ -5,7 +5,7 @@ max_snakes: 4
 
 relay:
   mem: "50Mi"
-  latency: 200
+  latency: 120
   parallel_reqs: 4
 
 worker:

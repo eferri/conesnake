@@ -19,7 +19,6 @@
                 "hashicorp.terraform",
                 "redhat.vscode-yaml",
                 "ms-kubernetes-tools.vscode-kubernetes-tools",
-                "eamodio.gitlens",
                 "shardulm94.trailing-spaces",
                 "bungcip.better-toml",
                 "vadimcn.vscode-lldb",

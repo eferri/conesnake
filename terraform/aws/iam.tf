@@ -13,6 +13,10 @@ resource "aws_iam_role" "conesnake" {
       },
     ]
   })
+
+  tags = {
+    app = local.deployment
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "conesnake" {
@@ -30,7 +34,7 @@ resource "aws_iam_user" "conesnake" {
 
 resource "aws_iam_access_key" "conesnake" {
   user    = aws_iam_user.conesnake.name
-  pgp_key = filebase64("${path.module}/../iam-public-key.gpg")
+  pgp_key = var.pgp_public_key
 }
 
 resource "aws_iam_user_policy_attachment" "conesnake" {
@@ -59,30 +63,16 @@ resource "aws_iam_policy" "conesnake" {
             "ecr:GetLifecyclePolicy",
             "ecr:GetLifecyclePolicyPreview",
             "ecr:ListTagsForResource",
-            "ecr:DescribeImageScanFindings",
-            "ec2:DescribeVpcs",
-            "ec2:DescribeSecurityGroups",
-            "ec2:DescribeInstances",
-            "elasticloadbalancing:DescribeTargetGroups",
-            "elasticloadbalancing:DescribeTargetHealth",
-            "elasticloadbalancing:ModifyTargetGroup",
-            "elasticloadbalancing:ModifyTargetGroupAttributes",
-            "elasticloadbalancing:RegisterTargets",
-            "elasticloadbalancing:DeregisterTargets",
-            "sns:Publish"
+            "ecr:DescribeImageScanFindings"
           ],
           Resource = "*"
         }
       ]
     }
   )
+
+  tags = {
+    app = local.deployment
+  }
 }
 
-
-output "conesnake_access_key_id" {
-  value = aws_iam_access_key.conesnake.id
-}
-
-output "conesnake_secret_access_key" {
-  value = aws_iam_access_key.conesnake.encrypted_secret
-}

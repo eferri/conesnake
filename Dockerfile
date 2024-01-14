@@ -138,7 +138,7 @@ ENV CARGO_HOME .cargo
 
 FROM base as prod
 
-COPY target-snake/release/conesnake .
+COPY --chown=conesnake target-snake/release/conesnake .
 
 USER conesnake
 

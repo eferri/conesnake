@@ -2,11 +2,6 @@
 serviceAccountName: "{{ .Release.Name }}-sa-ecr-creds"
 nodeSelector:
   mode: relay
-tolerations:
-- key: "AppPodsOnly"
-  operator: "Equal"
-  value: "true"
-  effect: "NoExecute"
 restartPolicy: Never
 initContainers:
 - name: "{{ .Release.Name }}-ecr-get-token"

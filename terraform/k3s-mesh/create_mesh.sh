@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-./wg-mesh/destroy_mesh.sh
+./destroy_mesh.sh
 
 CURR_DIR="$(pwd)"
 SCRATCH_DIR="$(mktemp -d)"

@@ -17,10 +17,11 @@ use axum::{
 };
 use deepsize::DeepSizeOf;
 use futures::future;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use reqwest::Client;
 use tokio::{net::TcpListener, select, signal, time};
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tracing::Level;
 
 use std::{
     collections::HashMap,
@@ -124,11 +125,16 @@ impl Server {
         let app = Router::new()
             .route("/", get(root))
             .route("/ping", get(ping))
+            .route("/trace", get(trace))
             .route("/move", post(move_req))
             .route("/start", post(start))
             .route("/end", post(end))
             .with_state(self.state.clone())
-            .layer(TraceLayer::new_for_http());
+            .layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                    .on_response(DefaultOnResponse::new().level(Level::INFO)),
+            );
 
         let addr = SocketAddr::from(([0, 0, 0, 0], self.state.config.port.parse().unwrap()));
 
@@ -221,7 +227,7 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
                     false
                 }
                 Ok(_) => {
-                    info!("Worker {} latency ms: {}", worker, latency_ms);
+                    debug!("Worker {} latency ms: {}", worker, latency_ms);
                     true
                 }
             }
@@ -244,6 +250,11 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
         StatusCode::INTERNAL_SERVER_ERROR
     }
     .into_response()
+}
+
+async fn trace() -> Response {
+    info!("Tracing request");
+    StatusCode::OK.into_response()
 }
 
 async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<BattleState>) -> Response {
@@ -396,7 +407,7 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
                 let current_dur = Instant::now() - start_time;
                 let timeout_dur = Duration::from_millis(delay_ms as u64).saturating_sub(current_dur);
 
-                info!("Worker request timeout is {} us", timeout_dur.as_micros());
+                debug!("Worker request timeout is {} us", timeout_dur.as_micros());
 
                 let req_start = Instant::now();
                 let move_resp = state

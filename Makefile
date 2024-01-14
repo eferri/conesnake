@@ -125,7 +125,7 @@ helm-upgrade:
 		--install \
 		--create-namespace \
 		--namespace conesnake \
-		--values conesnake/values.secrets.yaml
+		--values conesnake/values-secrets.yaml
 
 .PHONY: helm-uninstall
 helm-uninstall:
@@ -136,14 +136,14 @@ helm-uninstall:
 helm-template:
 	docker compose run --rm --workdir /app/k8s -v "$(HOME)/.kube:/home/conesnake/.kube" snake \
 	helm template \
-		--values conesnake/values.secrets.yaml \
+		--values conesnake/values-secrets.yaml \
 		--debug prod conesnake > k8s/manifest.yaml
 
 .PHONY: helm-lint
 helm-lint:
 	docker compose run --rm --workdir /app/k8s -v "$(HOME)/.kube:/home/conesnake/.kube" snake \
 	helm lint conesnake \
-		--values conesnake/values.secrets.yaml \
+		--values conesnake/values-secrets.yaml \
 
 # terraform
 
@@ -188,4 +188,4 @@ terraform-destroy-wg:
 		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \
-	terraform -chdir=terraform destroy -target null_resource.wg_mesh
+	terraform -chdir=terraform destroy -target module.k3s_mesh

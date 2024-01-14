@@ -1,16 +1,31 @@
 ---
-apiVersion: elbv2.k8s.aws/v1beta1
-kind: TargetGroupBinding
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: "{{ .Release.Name }}-tgb"
+  name: "{{ .Release.Name }}-ingress"
   labels:
     {{- include "common_labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: "{{ .Release.Namespace }}-{{ .Release.Name }}-ratelimit@kubernetescrd"
 spec:
-  serviceRef:
-    name: "{{ .Release.Name }}-relay-external"
-    port: 8080
-  targetType: instance
-  nodeSelector:
-    matchLabels:
-      mode: relay
-  targetGroupARN: "{{ .Values.aws_target_group_arn }}"
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-relay-external
+                port:
+                  number: 8080
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-ratelimit
+spec:
+  rateLimit:
+    average: 300
+    burst: 50

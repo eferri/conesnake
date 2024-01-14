@@ -6,10 +6,8 @@ metadata:
   labels:
     {{- include "common_labels" . | nindent 4 }}
 spec:
-  type: NodePort
   ports:
   - port: 8080
-    nodePort: 30001
   selector:
     {{- include "common_labels" . | nindent 4 }}
     app: relay
