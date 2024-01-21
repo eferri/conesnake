@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: "{{ .Release.Name }}-sa-ecr-creds"
+  name: "{{ .Release.Name }}-sa-creds"
   labels:
     {{- include "common_labels" . | nindent 4 }}
 ---
@@ -20,49 +20,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: "{{ .Release.Name }}-ecr-creds-role-binding"
+  name: "{{ .Release.Name }}-creds-role-binding"
   labels:
     {{- include "common_labels" . | nindent 4 }}
 subjects:
 - kind: ServiceAccount
-  name: "{{ .Release.Name }}-sa-ecr-creds"
+  name: "{{ .Release.Name }}-sa-creds"
   apiGroup: ""
 roleRef:
   kind: Role
   name: "{{ .Release.Name }}-role-secrets-rw"
-  apiGroup: ""
-
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: "{{ .Release.Name }}-sa-get-pods"
-  labels:
-    {{- include "common_labels" . | nindent 4 }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: "{{ .Release.Name }}-role-get-pods-ro"
-  labels:
-    {{- include "common_labels" . | nindent 4 }}
-rules:
-- apiGroups: [""]
-  resources: ["endpoints"]
-  verbs: ["get"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: "{{ .Release.Name }}-get-pods-role-binding"
-  labels:
-    {{- include "common_labels" . | nindent 4 }}
-subjects:
-- kind: ServiceAccount
-  name: "{{ .Release.Name }}-sa-get-pods"
-  apiGroup: ""
-roleRef:
-  kind: Role
-  name: "{{ .Release.Name }}-role-get-pods-ro"
   apiGroup: ""

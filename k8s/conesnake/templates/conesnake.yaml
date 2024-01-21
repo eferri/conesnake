@@ -1,8 +1,5 @@
 {{- define "conesnake_common" -}}
 imagePullPolicy: Always
-envFrom:
-- secretRef:
-    name: "{{ .Release.Name }}-conesnake-secrets"
 env:
 - name: RUST_BACKTRACE
   value: "1"
@@ -61,7 +58,6 @@ spec:
         {{- include "common_labels" . | nindent 8 }}
         app: relay
     spec:
-      serviceAccountName: "{{ .Release.Name }}-sa-get-pods"
       nodeSelector:
         mode: relay
       imagePullSecrets:
@@ -121,7 +117,6 @@ spec:
         app: worker
         node: "worker-{{ $worker.hostname }}"
     spec:
-      serviceAccountName: "{{ $.Release.Name }}-sa-get-pods"
       nodeName: "{{ $worker.hostname }}"
       tolerations:
       - key: AppPodsOnly

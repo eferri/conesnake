@@ -3,9 +3,11 @@ max_width: 19
 max_height: 21
 max_snakes: 4
 
+use_gcp: true
+
 relay:
   mem: "50Mi"
-  latency: 120
+  latency: 100
   parallel_reqs: 4
 
 worker:

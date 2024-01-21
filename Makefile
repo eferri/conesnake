@@ -1,33 +1,50 @@
 # Docker
-AWS_ACCOUNT_ID ?= $(shell aws --no-cli-pager sts get-caller-identity --query 'Account')
-AWS_REGION ?= $(shell aws --no-cli-pager configure get region)
+GCP_REGISTRY_SA_EMAIL := $(shell gcloud iam service-accounts list --filter=displayName="conesnake_registry_service_account" --format="get(email)" 2>/dev/null)
+GCP_PROJECT_NAME := $(shell gcloud config get-value project)
 
 .PHONY: shell
 shell:
-	docker compose run --rm snake bash
+	docker compose run --rm \
+		-v "$(HOME)/.config/gcloud:/home/conesnake/.config/gcloud" \
+		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
+		-v "$(HOME)/.kube:/home/conesnake/.kube" \
+	snake bash
 
 .PHONY: root-shell
 root-shell:
 	docker compose run --user root --rm snake bash
 
+# TODO: don't hardcode region
 .PHONY: prod-shell
 prod-shell:
-	docker run --rm -it --entrypoint bash $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/conesnake:latest-app
+	docker run --rm -it --entrypoint bash us-west1-docker.pkg.dev/$(GCP_PROJECT_NAME)/conesnake/conesnake:latest-app
 
-.PHONY: ecr-login
-ecr-login:
-	aws ecr get-login-password | docker login \
-		--username AWS \
-		--password-stdin "$(AWS_ACCOUNT_ID)".dkr.ecr.$(AWS_REGION).amazonaws.com
+.PHONY: gcloud-config-docker
+gcloud-config-docker:
+	gcloud auth configure-docker us-west1-docker.pkg.dev
+
+.PHONY: regcred-secret
+regcred-secret:
+	docker compose run --rm \
+		-v "$(HOME)/.kube:/home/conesnake/.kube" \
+		snake bash -c '\
+	kubectl create namespace conesnake || true \
+	&& kubectl delete secret --namespace conesnake --ignore-not-found regcred \
+	&& kubectl --namespace conesnake create secret docker-registry regcred \
+		--docker-server=https://us-west1-docker.pkg.dev \
+		--docker-email=$(GCP_REGISTRY_SA_EMAIL) \
+		--docker-username=_json_key \
+		--docker-password='\''$(shell cat ./service_key.json)'\'' \
+	'
 
 .PHONY: prod-build
 prod-build:
 	docker compose run --rm snake cargo build --release
 	DOCKER_BUILDKIT=1 docker build \
 		--target prod \
-		--tag $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/conesnake:latest-app .
+		--tag us-west1-docker.pkg.dev/$(GCP_PROJECT_NAME)/conesnake/conesnake:latest-app .
 
-	docker push $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/conesnake:latest-app
+	docker push us-west1-docker.pkg.dev/$(GCP_PROJECT_NAME)/conesnake/conesnake:latest-app
 
 # Misc
 
@@ -150,7 +167,7 @@ helm-lint:
 .PHONY: terraform-apply
 terraform-apply:
 	docker compose run --rm -w /app/terraform \
-		-v "$(HOME)/.aws:/home/conesnake/.aws" \
+		-v "$(HOME)/.config/gcloud:/home/conesnake/.config/gcloud" \
 		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \
@@ -159,14 +176,14 @@ terraform-apply:
 .PHONY: terraform-init
 terraform-init:
 	docker compose run --rm \
-		-v "$(HOME)/.aws:/home/conesnake/.aws" \
+		-v "$(HOME)/.config/gcloud:/home/conesnake/.config/gcloud" \
 		snake \
 	terraform -chdir=terraform init -upgrade -migrate-state
 
 .PHONY: terraform-destroy
 terraform-destroy:
 	docker compose run --rm \
-		-v "$(HOME)/.aws:/home/conesnake/.aws" \
+		-v "$(HOME)/.config/gcloud:/home/conesnake/.config/gcloud" \
 		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \
@@ -175,7 +192,7 @@ terraform-destroy:
 .PHONY: terraform-output-secret
 terraform-output-secret:
 	docker compose run --rm \
-		-v "$(HOME)/.aws:/home/conesnake/.aws" \
+		-v "$(HOME)/.config/gcloud:/home/conesnake/.config/gcloud" \
 		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \
@@ -184,7 +201,7 @@ terraform-output-secret:
 .PHONY: terraform-destroy-wg
 terraform-destroy-wg:
 	docker compose run --rm \
-		-v "$(HOME)/.aws:/home/conesnake/.aws" \
+		-v "$(HOME)/.config/gcloud:/home/conesnake/.config/gcloud" \
 		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \

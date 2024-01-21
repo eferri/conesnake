@@ -11,5 +11,5 @@ helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
 {{- end -}}
 
 {{- define "amd64_image" -}}
-"{{ .Values.aws_account_id }}.dkr.ecr.{{ .Values.aws_default_region }}.amazonaws.com/conesnake:latest-app"
+"{{ .Values.gcp_region }}-docker.pkg.dev/{{ .Values.gcp_project }}/conesnake/conesnake:latest-app"
 {{- end -}}

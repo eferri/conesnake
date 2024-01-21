@@ -12,3 +12,6 @@ spec:
         exposed: false
     nodeSelector:
       mode: relay
+    logs:
+      access:
+        enabled: true

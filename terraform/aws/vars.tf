@@ -1,16 +1,8 @@
-variable "primary_host" {
-  type = string
-}
-
 variable "local_ip" {
   type = string
 }
 
 variable "ssh_public_key" {
-  type = string
-}
-
-variable "pgp_public_key" {
   type = string
 }
 

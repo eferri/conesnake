@@ -3,10 +3,7 @@
     "context": "..",
     "dockerFile": "../Dockerfile",
     "build": {
-        "target": "dev",
-        "args": {
-            "BUILDKIT_INLINE_CACHE": "0"
-        }
+        "target": "dev"
     },
     "customizations": {
         "vscode": {

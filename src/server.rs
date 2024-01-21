@@ -227,7 +227,7 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
                     false
                 }
                 Ok(_) => {
-                    debug!("Worker {} latency ms: {}", worker, latency_ms);
+                    info!("Worker {} ping latency ms: {}", worker, latency_ms);
                     true
                 }
             }
@@ -421,8 +421,8 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
                     .await?;
 
                 let req_dur = Instant::now() - req_start;
-                let server_latency = req_dur.as_micros() as i64;
-                let mut run_str = format!("\nWorker {worker} latency us {server_latency}\n");
+                let server_latency = req_dur.as_millis() as i64;
+                let mut run_str = format!("\nWorker {worker} move latency ms {server_latency}\n");
 
                 let scores = move_resp.scores.unwrap();
 

@@ -3,10 +3,7 @@
 target*
 build*
 
-certs
-
 **/manifest.yaml
-
 
 **/values-secrets.yaml
 **/*.key
@@ -23,6 +20,7 @@ certs
 *.pb
 *.gpg
 *.perf
+*.json
 perf.data
 perf.data.*
 nohup.out

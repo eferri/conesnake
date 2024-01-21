@@ -19,17 +19,7 @@ A tree search-based battlesnake.
 
 ## Production
 
-1. Create an S3 bucket named "conesnake-tf-state" to store terraform state. Restrict public access
-
-1. Create a dynamodb table named "terraform_state" for state locking
-
-1. Register or import domain into Route53
-
-1. Generate a gpg key for encrypting iam keys. Use conesnake as the name:
-    ```
-    gpg --generate-key
-    gpg --output iam-public-key.gpg --export conesnake
-    ```
+1. Create an GCP cloud bucket named "conesnake-tf-state" to store terraform state. Restrict public access
 
 1. Generate ssh key for aws instance access:
     ```
@@ -40,7 +30,7 @@ A tree search-based battlesnake.
 1. Ensure all local nodes configured in terraform/vars.tf have password-less ssh access configured in ~/.ssh/config
    SSH host alias should match the `local_nodes`` map key in terraform/vars.tf
 
-1. Install wireguard on all local nodes
+1. Install wireguard on all local nodes:
     ```
     ssh <local-node>
     sudo apt-get update && sudo apt-get install -no-install-recommends -y wireguard
@@ -52,20 +42,22 @@ A tree search-based battlesnake.
     make terraform-apply
     ```
 
-1. Create a secrets file for the helm chart.
-   Use the `conesnake_access_key_id` value printed at the end of the command `make terraform-apply` in the previous step to fill in the value in `values.secrets.yaml`
-   Use the `conesnake_target_group_arn` for the `aws_target_group_arn` value in `values.secrets.yaml`
-   Decrypt the secret access key:
+1. Create a service account key for the "conesnake_registry" service account.
+   Copy it to a file named `service_key.json` in the repo root
 
+1. Create the regcred secret in k8s for pulling container images:
+    ```
+    make regcred-secret
+    ```
+
+1. Create a secrets file for the helm chart:
     ```
     cp k8s/conesnake/values.secrets.yaml.template k8s/conesnake/values.secrets.yaml
-    make terraform-output-secret
     ```
-   Use the decrypted secret access key for the `aws_secret_access_key` key in `values.secrets.yaml`
 
 1. Build and push production docker images:
     ```
-    make ecr-login
+    make gcloud-config-docker
     make prod-build
     ```
 

@@ -34,7 +34,7 @@ resource "aws_iam_user" "conesnake" {
 
 resource "aws_iam_access_key" "conesnake" {
   user    = aws_iam_user.conesnake.name
-  pgp_key = var.pgp_public_key
+  pgp_key = filebase64("${path.module}/../../iam-public-key.gpg")
 }
 
 resource "aws_iam_user_policy_attachment" "conesnake" {
