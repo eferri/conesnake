@@ -355,7 +355,7 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         Map::Standard,
     ),
     (
-        "turn: 171 health: 68 health: 87 
+        "turn: 171 health: 68 health: 87
         - - - - - - - - - - -
         + > > > 0 - + - - - -
         - ^ - - - + - - - - -
@@ -366,6 +366,25 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         ^ a - - - ^ - - - v -
         - - - - - ^ < < < < -
         - - - - - - - + - - -
+        - - - - - - - - - - -
+        ",
+        &[(0, false, Move::Down), (1, true, Move::Up)],
+        Rules::Standard,
+        Map::Standard,
+    ),
+    // To see head-on-col problem, replace "F" with "b"
+    (
+        "turn: 22 health: 100 health: 90 health: 82
+        - - - F > > 0 - - - -
+        - - + - - - + - - - -
+        - - - - - - 1 - - - -
+        - - - - - - ^ - - - -
+        - - - - - - ^ - - - -
+        - - - - - - ^ - - - -
+        - - - - - - c - - - -
+        - - - - - - - - - - -
+        - - 2 < - - - - - - -
+        - + b ^ - - - - - - -
         - - - - - - - - - - -
         ",
         &[(0, false, Move::Down), (1, true, Move::Up)],

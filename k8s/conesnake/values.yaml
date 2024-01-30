@@ -7,7 +7,7 @@ use_gcp: true
 
 relay:
   mem: "50Mi"
-  latency: 100
+  latency: 40
   parallel_reqs: 4
 
 worker:

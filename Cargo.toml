@@ -34,7 +34,7 @@ nix = "~0.27"
 [dev-dependencies]
 approx = "~0.5"
 pretty_assertions = "~1.4"
-cargo-show-asm = "~0.2"
+cargo-show-asm = "~0.2.29"
 
 [features]
 default = ["simd"]

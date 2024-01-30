@@ -88,14 +88,24 @@ rel-test:
 		--test-threads=1
 
 .PHONY: profile
-profile: record report
+profile: build-profile record report
+
+.PHONY: build-profile
+build-profile:
+	docker compose run --rm snake bash -c ' \
+		RUSTFLAGS="-C force-frame-pointers=yes" cargo build \
+			-Z build-std \
+			--profile=release-with-debug \
+			--target x86_64-unknown-linux-gnu'
 
 .PHONY: record
 record:
-	docker compose run --rm snake bash -c ' \
-		cargo build --profile=release-with-debug \
-		&& perf record --call-graph dwarf -F 1000 \
-			./target-snake/release-with-debug/performance'
+	docker compose run --rm snake \
+		perf record \
+			-e cycles \
+			--call-graph fp \
+			-F 1000 \
+			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/performance
 
 .PHONY: report
 report:
@@ -105,8 +115,14 @@ report:
 			--stdio-color \
 			--percent-limit 0.5 \
 			--show-nr-samples \
-			--show-cpu-utilization \
-			--call-graph srcline
+			--show-cpu-utilization
+
+.PHONY: stat
+stat: build-profile
+	docker compose run --rm snake \
+		perf stat \
+			-e task-clock,cycles,instructions,cache-references,cache-misses \
+			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/performance
 
 .PHONY: bench
 bench:
@@ -126,7 +142,7 @@ optimize:
 		cargo build --release \
 		&& python3 -u ./scripts/play_games.py --mode optimize 2>&1 | tee optimize.log'
 
-ASM_FUNC ?= "search_worker"
+ASM_FUNC ?= "conesnake::board::Board::set_from"
 
 .PHONY: asm
 asm:

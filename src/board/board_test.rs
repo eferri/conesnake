@@ -16,7 +16,6 @@ pub fn basic_str_test() {
     board.add_api_snake(&game, &snake).unwrap();
 
     board.set_at(Coord::new(5, 6), BoardSquare::Food);
-    board.food.insert(Coord::new(5, 6));
     board.num_food += 1;
 
     board.set_at(Coord::new(1, 3), BoardSquare::Hazard);
@@ -35,7 +34,6 @@ pub fn multiple_snake_str_test() {
     board.turn = 4;
 
     board.set_at(Coord::new(10, 7), BoardSquare::Food);
-    board.food.insert(Coord::new(10, 7));
     board.num_food += 1;
 
     let snake_0 = test_snake(&[Coord::new(3, 4), Coord::new(2, 4)], 87);
@@ -435,17 +433,6 @@ pub fn head_on_col_wrapped_test() {
     assert_eq!(board_y.head_on_col(&game, 1, Move::Right), HeadOnCol::None);
     assert_eq!(board_y.head_on_col(&game, 1, Move::Up), HeadOnCol::PossibleCollision);
     assert_eq!(board_y.head_on_col(&game, 1, Move::Down), HeadOnCol::None);
-}
-
-#[test]
-pub fn closest_food_test() {
-    let game = test_game();
-
-    let board_x = Board::from_str(BOARD_X, &game).unwrap();
-    let board_y = Board::from_str(BOARD_Y, &game).unwrap();
-
-    assert_eq!(board_x.closest_food(&game, 0), Some(Coord::new(0, 5)));
-    assert_eq!(board_y.closest_food(&game, 0), None);
 }
 
 #[test]

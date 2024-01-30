@@ -32,6 +32,10 @@ impl Board {
                 num_valid += 1;
                 if cfg.strong_playout {
                     match self.head_on_col(game, snake_idx, mv) {
+                        HeadOnCol::PossibleElimination => {
+                            good_moves[num_good as usize] = mv;
+                            num_good += 1;
+                        }
                         HeadOnCol::None => {
                             neutral_moves[num_neutral as usize] = mv;
                             num_neutral += 1;
@@ -39,10 +43,6 @@ impl Board {
                         HeadOnCol::PossibleCollision => {
                             bad_moves[num_bad as usize] = mv;
                             num_bad += 1;
-                        }
-                        HeadOnCol::PossibleElimination => {
-                            good_moves[num_good as usize] = mv;
-                            num_good += 1;
                         }
                     }
                 }
@@ -138,25 +138,6 @@ impl Board {
             };
         }
         HeadOnCol::None
-    }
-
-    pub fn closest_food(&self, game: &Game, snake_idx: usize) -> Option<Coord> {
-        let mut min_abs_dist = i32::MAX;
-        let mut closest_food = None;
-
-        let snake_head = self.snake_head(snake_idx);
-
-        for food in &self.food {
-            let (dist_x, dist_y) = self.abs_dist(snake_head, *food, game.ruleset);
-            let abs_dist = dist_x + dist_y;
-
-            if abs_dist < min_abs_dist {
-                min_abs_dist = abs_dist;
-                closest_food = Some(*food);
-            }
-        }
-
-        closest_food
     }
 
     pub fn closest_snake(&self, game: &Game, snake_idx: usize) -> Option<Coord> {
@@ -376,7 +357,6 @@ impl Board {
                 BoardSquare::Food => {
                     self.set_at(new_head, BoardSquare::SnakeHead(idx_byte));
                     self.num_food -= 1;
-                    self.food.remove(&new_head);
                 }
                 BoardSquare::Hazard => {
                     self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
@@ -384,7 +364,6 @@ impl Board {
                 BoardSquare::FoodHazard => {
                     self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
                     self.num_food -= 1;
-                    self.food.remove(&new_head);
                 }
                 BoardSquare::SnakeHead(s) => {
                     if self.snakes[s as usize].eliminated
@@ -555,7 +534,6 @@ impl Board {
                 self.num_food += num_spawn as i32;
 
                 for coord in food_buff.iter().take(num_spawn) {
-                    self.food.insert(*coord);
                     match self.at(*coord) {
                         BoardSquare::Empty => self.set_at(*coord, BoardSquare::Food),
                         BoardSquare::Hazard => self.set_at(*coord, BoardSquare::FoodHazard),

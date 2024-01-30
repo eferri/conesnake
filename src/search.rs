@@ -344,7 +344,7 @@ pub fn search_moves<R: Rand>(
         let mut root_state_guard = ctx.node_space[0].state.write().unwrap();
 
         root_state_guard.reset();
-        root_state_guard.board.set(board);
+        root_state_guard.board.set_from(board);
     }
 
     ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
@@ -437,7 +437,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
                 // OR reached node that hasn't been played out yet.
                 if game.over(&state_guard.board) || curr_idx != 0 && playout_guard.is_some() && state_guard.games == 0 {
                     // Set the board for playout
-                    scratch_guard.board.set(&state_guard.board);
+                    scratch_guard.board.set_from(&state_guard.board);
                     break;
                 } else {
                     playout_guard = None;
@@ -675,7 +675,7 @@ fn expand_node<R: Rand>(
 
             child_state_guard.reset();
 
-            child_state_guard.board.set(&node.board);
+            child_state_guard.board.set_from(&node.board);
             child_state_guard
                 .board
                 .gen_board(child_moves, game, &mut state.food_buff, &mut state.rng);

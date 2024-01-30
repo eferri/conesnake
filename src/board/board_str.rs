@@ -217,10 +217,7 @@ impl Board {
             board.board_mat[idx] = board_square;
 
             match board_square {
-                BoardSquare::Food | BoardSquare::FoodHazard => {
-                    board.food.insert(board.coord_from_idx(idx));
-                    board.num_food += 1
-                }
+                BoardSquare::Food | BoardSquare::FoodHazard => board.num_food += 1,
                 _ => (),
             }
         }

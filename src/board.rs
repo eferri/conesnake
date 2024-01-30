@@ -4,14 +4,7 @@ use crate::util::{self};
 use crate::util::{Coord, Error, Move};
 
 use std::cmp::Ordering;
-use std::{
-    cmp::min,
-    cmp::min_by,
-    collections::{HashSet, VecDeque},
-    fmt,
-    fmt::Write,
-    str,
-};
+use std::{cmp::min, cmp::min_by, collections::VecDeque, fmt, fmt::Write, str};
 
 use deepsize::DeepSizeOf;
 use serde::{Deserialize, Serialize};
@@ -97,7 +90,6 @@ pub struct Board {
     pub royale_min_y: i32,
     pub royale_max_y: i32,
 
-    pub food: HashSet<Coord>,
     pub snakes: Vec<Snake>,
 
     board_mat: Vec<BoardSquare>,
@@ -117,7 +109,6 @@ impl Board {
             royale_max_x: 0,
             royale_min_y: 0,
             royale_max_y: 0,
-            food: HashSet::with_capacity(max_board_size),
             snakes: Vec::with_capacity(max_snakes),
             board_mat: vec![BoardSquare::Empty; max_board_size],
         };
@@ -141,7 +132,6 @@ impl Board {
 
         let mut board = Board::new(req.board.width, req.board.height, max_width, max_height, max_snakes);
         for coord in req.board.food.iter() {
-            board.food.insert(*coord);
             board.set_at(*coord, BoardSquare::Food);
             board.num_food += 1;
         }
@@ -229,7 +219,7 @@ impl Board {
         })
     }
 
-    pub fn set(&mut self, other: &Board) {
+    pub fn set_from(&mut self, other: &Board) {
         self.width = other.width;
         self.height = other.height;
         self.turn = other.turn;
@@ -237,9 +227,6 @@ impl Board {
         self.num_snakes = other.num_snakes;
 
         let board_len = (self.width * self.height) as usize;
-
-        self.food.clear();
-        self.food.extend(&other.food);
 
         for s_idx in 0..other.num_snakes {
             let snake = &mut self.snakes[s_idx as usize];

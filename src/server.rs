@@ -19,7 +19,7 @@ use deepsize::DeepSizeOf;
 use futures::future;
 use log::{debug, error, info, warn};
 use reqwest::Client;
-use tokio::{net::TcpListener, select, signal, time};
+use tokio::{net::TcpSocket, select, signal, time};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
@@ -138,7 +138,12 @@ impl Server {
 
         let addr = SocketAddr::from(([0, 0, 0, 0], self.state.config.port.parse().unwrap()));
 
-        let listener = TcpListener::bind(&addr).await.unwrap();
+        let socket = TcpSocket::new_v4().unwrap();
+        socket.set_reuseaddr(true).unwrap();
+        socket.set_nodelay(true).unwrap();
+        socket.bind(addr).unwrap();
+
+        let listener = socket.listen(1024).unwrap();
 
         info!("Starting conesnake");
 
