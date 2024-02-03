@@ -28,7 +28,7 @@ struct Results {
     max_nodes: i64,
     mean_depth: f64,
     mean_playouts: f64,
-    mean_games: f64,
+    mean_searches: f64,
 }
 
 type TestCase<'a> = &'a [(usize, bool, Move)];
@@ -391,6 +391,24 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         Rules::Standard,
         Map::Standard,
     ),
+    (
+        "turn: 101 health: 93 health: 91 health: 97
+        - - - - - - - - - - -
+        - - - - b > > v - - -
+        - - - - - - - v - - -
+        - - - - - - - v - - -
+        - - v < - - - v + - -
+        - - v ^ a - - v - - -
+        - - v - - - - v - - -
+        - - v - - - - v - - d
+        - - v 2 - - - v - - v
+        - - > ^ - - 1 < - - v
+        - - - - - 0 < < < < <
+        ",
+        &[(0, true, Move::Left)],
+        Rules::Standard,
+        Map::Standard,
+    ),
 ];
 
 #[tokio::main]
@@ -425,7 +443,7 @@ async fn main() -> Result<(), Error> {
     let mut total_node_sum = 0;
     let mut total_depth_sum = 0.0;
     let mut total_playouts_sum = 0.0;
-    let mut total_games_sum = 0.0;
+    let mut total_searches_sum = 0.0;
 
     let mut results: Results = Default::default();
 
@@ -457,7 +475,7 @@ async fn main() -> Result<(), Error> {
                 config.set_temp(board.as_ref(), game.as_ref());
 
                 search_results_futures.push(task::spawn(async move {
-                    search::search_moves(ctx, Arc::new(config), &pool, &board, &game, Instant::now()).unwrap()
+                    search::mcts(ctx, Arc::new(config), &pool, &board, &game, Instant::now()).unwrap()
                 }));
             }
 
@@ -483,7 +501,7 @@ async fn main() -> Result<(), Error> {
                 total_depth_sum += search_result.max_depth as f64;
                 total_node_sum += search_result.total_nodes;
                 total_playouts_sum += search_result.num_playouts as f64;
-                total_games_sum += search_result.num_games as f64;
+                total_searches_sum += search_result.num_searches as f64;
             }
 
             for (snake_idx, eq, mv) in *desired_moves {
@@ -526,7 +544,7 @@ async fn main() -> Result<(), Error> {
     results.mean_nodes = total_node_sum as f64 / total_tests as f64;
     results.mean_depth = total_depth_sum / total_tests as f64;
     results.mean_playouts = total_playouts_sum / total_tests as f64;
-    results.mean_games = total_games_sum / total_tests as f64;
+    results.mean_searches = total_searches_sum / total_tests as f64;
 
     println!("{}", serde_json::to_string_pretty(&results).unwrap());
 

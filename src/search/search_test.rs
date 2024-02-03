@@ -320,8 +320,7 @@ fn small_search_test() {
     config.set_temp(&board, &game);
     let config = Arc::new(config);
 
-    let search_result =
-        search::search_moves(Arc::new(ctx), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
+    let search_result = search::mcts(Arc::new(ctx), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
     let best_move = search::best_move(&config, 0, &search_result.scores, true);
 
     assert_eq!(best_move, Move::Right);
@@ -369,8 +368,7 @@ fn arcade_maze_search_test() {
         config.set_temp(&board, &game);
         let config = Arc::new(config);
 
-        let search_result =
-            search::search_moves(ctx.clone(), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
+        let search_result = search::mcts(ctx.clone(), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
         let best_move = search::best_move(&config, 0, &search_result.scores, true);
 
         assert!(best_move == Move::Down || best_move == Move::Up);

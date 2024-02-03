@@ -239,7 +239,7 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
         })
     }
 
-    let timeout_dur = Duration::from_millis(700 as u64);
+    let timeout_dur = Duration::from_millis(700);
 
     let ping_res = match time::timeout(timeout_dur, future::join_all(ping_futures)).await {
         Ok(res) => res,
@@ -330,7 +330,7 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
             config.set_temp(&board, &game);
             let config = Arc::new(config);
 
-            let search_res = search::search_moves(
+            let search_res = search::mcts(
                 state.context.clone(),
                 config.clone(),
                 &state.worker_pool,
@@ -355,7 +355,7 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
                     )
                 }
                 Err(e) => {
-                    error!("Error from search_moves: {}", e);
+                    error!("Error from mcts: {}", e);
                     (
                         StatusCode::CONFLICT,
                         Json(MoveResp {

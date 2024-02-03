@@ -87,6 +87,8 @@ rel-test:
 		--color always \
 		--test-threads=1
 
+# Profiling
+
 .PHONY: profile
 profile: build-profile record report
 
@@ -103,7 +105,6 @@ record:
 	docker compose run --rm snake \
 		perf record \
 			-e cycles \
-			--call-graph fp \
 			-F 1000 \
 			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/performance
 
@@ -113,7 +114,7 @@ report:
 		perf report \
 			--stdio \
 			--stdio-color \
-			--percent-limit 0.5 \
+			--percent-limit 3 \
 			--show-nr-samples \
 			--show-cpu-utilization
 
@@ -123,6 +124,8 @@ stat: build-profile
 		perf stat \
 			-e task-clock,cycles,instructions,cache-references,cache-misses \
 			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/performance
+
+# Performance
 
 .PHONY: bench
 bench:
@@ -142,12 +145,12 @@ optimize:
 		cargo build --release \
 		&& python3 -u ./scripts/play_games.py --mode optimize 2>&1 | tee optimize.log'
 
-ASM_FUNC ?= "conesnake::board::Board::set_from"
+ASM_FUNC ?= "conesnake::board::board_rules::<impl conesnake::board::Board>::valid_move"
 
 .PHONY: asm
 asm:
-	docker compose run --rm snake \
-		cargo asm --lib $(ASM_FUNC)
+	docker compose run --rm snake bash -ic '\
+		cargo asm --lib --rust --color $(ASM_FUNC) | less -R'
 
 # helm
 

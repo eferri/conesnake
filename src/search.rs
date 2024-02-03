@@ -28,7 +28,7 @@ pub struct SearchContext<R: Rand> {
     search_timeout: AtomicBool,
     done_barrier: Barrier,
     total_nodes: AtomicI64,
-    num_games: AtomicI64,
+    num_searches: AtomicI64,
     num_playouts: AtomicI64,
     playout_ns: AtomicI64,
 }
@@ -126,7 +126,7 @@ impl<R: Rand> SearchContext<R> {
             search_timeout: AtomicBool::new(false),
             done_barrier: Barrier::new(config.num_threads + 1),
             total_nodes: AtomicI64::new(0),
-            num_games: AtomicI64::new(0),
+            num_searches: AtomicI64::new(0),
             num_playouts: AtomicI64::new(0),
             playout_ns: AtomicI64::new(0),
         }
@@ -134,7 +134,7 @@ impl<R: Rand> SearchContext<R> {
 
     pub fn reset(&self) {
         self.total_nodes.store(0, Ordering::Release);
-        self.num_games.store(0, Ordering::Release);
+        self.num_searches.store(0, Ordering::Release);
         self.num_playouts.store(0, Ordering::Release);
         self.search_timeout.store(false, Ordering::Release);
         self.playout_ns.store(0, Ordering::Release);
@@ -319,7 +319,7 @@ pub fn best_move(cfg: &Config, snake_idx: usize, scores: &[Scores], print_summar
     best_move
 }
 
-pub fn search_moves<R: Rand>(
+pub fn mcts<R: Rand>(
     ctx: Arc<SearchContext<R>>,
     config: Arc<Config>,
     pool: &ThreadPool,
@@ -392,15 +392,15 @@ pub fn search_moves<R: Rand>(
 
     let max_depth = root_guard.max_depth;
     let total_nodes = ctx.total_nodes.load(Ordering::Relaxed);
-    let num_games = ctx.num_games.load(Ordering::Relaxed);
+    let num_searches = ctx.num_searches.load(Ordering::Relaxed);
     let num_playouts = ctx.num_playouts.load(Ordering::Relaxed);
-    let num_terminal = num_games - num_playouts;
+    let num_terminal = num_searches - num_playouts;
     let playout_ns = ctx.playout_ns.load(Ordering::Relaxed);
     let avg_playout_us = (playout_ns as f64 / num_playouts as f64) / (1000.0);
 
     info!("search max depth: {}", max_depth);
     info!("search total nodes: {}", total_nodes);
-    info!("search num games: {}", num_games);
+    info!("search num games: {}", num_searches);
     info!("search num playouts: {}", num_playouts);
     info!("search num terminal: {}", num_terminal);
     info!("Average playout us: {}", avg_playout_us);
@@ -408,7 +408,7 @@ pub fn search_moves<R: Rand>(
     Ok(SearchStats {
         total_nodes,
         num_playouts,
-        num_games,
+        num_searches,
         max_depth,
         scores,
     })
@@ -516,7 +516,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
             ctx.num_playouts.fetch_add(1, Ordering::Relaxed);
             ctx.playout_ns.fetch_add(dur_ns, Ordering::Relaxed);
         }
-        ctx.num_games.fetch_add(1, Ordering::Relaxed);
+        ctx.num_searches.fetch_add(1, Ordering::Relaxed);
 
         // Update rollout node score, get parent node for backpropagation
         let mut curr_move_idx;

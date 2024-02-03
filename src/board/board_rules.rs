@@ -198,8 +198,12 @@ impl Board {
         // Apply map logic
         // Does not correspond to a rules stage
         self.update_board(game, food_buff, rng);
+
+        // Update cached board date
+        self.update_cache(game);
     }
 
+    #[inline(always)]
     fn move_snakes(&mut self, moves: u32, game: &Game) {
         // StageMovementStandard
         // Move snakes board_mat tails only, Compute location of move
@@ -270,6 +274,7 @@ impl Board {
         }
     }
 
+    #[inline(always)]
     fn update_health(&mut self, game: &Game) {
         for idx in 0..(self.num_snakes() as usize) {
             if !self.snakes[idx].alive() {
@@ -320,6 +325,7 @@ impl Board {
 
     // StageEliminationStandard
     // Move Head, Track Collisions
+    #[inline(always)]
     fn eliminate_snakes(&mut self, moves: u32, game: &Game) {
         for idx in 0..(self.num_snakes() as usize) {
             if !self.snakes[idx].alive() {
@@ -462,6 +468,7 @@ impl Board {
         }
     }
 
+    #[inline(always)]
     fn update_board(&mut self, game: &Game, food_buff: &mut Vec<Coord>, rng: &mut impl Rand) {
         let map = game.api.map;
         let rules = game.ruleset;
@@ -602,6 +609,7 @@ impl Board {
         }
     }
 
+    #[inline(always)]
     fn post_process(&mut self, game: &Game) {
         match game.ruleset {
             Rules::Constrictor => (),
@@ -623,4 +631,7 @@ impl Board {
             }
         }
     }
+
+    #[inline(always)]
+    pub fn update_cache(&mut self, _game: &Game) {}
 }

@@ -3,8 +3,8 @@ use crate::game::{Game, Map, Rules};
 use crate::util::{self};
 use crate::util::{Coord, Error, Move};
 
-use std::cmp::Ordering;
-use std::{cmp::min, cmp::min_by, collections::VecDeque, fmt, fmt::Write, str};
+use std::cmp::{min, min_by, Ordering};
+use std::{collections::VecDeque, fmt::Write, str};
 
 use deepsize::DeepSizeOf;
 use serde::{Deserialize, Serialize};
@@ -159,6 +159,8 @@ impl Board {
         if let Map::Royale = req.game.map {
             board.set_royale();
         }
+
+        board.update_cache(game);
 
         Ok(board)
     }

@@ -5,7 +5,7 @@ use clap::{Parser, ValueEnum};
 
 // Hyperparameters
 
-pub const DEFAULT_TEMP: f64 = 2.3;
+pub const DEFAULT_TEMP: f64 = 4.0;
 pub const DEFAULT_CONSTRICTOR_TEMP: f64 = 4.0;
 pub const DEFAULT_MIN_PLAYOUTS: i64 = 1;
 pub const DEFAULT_WIN_VAL: f64 = 1.0;
@@ -53,7 +53,7 @@ pub struct Config {
     pub max_snakes: i32,
 
     // Latencies are round trip time
-    #[clap(long, default_value_t = 30)]
+    #[clap(long, default_value_t = 50)]
     pub latency: i32,
 
     #[clap(long, default_value_t = false)]

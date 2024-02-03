@@ -20,6 +20,8 @@ pub fn basic_str_test() {
 
     board.set_at(Coord::new(1, 3), BoardSquare::Hazard);
 
+    board.update_cache(&game);
+
     let board_string = board.to_string();
     let parsed_board = Board::from_str_dims(board_string.as_str(), &game, 7, 7, 4).unwrap();
 
@@ -51,6 +53,8 @@ pub fn multiple_snake_str_test() {
     board.add_api_snake(&game, &snake_0).unwrap();
     board.add_api_snake(&game, &snake_1).unwrap();
 
+    board.update_cache(&game);
+
     let board_string = board.to_string();
     let parsed_board = Board::from_str_dims(board_string.as_str(), &game, 11, 11, 4).unwrap();
 
@@ -65,6 +69,8 @@ pub fn stacked_str_test() {
 
     let snake = test_snake(&[Coord::new(3, 5), Coord::new(3, 5), Coord::new(3, 5)], 100);
     board.add_api_snake(&game, &snake).unwrap();
+
+    board.update_cache(&game);
 
     let board_string = board.to_string();
     let parsed_board = Board::from_str_dims(board_string.as_str(), &game, 7, 7, 4).unwrap();
@@ -88,6 +94,8 @@ pub fn hazard_str_test() {
     board.set_at(Coord::new(4, 2), BoardSquare::Hazard);
 
     board.add_api_snake(&game, &snake).unwrap();
+
+    board.update_cache(&game);
 
     let board_string = board.to_string();
     let parsed_board = Board::from_str_dims(board_string.as_str(), &game, 11, 11, 4).unwrap();
@@ -373,18 +381,20 @@ pub fn tail_test() {
     let mut game = test_game();
 
     let board_tail = Board::from_str(BOARD_TAIL, &game).unwrap();
-    let board_hazard = Board::from_str(BOARD_TAIL_HAZARD, &game).unwrap();
+
+    game.api.ruleset.settings.hazard_damage_per_turn = 10;
+    let mut board_hazard = Board::from_str(BOARD_TAIL_HAZARD, &game).unwrap();
 
     assert!(board_tail.valid_move(&game, 0, Move::Up));
 
     // Stacked, shouldn't be able to move into tail
     assert!(!board_tail.valid_move(&game, 0, Move::Left));
 
-    game.api.ruleset.settings.hazard_damage_per_turn = 10;
     assert!(board_hazard.valid_move(&game, 0, Move::Up));
     assert!(!board_hazard.valid_move(&game, 0, Move::Left));
 
     game.api.ruleset.settings.hazard_damage_per_turn = 80;
+    board_hazard = Board::from_str(BOARD_TAIL_HAZARD, &game).unwrap();
     assert!(!board_hazard.valid_move(&game, 0, Move::Up));
     assert!(!board_hazard.valid_move(&game, 0, Move::Left));
 }

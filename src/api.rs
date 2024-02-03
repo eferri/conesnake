@@ -102,7 +102,7 @@ pub type Scores = [SearchScore; 4];
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SearchStats {
     pub total_nodes: i64,
-    pub num_games: i64,
+    pub num_searches: i64,
     pub num_playouts: i64,
     pub max_depth: i32,
     pub scores: Vec<Scores>,

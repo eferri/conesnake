@@ -1,4 +1,4 @@
-FROM ubuntu:mantic-20231128 as base
+FROM ubuntu:mantic-20240122 as base
 
 ARG UID=1000
 ARG GID=1000
@@ -31,39 +31,17 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     g++ \
     unzip \
     jq \
+    valgrind \
     python3 \
     python3-dev \
     python3-pip \
     python3-venv \
     python3-autopep8 \
     binutils-dev \
-    build-essential \
-    pkg-config \
-    flex \
-    bison \
-    libtraceevent-dev \
-    libelf-dev \
-    zlib1g-dev \
-    libdw-dev \
-    systemtap-sdt-dev \
-    libunwind-dev \
     libssl-dev \
-    liblzma-dev \
-    libnuma-dev \
-    libcap-dev \
-    libbabeltrace-dev \
-    libpfm4-dev \
-    libperl-dev \
-    libzstd-dev \
+    pkg-config \
+    linux-tools-generic \
     && rm -rf /var/lib/apt/lists/*
-
-# Build recent version of perf
-RUN curl -sSfL "https://github.com/torvalds/linux/archive/refs/tags/v6.6.zip" -o linux.zip \
-    && unzip -q linux.zip \
-    && cd linux-6.6/tools/perf \
-    && make prefix=/usr/local install-bin \
-    && cd ../../../ \
-    && rm -rf ./linux*
 
 # Install golang
 RUN curl -sSfL "https://go.dev/dl/go1.21.6.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
@@ -96,7 +74,7 @@ ENV PATH "/home/conesnake/.local/bin:/usr/local/go/bin:/home/conesnake/go/bin:/h
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2024-01-29
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2024-02-01
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \

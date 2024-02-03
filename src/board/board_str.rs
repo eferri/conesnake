@@ -2,6 +2,7 @@ use super::*;
 use crate::game::{Game, Map};
 
 use std::collections::HashMap;
+use std::fmt;
 
 impl Board {
     // Assumes snake is not just a head (first turn)
@@ -264,6 +265,8 @@ impl Board {
         if let Map::Royale = game.api.map {
             board.set_royale();
         }
+
+        board.update_cache(game);
 
         Ok(board)
     }
