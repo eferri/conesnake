@@ -25,7 +25,7 @@ pub struct RefMove<'de> {
 impl<'de> RefMove<'de> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut child = Command::new("battlesnake")
+        let mut child = Command::new("move")
             .arg("move")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

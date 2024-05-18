@@ -1,4 +1,5 @@
 .cargo/*
+.go
 !.cargo/config.toml
 target*
 build*

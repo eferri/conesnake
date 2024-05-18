@@ -35,11 +35,11 @@ pub struct SearchContext<R: Rand> {
 
 // Thread-local search resources, pre-allocated
 pub struct ThreadContext<R: Rand> {
+    pub board: Board,
+
     rng: R,
 
-    board: Board,
     food_buff: Vec<Coord>,
-
     play_scores: Vec<f64>,
     child_scores: Vec<SearchSort>,
 }
@@ -96,6 +96,19 @@ struct NodePtr {
     index: u32,
 }
 
+impl<R: Rand> ThreadContext<R> {
+    pub fn new(cfg: &Config) -> Self {
+        ThreadContext {
+            rng: R::new(),
+            board: Board::new(0, 0, cfg.max_width, cfg.max_height, cfg.max_snakes),
+            food_buff: Vec::with_capacity((cfg.max_width * cfg.max_height) as usize),
+
+            play_scores: Vec::with_capacity(cfg.max_snakes as usize),
+            child_scores: Vec::with_capacity(max_children(cfg.max_snakes)),
+        }
+    }
+}
+
 impl<R: Rand> SearchContext<R> {
     pub fn new(config: &Config) -> Self {
         let mut node_space = Vec::with_capacity(config.max_boards);
@@ -104,16 +117,7 @@ impl<R: Rand> SearchContext<R> {
         });
 
         let mut thread_state = Vec::with_capacity(config.num_threads);
-        thread_state.resize_with(config.num_threads, || {
-            Mutex::new(ThreadContext {
-                rng: R::new(),
-                board: Board::new(0, 0, config.max_width, config.max_height, config.max_snakes),
-                food_buff: Vec::with_capacity((config.max_width * config.max_height) as usize),
-
-                play_scores: Vec::with_capacity(config.max_snakes as usize),
-                child_scores: Vec::with_capacity(max_children(config.max_snakes)),
-            })
-        });
+        thread_state.resize_with(config.num_threads, || Mutex::new(ThreadContext::new(config)));
 
         SearchContext {
             config: config.clone(),
@@ -371,6 +375,7 @@ pub fn mcts<R: Rand>(
     }
 
     ctx.search_timeout.store(true, Ordering::Release);
+
     ctx.done_barrier.wait();
 
     let root_guard = ctx.node_space[0].state.read().unwrap();
@@ -502,11 +507,9 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
             }
         }
 
-        scratch_guard.play_scores.clear();
-
         // Perform rollout
         let start_time = Instant::now();
-        let is_terminal = {
+        let (is_terminal, _) = {
             let _playout_guard = playout_guard;
             playout_game(&config, &mut scratch_guard, game)
         };
@@ -582,9 +585,12 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
     ctx.done_barrier.wait();
 }
 
-fn playout_game<R: Rand>(cfg: &Config, state: &mut ThreadContext<R>, game: &Game) -> bool {
+pub fn playout_game<R: Rand>(cfg: &Config, state: &mut ThreadContext<R>, game: &Game) -> (bool, i32) {
     let mut terminal = true;
     let mut playout_moves: u32 = 0;
+    let mut num_moves = 0;
+
+    state.play_scores.clear();
 
     while !game.over(&state.board) {
         terminal = false;
@@ -594,23 +600,27 @@ fn playout_game<R: Rand>(cfg: &Config, state: &mut ThreadContext<R>, game: &Game
                 continue;
             }
 
-            playout_moves = Move::set_move(
-                playout_moves,
-                s as u32,
-                state.board.gen_move(cfg, game, s, &mut state.rng),
-            );
+            let mv = if cfg.strong_playout {
+                state.board.gen_strong_move(game, s, &mut state.rng)
+            } else {
+                state.board.gen_move(game, s, &mut state.rng)
+            };
+
+            playout_moves = Move::set_move(playout_moves, s as u32, mv);
         }
 
         state
             .board
             .gen_board(playout_moves, game, &mut state.food_buff, &mut state.rng);
+
+        num_moves += 1;
     }
 
     for snake_idx in 0..state.board.num_snakes() as usize {
         let score = game.score(&state.board, cfg, snake_idx);
         state.play_scores.push(score);
     }
-    terminal
+    (terminal, num_moves)
 }
 
 fn expand_node<R: Rand>(

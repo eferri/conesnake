@@ -1,6 +1,7 @@
 {
     "search.exclude": {
         ".cargo": true,
+        ".go": true,
         "target*": true,
         "submodules/board": true,
         "submodules/snork": true,

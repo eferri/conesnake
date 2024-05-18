@@ -1,6 +1,3 @@
-[submodule "submodules/rules"]
-	path = submodules/rules
-	url = git@github.com:eferri/rules.git
 [submodule "submodules/board"]
 	path = submodules/board/board
 	url = git@github.com:BattlesnakeOfficial/board.git

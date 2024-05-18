@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   test:
     machine:
-      image: "ubuntu-2204:2023.10.1"
+      image: "ubuntu-2204:2024.04.4"
       docker_layer_caching: true
     resource_class: medium
     steps:
@@ -23,20 +23,21 @@ jobs:
       - restore_cache:
           name: restore cache
           keys:
-            - cache-{{ checksum "Cargo.lock" }}
+            - cache-{{ checksum "Cargo.lock" }}-{{ checksum "rules/go.sum" }}
             - cache-
       - run:
           name: compile
-          command: docker compose run --rm snake cargo build --tests
+          command: docker compose run --rm snake cargo build --tests && make move
       - run:
           name: lint
           command: make lint
       - save_cache:
           name: save cache
-          key: cache-{{ checksum "Cargo.lock" }}
+          key: cache-{{ checksum "Cargo.lock" }}-{{ checksum "rules/go.sum" }}
           paths:
             - ./target-snake
             - ./.cargo
+            - ./.go
       - run:
           name: test
           command: make test

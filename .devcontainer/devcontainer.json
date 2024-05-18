@@ -17,7 +17,7 @@
                 "redhat.vscode-yaml",
                 "ms-kubernetes-tools.vscode-kubernetes-tools",
                 "shardulm94.trailing-spaces",
-                "bungcip.better-toml",
+                "tamasfe.even-better-toml",
                 "vadimcn.vscode-lldb",
                 "streetsidesoftware.code-spell-checker"
             ]

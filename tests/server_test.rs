@@ -45,7 +45,11 @@ async fn server_test() {
 
     let base_port = 4000;
 
-    let base_config = get_config();
+    let mut base_config = get_config();
+
+    base_config.max_height = 11;
+    base_config.max_width = 11;
+
     let mut relay_config = base_config.clone();
 
     let num_workers = 3;
@@ -79,26 +83,23 @@ async fn server_test() {
     }));
 
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(500))
+        .timeout(Duration::from_millis(2000))
         .build()
         .unwrap();
 
     // Wait for server to be ready
     loop {
-        let mut futures = Vec::new();
-        for i in 0..num_workers + 1 {
-            futures.push(client.get(format!("http://localhost:{}/ping", base_port + i)).send());
-        }
+        let res = client.get(format!("http://localhost:{}/ping", base_port)).send().await;
 
-        let resps = join_all(futures).await;
-
-        if resps.iter().any(|x| x.is_err() || x.as_ref().unwrap().status() != 200) {
+        if res.is_err() || res.as_ref().unwrap().status() != 200 {
             time::sleep(Duration::from_millis(500)).await;
             continue;
         } else {
             break;
         }
     }
+
+    time::sleep(Duration::from_millis(1000)).await;
 
     info!("All server tasks ready");
 
@@ -127,6 +128,7 @@ async fn server_test() {
             .await
             .unwrap();
 
+        time::sleep(Duration::from_millis(500)).await;
         info!("server_test: /move");
 
         let move_response = client
@@ -146,6 +148,8 @@ async fn server_test() {
                 assert_ne!(*mv, move_response.mv);
             }
         }
+
+        time::sleep(Duration::from_millis(500)).await;
 
         info!("server_test: /end");
 

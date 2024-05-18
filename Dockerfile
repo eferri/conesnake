@@ -1,4 +1,4 @@
-FROM ubuntu:mantic-20240122 as base
+FROM ubuntu:noble-20240429 as base
 
 ARG UID=1000
 ARG GID=1000
@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 FROM base as dev
 
-# Debugger, other development tools, perf build dependencies
+# Debugger, other development tools
 RUN apt-get update && apt-get install --no-install-recommends -y \
     curl \
     ssh \
@@ -44,11 +44,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install golang
-RUN curl -sSfL "https://go.dev/dl/go1.21.6.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
+RUN curl -sSfL "https://go.dev/dl/go1.22.3.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
     && tar -C /usr/local -xf go.tar.gz
 
 # Install helm
-RUN curl -sSfL "https://get.helm.sh/helm-v3.13.3-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
+RUN curl -sSfL "https://get.helm.sh/helm-v3.15.0-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
     && tar -xf helm.tar.gz \
     && cp ./linux-${DOCKER_ARCH}/helm . \
     && chmod +x helm \
@@ -56,12 +56,12 @@ RUN curl -sSfL "https://get.helm.sh/helm-v3.13.3-linux-${DOCKER_ARCH}.tar.gz" -o
     && rm -rf ./*
 
 # Install kubectl
-RUN curl -sSfL "https://dl.k8s.io/release/v1.29.0/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
+RUN curl -sSfL "https://dl.k8s.io/release/v1.30.1/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
     && chmod +x ./kubectl \
     && cp kubectl /usr/local/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.7.0/terraform_1.7.0_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.8.3/terraform_1.8.3_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /usr/local/bin \
@@ -70,45 +70,29 @@ RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.7.0/terraform_1.7.0_l
 # Install rust
 USER conesnake
 
-ENV PATH "/home/conesnake/.local/bin:/usr/local/go/bin:/home/conesnake/go/bin:/home/conesnake/.cargo/bin:/home/conesnake/.venv/bin:${PATH}"
+ENV PATH "/usr/local/go/bin:/app/.go/bin:/home/conesnake/.cargo/bin:/home/conesnake/.venv/bin:/usr/lib/linux-tools-6.8.0-31:${PATH}"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2024-02-01
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2024-05-16
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \
     && cargo install cargo-show-asm
 
-# Go development tools
-RUN go install github.com/ramya-rao-a/go-outline@latest \
-    && go install github.com/cweill/gotests/gotests@latest \
-    && go install github.com/fatih/gomodifytags@latest \
-    && go install github.com/josharian/impl@latest \
-    && go install github.com/haya14busa/goplay/cmd/goplay@latest \
-    && go install github.com/go-delve/delve/cmd/dlv@latest \
-    && go install honnef.co/go/tools/cmd/staticcheck@latest \
-    && go install golang.org/x/tools/gopls@latest
-
 # Python development tools
 RUN python3 -m venv /home/conesnake/.venv \
     && python3 -m pip install \
     wg-meshconf==2.5.1 \
-    scikit-optimize[plots]==0.9.0 \
-    numpy==1.26.2 \
-    aiohttp==3.9.1 \
-    matplotlib==3.8.2
+    scikit-optimize[plots]==0.10.1 \
+    numpy==1.26.4 \
+    aiohttp==3.9.5 \
+    matplotlib==3.9.0 \
+    && rm -rf ~/.cache/pip
 
-# Cache rules dependencies
-COPY submodules/rules/go.mod submodules/rules/go.sum ./
-RUN go mod download && rm -f go.mod go.sum
 
-# Build, install rules test program
-COPY --chown=conesnake submodules/rules/ .
-COPY --chown=conesnake scripts/entrypoint_rules.sh /home/conesnake/go/bin
-RUN go build -o battlesnake ./cli/battlesnake/main.go \
-    && mv battlesnake /home/conesnake/go/bin \
-    && rm -rf ./*
+ENV GOPATH  /app/.go
+ENV GOCACHE /app/.go/cache
 
 ENV CARGO_TARGET_DIR target-snake
 ENV CARGO_HOME .cargo

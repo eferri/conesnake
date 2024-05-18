@@ -1,6 +1,5 @@
 use super::*;
 
-use crate::config::Config;
 use crate::game::{Game, Map, ARCADE_FOOD_COORDS};
 use crate::rand::Rand;
 
@@ -9,7 +8,32 @@ use std::cmp::max;
 impl Board {
     // Move heuristics applied to each move in random playout
 
-    pub fn gen_move(&self, cfg: &Config, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
+    pub fn gen_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
+        let mut best_move = None;
+
+        let mut valid_moves = [Move::Left; 4];
+        let mut num_valid = 0;
+
+        for mv_idx in 0..4 {
+            let mv = Move::from_idx(mv_idx);
+            let is_valid = self.valid_move(game, snake_idx, mv);
+            if is_valid {
+                valid_moves[num_valid as usize] = mv;
+                num_valid += 1;
+            }
+        }
+
+        if num_valid == 1 {
+            best_move = Some(valid_moves[0]);
+        } else if num_valid > 1 {
+            let mv_idx = rng.range(0, num_valid - 1);
+            best_move = Some(valid_moves[mv_idx as usize]);
+        }
+
+        best_move.unwrap_or(Move::Left)
+    }
+
+    pub fn gen_strong_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
         let mut best_move = None;
 
         let mut valid_moves = [Move::Left; 4];
@@ -30,47 +54,38 @@ impl Board {
             if is_valid {
                 valid_moves[num_valid as usize] = mv;
                 num_valid += 1;
-                if cfg.strong_playout {
-                    match self.head_on_col(game, snake_idx, mv) {
-                        HeadOnCol::PossibleElimination => {
-                            good_moves[num_good as usize] = mv;
-                            num_good += 1;
-                        }
-                        HeadOnCol::None => {
-                            neutral_moves[num_neutral as usize] = mv;
-                            num_neutral += 1;
-                        }
-                        HeadOnCol::PossibleCollision => {
-                            bad_moves[num_bad as usize] = mv;
-                            num_bad += 1;
-                        }
+                match self.head_on_col(game, snake_idx, mv) {
+                    HeadOnCol::PossibleElimination => {
+                        good_moves[num_good as usize] = mv;
+                        num_good += 1;
+                    }
+                    HeadOnCol::None => {
+                        neutral_moves[num_neutral as usize] = mv;
+                        num_neutral += 1;
+                    }
+                    HeadOnCol::PossibleCollision => {
+                        bad_moves[num_bad as usize] = mv;
+                        num_bad += 1;
                     }
                 }
             }
         }
 
-        if cfg.strong_playout {
-            if num_good == 1 {
-                best_move = Some(good_moves[0])
-            } else if num_good > 1 {
-                let mv_idx = rng.range(0, num_good - 1);
-                best_move = Some(good_moves[mv_idx as usize]);
-            } else if num_neutral == 1 {
-                best_move = Some(neutral_moves[0]);
-            } else if num_neutral > 1 {
-                let mv_idx = rng.range(0, num_neutral - 1);
-                best_move = Some(neutral_moves[mv_idx as usize]);
-            } else if num_bad == 1 {
-                best_move = Some(bad_moves[0]);
-            } else if num_bad > 1 {
-                let mv_idx = rng.range(0, num_bad - 1);
-                best_move = Some(bad_moves[mv_idx as usize]);
-            }
-        } else if num_valid == 1 {
-            best_move = Some(valid_moves[0]);
-        } else if num_valid > 1 {
-            let mv_idx = rng.range(0, num_valid - 1);
-            best_move = Some(valid_moves[mv_idx as usize]);
+        if num_good == 1 {
+            best_move = Some(good_moves[0])
+        } else if num_good > 1 {
+            let mv_idx = rng.range(0, num_good - 1);
+            best_move = Some(good_moves[mv_idx as usize]);
+        } else if num_neutral == 1 {
+            best_move = Some(neutral_moves[0]);
+        } else if num_neutral > 1 {
+            let mv_idx = rng.range(0, num_neutral - 1);
+            best_move = Some(neutral_moves[mv_idx as usize]);
+        } else if num_bad == 1 {
+            best_move = Some(bad_moves[0]);
+        } else if num_bad > 1 {
+            let mv_idx = rng.range(0, num_bad - 1);
+            best_move = Some(bad_moves[mv_idx as usize]);
         }
 
         best_move.unwrap_or(Move::Left)

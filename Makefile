@@ -61,7 +61,9 @@ clean:
 
 .PHONY: veryclean
 veryclean: clean
+	( chmod 700 -R .go || true ) && \
 	rm -rf target* build* \
+		.go \
 		.cargo/registry \
 		.cargo/.package-cache \
 		.cargo/.package-cache-mutate \
@@ -74,23 +76,31 @@ lint:
 	docker compose run --rm snake cargo clippy
 
 .PHONY: test
-test:
+test: move
 	docker compose run --rm snake cargo test -- \
 		--nocapture \
 		--color always
 
 .PHONY: rel-test
-rel-test:
+rel-test: move
 	docker compose run --rm snake cargo test \
 		--release -- \
 		--nocapture \
 		--color always \
 		--test-threads=1
 
+.PHONY: move
+move .go/bin/move:
+	docker compose run --rm snake bash -c ' \
+		cd rules && go install'
+
 # Profiling
 
 .PHONY: profile
 profile: build-profile record report
+
+.PHONY: profile-mem
+profile-mem: build-profile record-mem report
 
 .PHONY: build-profile
 build-profile:
@@ -104,9 +114,10 @@ build-profile:
 record:
 	docker compose run --rm snake \
 		perf record \
+			--call-graph dwarf \
 			-e cycles \
 			-F 1000 \
-			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/performance
+			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/benchmark
 
 .PHONY: report
 report:
@@ -116,22 +127,40 @@ report:
 			--stdio-color \
 			--percent-limit 3 \
 			--show-nr-samples \
-			--show-cpu-utilization
+			--show-cpu-utilization \
+			--call-graph srcline
+
+.PHONY: record-mem
+record-mem:
+	docker compose run --rm snake \
+		perf record \
+			--call-graph dwarf \
+			-e cache-misses \
+			-F 1000 \
+			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/benchmark
 
 .PHONY: stat
-stat: build-profile
-	docker compose run --rm snake \
-		perf stat \
-			-e task-clock,cycles,instructions,cache-references,cache-misses \
-			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/performance
+stat:
+	docker compose run --rm snake bash -c '\
+		cargo build --release \
+		&& perf stat \
+			-e task-clock,cycles,instructions,branches,branch-misses \
+			-e cache-references,cache-misses \
+			./target-snake/release/benchmark'
 
 # Performance
+
+.PHONY: performance
+performance:
+	docker compose run --rm snake bash -c ' \
+		cargo build --release \
+		&& ./target-snake/release/performance --num-threads 8'
 
 .PHONY: bench
 bench:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& ./target-snake/release/performance --num-threads 8'
+		&& ./target-snake/release/benchmark'
 
 .PHONY: compare
 compare:

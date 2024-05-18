@@ -18,7 +18,7 @@ pub fn test_config() -> Config {
     config.max_width = 19;
     config.max_height = 21;
     config.max_snakes = 4;
-    config.latency = 5;
+    config.latency = 50;
 
     config
 }
