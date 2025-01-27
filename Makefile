@@ -1,7 +1,3 @@
-# Docker
-GCP_REGISTRY_SA_EMAIL := $(shell gcloud iam service-accounts list --filter=displayName="conesnake_registry_service_account" --format="get(email)" 2>/dev/null)
-GCP_PROJECT_NAME := $(shell gcloud config get-value project)
-
 .PHONY: shell
 shell:
 	docker compose run --rm \
@@ -14,10 +10,10 @@ shell:
 root-shell:
 	docker compose run --user root --rm snake bash
 
-# TODO: don't hardcode region
 .PHONY: prod-shell
 prod-shell:
-	docker run --rm -it --entrypoint bash us-west1-docker.pkg.dev/$(GCP_PROJECT_NAME)/conesnake/conesnake:latest-app
+	docker run --rm -it --entrypoint bash \
+		us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app
 
 .PHONY: gcloud-config-docker
 gcloud-config-docker:
@@ -32,7 +28,8 @@ regcred-secret:
 	&& kubectl delete secret --namespace conesnake --ignore-not-found regcred \
 	&& kubectl --namespace conesnake create secret docker-registry regcred \
 		--docker-server=https://us-west1-docker.pkg.dev \
-		--docker-email=$(GCP_REGISTRY_SA_EMAIL) \
+		--docker-email=$(shell gcloud iam service-accounts list \
+			--filter=displayName="conesnake_registry_service_account" --format="get(email)" 2>/dev/null) \ 
 		--docker-username=_json_key \
 		--docker-password='\''$(shell cat ./service_key.json)'\'' \
 	'
@@ -42,9 +39,9 @@ prod-build:
 	docker compose run --rm snake cargo build --release
 	DOCKER_BUILDKIT=1 docker build \
 		--target prod \
-		--tag us-west1-docker.pkg.dev/$(GCP_PROJECT_NAME)/conesnake/conesnake:latest-app .
+		--tag us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app .
 
-	docker push us-west1-docker.pkg.dev/$(GCP_PROJECT_NAME)/conesnake/conesnake:latest-app
+	docker push us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app
 
 # Misc
 
@@ -174,7 +171,7 @@ optimize:
 		cargo build --release \
 		&& python3 -u ./scripts/play_games.py --mode optimize 2>&1 | tee optimize.log'
 
-ASM_FUNC ?= "conesnake::board::board_rules::<impl conesnake::board::Board>::valid_move"
+ASM_FUNC ?= "conesnake::search::NodeState::duct_scores_simd"
 
 .PHONY: asm
 asm:

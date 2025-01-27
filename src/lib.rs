@@ -1,3 +1,5 @@
+#![feature(portable_simd)]
+
 pub mod api;
 pub mod board;
 pub mod config;

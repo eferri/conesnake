@@ -43,6 +43,9 @@ fn main() {
 
     info!("allocating...");
 
+    #[cfg(feature = "simd")]
+    info!("using simd");
+
     let game = test_game();
     let start_board = Board::from_str(BOARD, &game).unwrap();
 
@@ -78,30 +81,31 @@ fn main() {
         info!("Benchmark was non-deterministic");
     }
 
-    let min = run_times[0] as f64 / 1000000000.0;
-    let max = run_times[num_rep - 1] as f64 / 1000000000.0;
-    let med = if num_rep % 2 == 1 {
-        run_times[(num_rep + 1) / 2 - 1] as f64 / 1000000000.0
+    let min_duration = run_times[0] as f64 / 1.0e9;
+    let max_duration = run_times[num_rep - 1] as f64 / 1.0e9;
+
+    let med_duration = if num_rep % 2 == 1 {
+        run_times[(num_rep + 1) / 2 - 1] as f64 / 1.0e9
     } else {
-        run_times[num_rep / 2 - 1] as f64 / 1000000000.0
+        run_times[num_rep / 2 - 1] as f64 / 1.0e9
     };
 
-    let min_games_hz = num_games as f64 / min;
-    let max_games_hz = num_games as f64 / max;
-    let med_games_hz = num_games as f64 / med;
+    let min_games_hz = num_games as f64 / max_duration;
+    let max_games_hz = num_games as f64 / min_duration;
+    let med_games_hz = num_games as f64 / med_duration;
 
-    let min_turns_hz = turns[0] as f64 / min;
-    let max_turns_hz = turns[0] as f64 / max;
-    let med_turns_hz = turns[0] as f64 / med;
+    let min_turns_hz = turns[0] as f64 / max_duration;
+    let max_turns_hz = turns[0] as f64 / min_duration;
+    let med_turns_hz = turns[0] as f64 / med_duration;
 
     info!("");
     info!("Num games: {}", num_games);
     info!("Num turns: {}", turns[0]);
     info!("Avg Turns/Game: {:.2}", turns[0] as f64 / num_games as f64);
     info!("");
-    info!("Min duration: {:.6}", min);
-    info!("Max duration: {:.6}", max);
-    info!("Med duration: {:.6}", med);
+    info!("Min duration: {:.6}s", min_duration);
+    info!("Max duration: {:.6}s", max_duration);
+    info!("Med duration: {:.6}s", med_duration);
     info!("");
     info!("Min games per second: {:.4}", min_games_hz);
     info!("Max games per second: {:.4}", max_games_hz);

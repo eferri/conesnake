@@ -8,8 +8,9 @@ use crate::util::{Coord, Error, Move};
 
 use deepsize::DeepSizeOf;
 use log::{error, info, warn};
+
 #[cfg(feature = "simd")]
-use packed_simd::{f32x4, m32x4};
+use std::simd::{f32x4, mask32x4, num::SimdFloat, StdFloat};
 
 use std::sync::{atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering, Arc, Barrier};
 use std::sync::{Mutex, RwLock};
@@ -227,49 +228,56 @@ impl NodeState {
 
     #[cfg(feature = "simd")]
     pub fn duct_scores_simd(&self, cfg: &Config, mvs: u32) -> f32x4 {
-        let mut op_mask = m32x4::splat(false);
-        let mut variance_sums: [f32; 4] = Default::default();
-        let mut games: [f32; 4] = Default::default();
-        let mut scores: [f32; 4] = Default::default();
-        let mut results: [f32; 4] = Default::default();
+        let mut op_mask = mask32x4::splat(false);
+
+        let mut variance_sums_arr: [f32; 4] = Default::default();
+        let mut games_arr: [f32; 4] = Default::default();
+        let mut scores_arr: [f32; 4] = Default::default();
+        let mut results_arr: [f32; 4] = Default::default();
 
         for snake_idx in 0..self.board.num_snakes() as usize {
             let mv = Move::extract(mvs, snake_idx as u32);
             let mcts_scores = &self.cache[snake_idx][mv.idx()];
 
             if mcts_scores.games < cfg.min_playouts || (self.games as i64) < cfg.min_playouts {
-                results[snake_idx] = f32::MAX
+                results_arr[snake_idx] = f32::MAX
             } else {
-                op_mask = op_mask.replace(snake_idx, true);
-                variance_sums[snake_idx] = mcts_scores.variance_sum as f32;
-                games[snake_idx] = mcts_scores.games as f32;
-                scores[snake_idx] = mcts_scores.score as f32;
+                op_mask.set(snake_idx, true);
+                variance_sums_arr[snake_idx] = mcts_scores.variance_sum as f32;
+                games_arr[snake_idx] = mcts_scores.games as f32;
+                scores_arr[snake_idx] = mcts_scores.score as f32;
             }
         }
 
-        let results = f32x4::from_slice_unaligned(&results);
+        let results = f32x4::from_array(results_arr);
 
-        if op_mask.none() {
+        if !op_mask.any() {
             return results;
         }
 
-        let variance_sums = f32x4::from_slice_unaligned(&variance_sums);
-        let games = f32x4::from_slice_unaligned(&games);
-        let scores = f32x4::from_slice_unaligned(&scores);
+        let variance_sums = f32x4::from_array(variance_sums_arr);
+        let games = f32x4::from_array(games_arr);
+        let scores = f32x4::from_array(scores_arr);
 
         let ln_parent_games = (self.games as f32).ln();
 
-        let variance_mask = op_mask & games.gt(f32x4::splat(1.0));
+        let variance_mask = op_mask & games.gt(&f32x4::splat(1.0));
 
-        let variances = variance_mask.select(variance_sums / (games - 1.0), f32x4::splat(0.0));
-        let var_ucb = op_mask.select(variances + (2.0 * ln_parent_games / games).sqrt(), f32x4::splat(0.0));
-
-        let uct_score = op_mask.select(
-            ((f32x4::splat(0.25).min(var_ucb) * ln_parent_games) / games).sqrt(),
+        let variances = variance_mask.select(variance_sums / (games - f32x4::splat(1.0)), f32x4::splat(0.0));
+        let var_ucb = op_mask.select(
+            variances + (f32x4::splat(2.0 * ln_parent_games) / games).sqrt(),
             f32x4::splat(0.0),
         );
 
-        op_mask.select((scores / games) + cfg.temperature as f32 * uct_score, results)
+        let uct_score = op_mask.select(
+            ((f32x4::splat(0.25).simd_min(var_ucb) * f32x4::splat(ln_parent_games)) / games).sqrt(),
+            f32x4::splat(0.0),
+        );
+
+        op_mask.select(
+            (scores / games) + f32x4::splat(cfg.temperature as f32) * uct_score,
+            results,
+        )
     }
 }
 
@@ -481,7 +489,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
                     {
                         let duct_scores = state_guard.duct_scores_simd(&config, child_ptr.moves);
 
-                        node_totals.total_score += duct_scores.sum() as f64;
+                        node_totals.total_score += duct_scores.reduce_sum() as f64;
                     }
 
                     scratch_guard.child_scores.push(node_totals);

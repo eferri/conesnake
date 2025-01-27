@@ -1,4 +1,4 @@
-FROM rust:1.75.0-bookworm
+FROM rust:1.84.0-bookworm
 
 ARG UID=1000
 ARG GID=1000

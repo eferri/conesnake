@@ -1,8 +1,9 @@
-FROM ubuntu:noble-20240429 as base
+FROM ubuntu:oracular-20241120 AS base
 
 ARG UID=1000
 ARG GID=1000
 ARG DOCKER_ARCH=amd64
+ARG KERNEL_VER=6.11.0-13-generic
 
 WORKDIR /app
 
@@ -15,7 +16,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base as dev
+# ---------------------------------
+
+FROM base AS dev
 
 # Debugger, other development tools
 RUN apt-get update && apt-get install --no-install-recommends -y \
@@ -40,15 +43,15 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     binutils-dev \
     libssl-dev \
     pkg-config \
-    linux-tools-generic \
+    linux-tools-${KERNEL_VER} \
     && rm -rf /var/lib/apt/lists/*
 
 # Install golang
-RUN curl -sSfL "https://go.dev/dl/go1.22.3.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
+RUN curl -sSfL "https://go.dev/dl/go1.23.5.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
     && tar -C /usr/local -xf go.tar.gz
 
 # Install helm
-RUN curl -sSfL "https://get.helm.sh/helm-v3.15.0-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
+RUN curl -sSfL "https://get.helm.sh/helm-v3.17.0-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
     && tar -xf helm.tar.gz \
     && cp ./linux-${DOCKER_ARCH}/helm . \
     && chmod +x helm \
@@ -56,12 +59,12 @@ RUN curl -sSfL "https://get.helm.sh/helm-v3.15.0-linux-${DOCKER_ARCH}.tar.gz" -o
     && rm -rf ./*
 
 # Install kubectl
-RUN curl -sSfL "https://dl.k8s.io/release/v1.30.1/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
+RUN curl -sSfL "https://dl.k8s.io/release/v1.32.1/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
     && chmod +x ./kubectl \
     && cp kubectl /usr/local/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.8.3/terraform_1.8.3_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.10.5/terraform_1.10.5_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /usr/local/bin \
@@ -70,11 +73,11 @@ RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.8.3/terraform_1.8.3_l
 # Install rust
 USER conesnake
 
-ENV PATH "/usr/local/go/bin:/app/.go/bin:/home/conesnake/.cargo/bin:/home/conesnake/.venv/bin:/usr/lib/linux-tools-6.8.0-31:${PATH}"
+ENV PATH "/usr/local/go/bin:/app/.go/bin:/home/conesnake/.cargo/bin:/home/conesnake/.venv/bin:${PATH}"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2024-05-16
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-01-26
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \
@@ -90,15 +93,15 @@ RUN python3 -m venv /home/conesnake/.venv \
     matplotlib==3.9.0 \
     && rm -rf ~/.cache/pip
 
-
 ENV GOPATH  /app/.go
 ENV GOCACHE /app/.go/cache
 
 ENV CARGO_TARGET_DIR target-snake
 ENV CARGO_HOME .cargo
 
+# ---------------------------------
 
-FROM base as prod
+FROM base AS prod
 
 COPY --chown=conesnake target-snake/release/conesnake .
 

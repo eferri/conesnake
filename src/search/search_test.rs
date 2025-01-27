@@ -10,6 +10,9 @@ use crate::util::Move;
 use approx::assert_relative_eq;
 use pretty_assertions::assert_eq;
 
+#[cfg(feature = "simd")]
+use std::simd::num::SimdFloat;
+
 use std::sync::{atomic::Ordering, Arc};
 use std::time::Instant;
 
@@ -386,7 +389,7 @@ fn arcade_maze_search_test() {
                     duct_sum += root_guard.duct_score(&ctx.config, snake_idx, mv)
                 }
 
-                let duct_sum_simd = root_guard.duct_scores_simd(&ctx.config, child_ptr.moves).sum();
+                let duct_sum_simd = root_guard.duct_scores_simd(&ctx.config, child_ptr.moves).reduce_sum();
 
                 assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-5);
             }

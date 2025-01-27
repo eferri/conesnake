@@ -3,8 +3,8 @@ module move
 go 1.22.3
 
 require (
-	github.com/BattlesnakeOfficial/rules v1.2.3
-	github.com/spf13/cobra v1.8.0
+	github.com/BattlesnakeOfficial/rules v1.2.4-0.20240120071151-13cdcc771a90
+	github.com/spf13/cobra v1.8.1
 )
 
 require (
