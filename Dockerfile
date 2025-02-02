@@ -21,7 +21,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 FROM base AS dev
 
 # Debugger, other development tools
-RUN apt-get update && apt-get install --no-install-recommends -y \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install --no-install-recommends -y \
     curl \
     ssh \
     ca-certificates \
