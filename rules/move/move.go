@@ -7,7 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
-	
+
 	"github.com/BattlesnakeOfficial/rules"
 	"github.com/BattlesnakeOfficial/rules/client"
 	"github.com/BattlesnakeOfficial/rules/maps"
@@ -18,7 +18,6 @@ type MoveState struct {
 	Request client.SnakeRequest `json:"request"`
 	Moves   []string            `json:"moves"`
 }
-
 
 func main() {
 	var moveCmd = &cobra.Command{
@@ -35,7 +34,6 @@ func main() {
 		os.Exit(1)
 	}
 }
-
 
 func move() {
 	decoder := json.NewDecoder(os.Stdin)

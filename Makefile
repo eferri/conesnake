@@ -1,3 +1,11 @@
+# -------------------- local development --------------------
+
+# Docker
+
+.PHONY: docker-build
+docker-build:
+	docker compose build
+
 .PHONY: shell
 shell:
 	docker compose run --rm \
@@ -10,62 +18,6 @@ shell:
 root-shell:
 	docker compose run --user root --rm snake bash
 
-.PHONY: prod-shell
-prod-shell:
-	docker run --rm -it --entrypoint bash \
-		us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app
-
-.PHONY: gcloud-config-docker
-gcloud-config-docker:
-	gcloud auth configure-docker us-west1-docker.pkg.dev
-
-.PHONY: regcred-secret
-regcred-secret:
-	docker compose run --rm \
-		-v "$(HOME)/.kube:/home/conesnake/.kube" \
-		snake bash -c '\
-	kubectl create namespace conesnake || true \
-	&& kubectl delete secret --namespace conesnake --ignore-not-found regcred \
-	&& kubectl --namespace conesnake create secret docker-registry regcred \
-		--docker-server=https://us-west1-docker.pkg.dev \
-		--docker-email=$(shell gcloud iam service-accounts list \
-			--filter=displayName="conesnake_registry_service_account" --format="get(email)" 2>/dev/null) \ 
-		--docker-username=_json_key \
-		--docker-password='\''$(shell cat ./service_key.json)'\'' \
-	'
-
-.PHONY: prod-build
-prod-build:
-	docker compose run --rm snake cargo build --release
-	DOCKER_BUILDKIT=1 docker build \
-		--target prod \
-		--tag us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app .
-
-	docker push us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app
-
-# Misc
-
-.PHONY: clean
-clean:
-	rm -f \
-		*.log \
-		.k8s/manifest.yaml \
-		*.perf \
-		perf.data \
-		perf.data.* \
-		*.png \
-		*.out
-
-.PHONY: veryclean
-veryclean: clean
-	( chmod 700 -R .go || true ) && \
-	rm -rf target* build* \
-		.go \
-		.cargo/registry \
-		.cargo/.package-cache \
-		.cargo/.package-cache-mutate \
-		terraform/.terraform
-
 # Cargo
 
 .PHONY: lint
@@ -73,23 +25,23 @@ lint:
 	docker compose run --rm snake cargo clippy
 
 .PHONY: test
-test: move
+test: rules
 	docker compose run --rm snake cargo test -- \
 		--nocapture \
 		--color always
 
 .PHONY: rel-test
-rel-test: move
+rel-test: rules
 	docker compose run --rm snake cargo test \
 		--release -- \
 		--nocapture \
 		--color always \
 		--test-threads=1
 
-.PHONY: move
-move .go/bin/move:
+.PHONY: rules
+rules:
 	docker compose run --rm snake bash -c ' \
-		cd rules && go install'
+		cd rules && go install ./move ./battlesnake'
 
 # Profiling
 
@@ -177,6 +129,66 @@ ASM_FUNC ?= "conesnake::search::NodeState::duct_scores_simd"
 asm:
 	docker compose run --rm snake bash -ic '\
 		cargo asm --lib --rust --color $(ASM_FUNC) | less -R'
+
+# Misc
+
+.PHONY: clean
+clean:
+	rm -f \
+		*.log \
+		.k8s/manifest.yaml \
+		*.perf \
+		perf.data \
+		perf.data.* \
+		*.png \
+		*.out
+
+.PHONY: veryclean
+veryclean: clean
+	( chmod 700 -R .go || true ) && \
+	rm -rf target* build* \
+		.go \
+		.cargo/registry \
+		.cargo/.package-cache \
+		.cargo/.package-cache-mutate \
+		terraform/.terraform
+
+# -------------------- production --------------------
+
+# docker
+
+.PHONY: prod-shell
+prod-shell:
+	docker run --rm -it --entrypoint bash \
+		us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app
+
+.PHONY: gcloud-config-docker
+gcloud-config-docker:
+	gcloud auth configure-docker us-west1-docker.pkg.dev
+
+.PHONY: regcred-secret
+regcred-secret:
+	docker compose run --rm \
+		-v "$(HOME)/.kube:/home/conesnake/.kube" \
+		snake bash -c '\
+	kubectl create namespace conesnake || true \
+	&& kubectl delete secret --namespace conesnake --ignore-not-found regcred \
+	&& kubectl --namespace conesnake create secret docker-registry regcred \
+		--docker-server=https://us-west1-docker.pkg.dev \
+		--docker-email=$(shell gcloud iam service-accounts list \
+			--filter=displayName="conesnake_registry_service_account" --format="get(email)" 2>/dev/null) \ 
+		--docker-username=_json_key \
+		--docker-password='\''$(shell cat ./service_key.json)'\'' \
+	'
+
+.PHONY: prod-build
+prod-build:
+	docker compose run --rm snake cargo build --release
+	DOCKER_BUILDKIT=1 docker build \
+		--target prod \
+		--tag us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app .
+
+	docker push us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app
 
 # helm
 
