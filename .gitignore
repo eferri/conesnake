@@ -25,3 +25,4 @@ build*
 perf.data
 perf.data.*
 nohup.out
+notes.*

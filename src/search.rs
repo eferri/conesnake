@@ -10,7 +10,7 @@ use deepsize::DeepSizeOf;
 use log::{error, info, warn};
 
 #[cfg(feature = "simd")]
-use std::simd::{f32x4, mask32x4, num::SimdFloat, StdFloat};
+use std::simd::{f64x4, mask64x4, num::SimdFloat, StdFloat};
 
 use std::sync::{atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering, Arc, Barrier};
 use std::sync::{Mutex, RwLock};
@@ -27,6 +27,7 @@ pub struct SearchContext<R: Rand> {
 
     // Search state
     search_timeout: AtomicBool,
+    out_of_space: AtomicBool,
     done_barrier: Barrier,
     total_nodes: AtomicI64,
     num_searches: AtomicI64,
@@ -129,6 +130,7 @@ impl<R: Rand> SearchContext<R> {
             thread_state,
 
             search_timeout: AtomicBool::new(false),
+            out_of_space: AtomicBool::new(false),
             done_barrier: Barrier::new(config.num_threads + 1),
             total_nodes: AtomicI64::new(0),
             num_searches: AtomicI64::new(0),
@@ -227,57 +229,48 @@ impl NodeState {
     }
 
     #[cfg(feature = "simd")]
-    pub fn duct_scores_simd(&self, cfg: &Config, mvs: u32) -> f32x4 {
-        let mut op_mask = mask32x4::splat(false);
+    pub fn duct_scores_simd(&self, cfg: &Config, mvs: u32) -> f64x4 {
+        let mut op_mask = mask64x4::splat(false);
 
-        let mut variance_sums_arr: [f32; 4] = Default::default();
-        let mut games_arr: [f32; 4] = Default::default();
-        let mut scores_arr: [f32; 4] = Default::default();
-        let mut results_arr: [f32; 4] = Default::default();
+        let mut results = f64x4::splat(0.0);
+        let mut variance_sums = f64x4::splat(0.0);
+        let mut games = f64x4::splat(0.0);
+        let mut scores = f64x4::splat(0.0);
 
         for snake_idx in 0..self.board.num_snakes() as usize {
             let mv = Move::extract(mvs, snake_idx as u32);
             let mcts_scores = &self.cache[snake_idx][mv.idx()];
 
             if mcts_scores.games < cfg.min_playouts || (self.games as i64) < cfg.min_playouts {
-                results_arr[snake_idx] = f32::MAX
+                results[snake_idx] = f64::MAX
             } else {
                 op_mask.set(snake_idx, true);
-                variance_sums_arr[snake_idx] = mcts_scores.variance_sum as f32;
-                games_arr[snake_idx] = mcts_scores.games as f32;
-                scores_arr[snake_idx] = mcts_scores.score as f32;
+                variance_sums[snake_idx] = mcts_scores.variance_sum as f64;
+                games[snake_idx] = mcts_scores.games as f64;
+                scores[snake_idx] = mcts_scores.score as f64;
             }
         }
-
-        let results = f32x4::from_array(results_arr);
 
         if !op_mask.any() {
             return results;
         }
 
-        let variance_sums = f32x4::from_array(variance_sums_arr);
-        let games = f32x4::from_array(games_arr);
-        let scores = f32x4::from_array(scores_arr);
+        let ln_parent_games = (self.games as f64).ln();
 
-        let ln_parent_games = (self.games as f32).ln();
+        let variance_mask = op_mask & games.gt(&f64x4::splat(1.0));
 
-        let variance_mask = op_mask & games.gt(&f32x4::splat(1.0));
-
-        let variances = variance_mask.select(variance_sums / (games - f32x4::splat(1.0)), f32x4::splat(0.0));
+        let variances = variance_mask.select(variance_sums / (games - f64x4::splat(1.0)), f64x4::splat(0.0));
         let var_ucb = op_mask.select(
-            variances + (f32x4::splat(2.0 * ln_parent_games) / games).sqrt(),
-            f32x4::splat(0.0),
+            variances + (f64x4::splat(2.0 * ln_parent_games) / games).sqrt(),
+            f64x4::splat(0.0),
         );
 
         let uct_score = op_mask.select(
-            ((f32x4::splat(0.25).simd_min(var_ucb) * f32x4::splat(ln_parent_games)) / games).sqrt(),
-            f32x4::splat(0.0),
+            ((f64x4::splat(0.25).simd_min(var_ucb) * f64x4::splat(ln_parent_games)) / games).sqrt(),
+            f64x4::splat(0.0),
         );
 
-        op_mask.select(
-            (scores / games) + f32x4::splat(cfg.temperature as f32) * uct_score,
-            results,
-        )
+        op_mask.select((scores / games) + f64x4::splat(cfg.temperature) * uct_score, results)
     }
 }
 
@@ -333,7 +326,6 @@ pub fn best_move(cfg: &Config, snake_idx: usize, scores: &[Scores], print_summar
 
 pub fn mcts<R: Rand>(
     ctx: Arc<SearchContext<R>>,
-    config: Arc<Config>,
     pool: &ThreadPool,
     board: &Board,
     game: &Game,
@@ -361,14 +353,13 @@ pub fn mcts<R: Rand>(
 
     ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
-    for id in 0..config.num_threads {
+    for id in 0..ctx.config.num_threads {
         let ctx_cln = ctx.clone();
-        let config = config.clone();
-        pool.execute(move || search_worker(ctx_cln, config, id));
+        pool.execute(move || search_worker(ctx_cln, id));
     }
 
     let startup_dur = Instant::now() - start_time;
-    let search_us = (game.api.timeout - config.latency) as i64 * 1000;
+    let search_us = (game.api.timeout - ctx.config.latency) as i64 * 1000;
     let search_dur = Duration::from_micros(search_us as u64).saturating_sub(startup_dur);
 
     if !search_dur.is_zero() {
@@ -388,7 +379,7 @@ pub fn mcts<R: Rand>(
 
     let root_guard = ctx.node_space[0].state.read().unwrap();
 
-    let mut scores = Vec::with_capacity(config.max_snakes as usize);
+    let mut scores = Vec::with_capacity(ctx.config.max_snakes as usize);
 
     for s_idx in 0..root_guard.board.num_snakes() as usize {
         let mut snake_scores: Scores = Default::default();
@@ -404,11 +395,11 @@ pub fn mcts<R: Rand>(
     }
 
     let max_depth = root_guard.max_depth;
-    let total_nodes = ctx.total_nodes.load(Ordering::Relaxed);
-    let num_searches = ctx.num_searches.load(Ordering::Relaxed);
-    let num_playouts = ctx.num_playouts.load(Ordering::Relaxed);
+    let total_nodes = ctx.total_nodes.load(Ordering::Acquire);
+    let num_searches = ctx.num_searches.load(Ordering::Acquire);
+    let num_playouts = ctx.num_playouts.load(Ordering::Acquire);
     let num_terminal = num_searches - num_playouts;
-    let playout_ns = ctx.playout_ns.load(Ordering::Relaxed);
+    let playout_ns = ctx.playout_ns.load(Ordering::Acquire);
     let avg_playout_us = (playout_ns as f64 / num_playouts as f64) / (1000.0);
 
     info!("search max depth: {}", max_depth);
@@ -427,7 +418,7 @@ pub fn mcts<R: Rand>(
     })
 }
 
-fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: usize) {
+fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
     let mut scratch_guard = ctx.thread_state[id].lock().unwrap();
 
     let game_guard = ctx.game.read().unwrap();
@@ -460,6 +451,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
                 if !state_guard.is_fully_expanded() {
                     let space_left = expand_node(&ctx, game, &mut scratch_guard, &mut state_guard, curr_idx as u32);
                     if !space_left {
+                        ctx.out_of_space.store(true, Ordering::Release);
                         break 'main_loop;
                     }
                 }
@@ -467,6 +459,9 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
 
             {
                 let state_guard = ctx.node_space[curr_idx].state.read().unwrap();
+                if ctx.out_of_space.load(Ordering::Acquire) {
+                    break 'main_loop;
+                }
 
                 scratch_guard.child_scores.clear();
 
@@ -480,14 +475,14 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
                     #[cfg(not(feature = "simd"))]
                     for snake_idx in 0..state_guard.board.num_snakes() {
                         let mv = Move::extract(child_ptr.moves, snake_idx as u32);
-                        let mv_duct_score = state_guard.duct_score(&config, snake_idx as usize, mv);
+                        let mv_duct_score = state_guard.duct_score(&ctx.config, snake_idx as usize, mv);
 
                         node_totals.total_score += mv_duct_score;
                     }
 
                     #[cfg(feature = "simd")]
                     {
-                        let duct_scores = state_guard.duct_scores_simd(&config, child_ptr.moves);
+                        let duct_scores = state_guard.duct_scores_simd(&ctx.config, child_ptr.moves);
 
                         node_totals.total_score += duct_scores.reduce_sum() as f64;
                     }
@@ -519,7 +514,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, config: Arc<Config>, id: u
         let start_time = Instant::now();
         let (is_terminal, _) = {
             let _playout_guard = playout_guard;
-            playout_game(&config, &mut scratch_guard, game)
+            playout_game(&ctx.config, &mut scratch_guard, game)
         };
         let dur_ns = (Instant::now() - start_time).as_nanos() as i64;
 

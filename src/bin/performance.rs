@@ -14,9 +14,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use clap::Parser;
-use futures::future::join_all;
 use serde::{Deserialize, Serialize};
-use tokio::task;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct Results {
@@ -411,11 +409,10 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
     ),
 ];
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
+fn main() -> Result<(), Error> {
     let mut cfg = Config::parse();
 
-    cfg.max_boards = 500000;
+    cfg.max_boards = 300000;
     cfg.max_snakes = 4;
     cfg.max_width = 19;
     cfg.max_height = 21;
@@ -429,10 +426,13 @@ async fn main() -> Result<(), Error> {
     })
     .expect("Error setting Ctrl-C handler");
 
+    #[cfg(feature = "simd")]
+    eprintln!("using simd");
+
     eprintln!("allocating...");
 
     let num_runs = 1;
-    let num_workers = 3;
+    let num_workers = 1;
 
     let mut ctxs = Vec::new();
     let mut pools = Vec::new();
@@ -463,30 +463,33 @@ async fn main() -> Result<(), Error> {
             let game = Arc::new(game);
             let board = Arc::new(Board::from_str(board_str, &game)?);
 
-            let mut search_results_futures = Vec::new();
+            let mut search_result_handles = Vec::new();
+            let mut search_results = Vec::new();
 
-            for i in 0..num_workers {
-                let ctx = ctxs[i].clone();
-                let pool = pools[i].clone();
-                let game = game.clone();
-                let board = board.clone();
+            if num_workers > 1 {
+                for i in 0..num_workers {
+                    let ctx = ctxs[i].clone();
+                    let pool = pools[i].clone();
+                    let game = game.clone();
+                    let board = board.clone();
 
-                let mut config = ctx.config.clone();
-                config.set_temp(board.as_ref(), game.as_ref());
+                    search_result_handles.push(std::thread::spawn(move || {
+                        search::mcts(ctx, &pool, &board, &game, Instant::now()).unwrap()
+                    }));
+                }
 
-                search_results_futures.push(task::spawn(async move {
-                    search::mcts(ctx, Arc::new(config), &pool, &board, &game, Instant::now()).unwrap()
-                }));
+                for handle in search_result_handles.into_iter() {
+                    search_results.push(handle.join().unwrap());
+                }
+            } else {
+                // Reduce number of threads when debugging
+                search_results.push(search::mcts(ctxs[0].clone(), &pools[0], &board, &game, Instant::now()).unwrap());
             }
-
-            let search_results = join_all(search_results_futures).await;
 
             let mut summed_scores: Vec<Scores> = Vec::new();
             summed_scores.resize_with(board.num_snakes() as usize, Default::default);
 
-            for res in search_results {
-                let search_result = res.unwrap();
-
+            for search_result in search_results {
                 if search_result.total_nodes > results.max_nodes {
                     results.max_nodes = search_result.total_nodes;
                 }

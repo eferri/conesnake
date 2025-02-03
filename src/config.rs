@@ -1,12 +1,8 @@
-use crate::board::Board;
-use crate::game::{Game, Rules};
-
 use clap::{Parser, ValueEnum};
 
 // Hyperparameters
 
 pub const DEFAULT_TEMP: f64 = 4.0;
-pub const DEFAULT_CONSTRICTOR_TEMP: f64 = 4.0;
 pub const DEFAULT_MIN_PLAYOUTS: i64 = 1;
 pub const DEFAULT_WIN_VAL: f64 = 1.0;
 pub const DEFAULT_LOSS_VAL: f64 = 0.0;
@@ -63,9 +59,6 @@ pub struct Config {
     #[clap(long, default_value_t = DEFAULT_TEMP)]
     pub temperature: f64,
 
-    #[clap(long, default_value_t = DEFAULT_CONSTRICTOR_TEMP)]
-    pub constrictor_temp: f64,
-
     #[clap(long, default_value_t = DEFAULT_MIN_PLAYOUTS)]
     pub min_playouts: i64,
 
@@ -78,14 +71,6 @@ pub struct Config {
     #[clap(long, allow_negative_numbers = true, default_value_t = DEFAULT_TIE_VAL)]
     pub tie_val: f64,
 
-    #[clap(long, default_value_t = true)]
+    #[clap(long, default_value_t = false)]
     pub strong_playout: bool,
-}
-
-impl Config {
-    pub fn set_temp(&mut self, board: &Board, game: &Game) {
-        if let (_, Rules::Constrictor) = (board.num_alive_snakes(), game.ruleset) {
-            self.temperature = self.constrictor_temp;
-        }
-    }
 }

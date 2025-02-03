@@ -80,6 +80,30 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug performance test performance",
+            "cargo": {
+                "env": {
+                    "RUSTFLAGS": "-C force-frame-pointers=yes -Cllvm-args=--inline-threshold=999999"
+                },
+                "args": [
+                    "build",
+                    "-Z",
+                    "build-std",
+                    "--profile=release-with-debug",
+                    "--target",
+                    "x86_64-unknown-linux-gnu"
+                ],
+                "filter": {
+                    "name": "performance",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

@@ -313,18 +313,14 @@ const SEARCH_SMALL: &str = "
 #[test]
 fn small_search_test() {
     log_test_init();
-    let ctx = get_deterministic_context();
+    let ctx = Arc::new(get_deterministic_context());
     let pool = ThreadPool::new(ctx.config.num_threads);
 
     let game = solo_game();
     let board = Board::from_str(SEARCH_SMALL, &game).unwrap();
 
-    let mut config = ctx.config.clone();
-    config.set_temp(&board, &game);
-    let config = Arc::new(config);
-
-    let search_result = search::mcts(Arc::new(ctx), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
-    let best_move = search::best_move(&config, 0, &search_result.scores, true);
+    let search_result = search::mcts(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
+    let best_move = search::best_move(&ctx.config, 0, &search_result.scores, true);
 
     assert_eq!(best_move, Move::Right);
     assert_eq!(search_result.max_depth, 2);
@@ -367,12 +363,8 @@ fn arcade_maze_search_test() {
         game.api.map = Map::ArcadeMaze;
         let board = Board::from_str(ARCADE_MAZE_BOARD, &game).unwrap();
 
-        let mut config = ctx.config.clone();
-        config.set_temp(&board, &game);
-        let config = Arc::new(config);
-
-        let search_result = search::mcts(ctx.clone(), config.clone(), &pool, &board, &game, Instant::now()).unwrap();
-        let best_move = search::best_move(&config, 0, &search_result.scores, true);
+        let search_result = search::mcts(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
+        let best_move = search::best_move(&ctx.config, 0, &search_result.scores, true);
 
         assert!(best_move == Move::Down || best_move == Move::Up);
 

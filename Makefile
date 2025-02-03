@@ -1,5 +1,8 @@
 # -------------------- local development --------------------
 
+.PHONY: build-all
+build-all: debug-build release-build profile-build rules
+
 # Docker
 
 .PHONY: docker-build
@@ -18,7 +21,23 @@ shell:
 root-shell:
 	docker compose run --user root --rm snake bash
 
-# Cargo
+# Build
+
+.PHONY: build debug-build
+build debug-build:
+	docker compose run --rm snake cargo build
+
+.PHONY: release-build
+release-build:
+	docker compose run --rm snake cargo build --release
+
+.PHONY: profile-build
+profile-build:
+	docker compose run --rm snake bash -c ' \
+		RUSTFLAGS="-C force-frame-pointers=yes -Cllvm-args=--inline-threshold=999999" cargo build \
+			-Z build-std \
+			--profile=release-with-debug \
+			--target x86_64-unknown-linux-gnu'
 
 .PHONY: lint
 lint:
@@ -30,8 +49,8 @@ test: rules
 		--nocapture \
 		--color always
 
-.PHONY: rel-test
-rel-test: rules
+.PHONY: release-test
+release-test: rules
 	docker compose run --rm snake cargo test \
 		--release -- \
 		--nocapture \
@@ -46,27 +65,30 @@ rules:
 # Profiling
 
 .PHONY: profile
-profile: build-profile record report
+profile: profile-build record report
 
 .PHONY: profile-mem
-profile-mem: build-profile record-mem report
+profile-mem: profile-build record-mem report
 
-.PHONY: build-profile
-build-profile:
-	docker compose run --rm snake bash -c ' \
-		RUSTFLAGS="-C force-frame-pointers=yes" cargo build \
-			-Z build-std \
-			--profile=release-with-debug \
-			--target x86_64-unknown-linux-gnu'
+PROFILE_EXE ?= benchmark
 
 .PHONY: record
 record:
 	docker compose run --rm snake \
 		perf record \
-			--call-graph dwarf \
-			-e cycles \
+			--call-graph fp \
+			-e sched \
 			-F 1000 \
-			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/benchmark
+			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/$(PROFILE_EXE)
+
+.PHONY: record-mem
+record-mem:
+	docker compose run --rm snake \
+		perf record \
+			--call-graph fp \
+			-e cache-misses \
+			-F 1000 \
+			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/$(PROFILE_EXE)
 
 .PHONY: report
 report:
@@ -77,16 +99,7 @@ report:
 			--percent-limit 3 \
 			--show-nr-samples \
 			--show-cpu-utilization \
-			--call-graph srcline
-
-.PHONY: record-mem
-record-mem:
-	docker compose run --rm snake \
-		perf record \
-			--call-graph dwarf \
-			-e cache-misses \
-			-F 1000 \
-			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/benchmark
+			--call-graph fractal,srcline
 
 .PHONY: stat
 stat:
@@ -95,7 +108,7 @@ stat:
 		&& perf stat \
 			-e task-clock,cycles,instructions,branches,branch-misses \
 			-e cache-references,cache-misses \
-			./target-snake/release/benchmark'
+			./target-snake/release/$(PROFILE_EXE)'
 
 # Performance
 
@@ -182,8 +195,7 @@ regcred-secret:
 	'
 
 .PHONY: prod-build
-prod-build:
-	docker compose run --rm snake cargo build --release
+prod-build: release-build
 	DOCKER_BUILDKIT=1 docker build \
 		--target prod \
 		--tag us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app .
