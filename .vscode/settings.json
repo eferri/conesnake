@@ -13,7 +13,7 @@
     "editor.formatOnSave": true,
     "editor.inlayHints.enabled": "offUnlessPressed",
     "debug.allowBreakpointsEverywhere": true,
-    "python.analysis.useLibraryCodeForTypes": false,
+    "python.analysis.useLibraryCodeForTypes": true,
     "rust-analyzer.completion.autoimport.enable": true,
     "rust-analyzer.debug.engine": "vadimcn.vscode-lldb",
     "rust-analyzer.debug.openDebugPane": true,

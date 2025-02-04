@@ -41,7 +41,6 @@ RUN apt-get update \
     python3-dev \
     python3-pip \
     python3-venv \
-    python3-autopep8 \
     binutils-dev \
     libssl-dev \
     pkg-config \
@@ -85,14 +84,11 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
 RUN rustup component add rust-src rustfmt clippy \
     && cargo install cargo-show-asm
 
+COPY requirements.txt .
+
 # Python development tools
 RUN python3 -m venv /home/conesnake/.venv \
-    && python3 -m pip install \
-    wg-meshconf==2.5.1 \
-    scikit-optimize[plots]==0.10.1 \
-    numpy==1.26.4 \
-    aiohttp==3.9.5 \
-    matplotlib==3.9.0 \
+    && python3 -m pip install -r requirements.txt \
     && rm -rf ~/.cache/pip
 
 ENV GOPATH  /app/.go

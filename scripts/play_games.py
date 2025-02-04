@@ -82,9 +82,9 @@ async def start_snake(index, opt_args=None):
 
 async def start_rules(snakes, game_type="standard", map="standard"):
     rules_args = [
-        "--timeout", "200",
-        "--width", "11",
-        "--height", "11",
+        "--timeout", "250",
+        "--width", "8",
+        "--height", "8",
         "--gametype", game_type,
         "--map", map,
         "--foodSpawnChance", "15",
@@ -121,7 +121,7 @@ async def get_status(session, url):
         return 500
 
 
-async def run_games(num_games=500, num_opponents=2, **kwargs):
+async def run_games(num_games=500, num_opponents=1, **kwargs):
     opt_args = []
     for key, value in kwargs.items():
         if isinstance(value, bool):
@@ -303,7 +303,7 @@ async def main():
         case "optimize":
             await optimize()
         case "compare":
-            await run_games(num_games=100, compare=True)
+            await run_games(num_games=500, compare=True)
         case _:
             raise ValueError(f"invalid mode {args.mode}")
 

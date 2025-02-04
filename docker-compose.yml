@@ -23,7 +23,7 @@ services:
       - "8080:8080"
     cap_add:
       - CAP_PERFMON
-      # - CAP_SYSLOG
+      - CAP_SYSLOG
     command: |
       scripts/entrypoint_relay.sh \
         --max-boards 0 \
