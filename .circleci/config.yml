@@ -28,7 +28,7 @@ jobs:
             - cache-
       - run:
           name: compile
-          command: docker compose run --rm snake cargo build --tests && make move
+          command: docker compose run --rm snake cargo build --tests && make rules
       - run:
           name: lint
           command: make lint
