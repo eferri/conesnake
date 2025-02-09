@@ -41,7 +41,7 @@ profile-build:
 
 .PHONY: lint
 lint:
-	docker compose run --rm snake cargo clippy
+	docker compose run --rm snake cargo clippy -- -D warnings
 
 .PHONY: test
 test: rules
@@ -112,17 +112,23 @@ stat:
 
 # Performance
 
+ifdef COMPARE
+COMPARE_ARGS:=--compare
+else
+COMPARE_ARGS:=
+endif
+
 .PHONY: performance
 performance:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& ./target-snake/release/performance --num-threads 8'
+		&& ./target-snake/release/performance --num-threads 8 $(COMPARE_ARGS)'
 
 .PHONY: bench
 bench:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& ./target-snake/release/benchmark'
+		&& ./target-snake/release/benchmark $(COMPARE_ARGS)'
 
 .PHONY: compare
 compare:

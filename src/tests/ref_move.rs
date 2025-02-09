@@ -22,7 +22,7 @@ pub struct RefMove<'de> {
     ref_iter: StreamDeserializer<'de, IoRead<ChildStdout>, BattleState>,
 }
 
-impl<'de> RefMove<'de> {
+impl RefMove<'_> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let mut child = Command::new("move")
@@ -72,7 +72,7 @@ impl<'de> RefMove<'de> {
     }
 }
 
-impl<'de> Drop for RefMove<'de> {
+impl Drop for RefMove<'_> {
     fn drop(&mut self) {
         self.child.wait().unwrap();
     }

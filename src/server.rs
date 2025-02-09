@@ -98,7 +98,7 @@ impl Server {
             }
         };
 
-        let index = match pod_name.split('-').last().unwrap().parse() {
+        let index = match pod_name.split('-').next_back().unwrap().parse() {
             Ok(idx) => idx,
             Err(e) => {
                 error!("Error parsing pod index: {}", e);
@@ -218,7 +218,7 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
             let req_start = Instant::now();
             let res = state
                 .req_client
-                .get(&format!("{worker}/"))
+                .get(format!("{worker}/"))
                 .timeout(Duration::from_millis(600))
                 .send()
                 .await;
@@ -405,7 +405,7 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
                 let req_start = Instant::now();
                 let move_resp = state
                     .req_client
-                    .post(&format!("{worker}/move"))
+                    .post(format!("{worker}/move"))
                     .timeout(timeout_dur)
                     .json(&game_state)
                     .send()

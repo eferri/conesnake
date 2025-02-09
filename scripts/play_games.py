@@ -36,7 +36,7 @@ async def start_snake(index, opt_args=None):
         "--worker-pod", f"http://127.0.0.1:{snake_port + 1}",
         "--worker-pod", f"http://127.0.0.1:{snake_port + 2}",
         "--latency", "10",
-        "relay",
+        "--mode", "relay",
     ]
 
     snake_args = snake_args + opt_args if opt_args else snake_args
@@ -57,7 +57,7 @@ async def start_snake(index, opt_args=None):
         "--max-height", max_height,
         "--max-snakes", max_snakes,
         "--latency", "10",
-        "worker",
+        "--mode", "worker",
     ]
     worker_args = worker_args + opt_args if opt_args else worker_args
 

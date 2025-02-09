@@ -431,6 +431,10 @@ fn main() -> Result<(), Error> {
 
     eprintln!("allocating...");
 
+    if cfg.compare {
+        eprintln!("compare is true!")
+    }
+
     let num_runs = 1;
     let num_workers = 1;
 

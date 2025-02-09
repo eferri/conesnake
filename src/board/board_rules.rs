@@ -9,8 +9,6 @@ impl Board {
     // Move heuristics applied to each move in random playout
 
     pub fn gen_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
-        let mut best_move = None;
-
         let mut valid_moves = [Move::Left; 4];
         let mut num_valid = 0;
 
@@ -23,12 +21,14 @@ impl Board {
             }
         }
 
-        if num_valid == 1 {
-            best_move = Some(valid_moves[0]);
-        } else if num_valid > 1 {
-            let mv_idx = rng.range(0, num_valid - 1);
-            best_move = Some(valid_moves[mv_idx as usize]);
-        }
+        let best_move = match num_valid.cmp(&1) {
+            Ordering::Equal => Some(valid_moves[0]),
+            Ordering::Greater => {
+                let mv_idx = rng.range(0, num_valid - 1);
+                Some(valid_moves[mv_idx as usize])
+            }
+            Ordering::Less => None,
+        };
 
         best_move.unwrap_or(Move::Left)
     }

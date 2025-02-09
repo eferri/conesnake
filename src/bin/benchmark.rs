@@ -46,6 +46,10 @@ fn main() {
     #[cfg(feature = "simd")]
     info!("using simd");
 
+    if cfg.compare {
+        info!("compare is true!")
+    }
+
     let game = test_game();
     let start_board = Board::from_str(BOARD, &game).unwrap();
 
@@ -84,11 +88,7 @@ fn main() {
     let min_duration = run_times[0] as f64 / 1.0e9;
     let max_duration = run_times[num_rep - 1] as f64 / 1.0e9;
 
-    let med_duration = if num_rep % 2 == 1 {
-        run_times[(num_rep + 1) / 2 - 1] as f64 / 1.0e9
-    } else {
-        run_times[num_rep / 2 - 1] as f64 / 1.0e9
-    };
+    let med_duration = run_times[num_rep.div_ceil(2) - 1] as f64 / 1.0e9;
 
     let min_games_hz = num_games as f64 / max_duration;
     let max_games_hz = num_games as f64 / min_duration;

@@ -52,12 +52,14 @@ sudo cp $TEMP_DIR/*.yaml /var/lib/rancher/k3s/server/manifests/
 
 export INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION
 
-curl -sfL https://get.k3s.io | sh -s - server \\
-  --cluster-init \\
-  --node-label mode=server \\
-  --node-name $HOST \\
-  --node-ip $INTERNAL_IP \\
-  --flannel-iface conesnake
+curl -sfL https://get.k3s.io > k3s.sh \\
+  && sha256sum k3s.sh | grep b0715fb49a4a1d32241ac23c222a1d343baa1f2846f25032b306d1b30dbacd15 \\
+  && sh -s - server \\
+    --cluster-init \\
+    --node-label mode=server \\
+    --node-name $HOST \\
+    --node-ip $INTERNAL_IP \\
+    --flannel-iface conesnake
 
 rm -r $TEMP_DIR
 EOF

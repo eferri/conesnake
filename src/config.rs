@@ -18,7 +18,7 @@ pub enum Mode {
 #[derive(Parser, Clone, Debug, Default)]
 #[clap(author, version, about = "conesnake", long_about = None)]
 pub struct Config {
-    #[clap(value_enum, default_value = "worker")]
+    #[clap(long, value_enum, default_value = "worker")]
     pub mode: Mode,
 
     #[clap(long)]

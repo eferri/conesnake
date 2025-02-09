@@ -84,7 +84,7 @@ spec:
         - "--worker-pod=http://10.43.{{ add 100 $i }}.{{ $j }}:8080"
         {{- end }}
         {{- end }}
-        - "relay"
+        - "--mode=relay"
 
 {{ range $worker := .Values.workers }}
 ---
@@ -141,5 +141,5 @@ spec:
         - "--max-boards={{ $.Values.worker.boards }}"
         - "--latency={{ $.Values.worker.latency }}"
         - "--num-threads={{ $.Values.worker.num_threads }}"
-        - "worker"
+        - "--mode=worker"
 {{ end }}
