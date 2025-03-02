@@ -87,7 +87,7 @@
             "name": "Debug performance test performance",
             "cargo": {
                 "env": {
-                    "RUSTFLAGS": "-C force-frame-pointers=yes -Cllvm-args=--inline-threshold=999999"
+                    "RUSTFLAGS": "-C force-frame-pointers=yes"
                 },
                 "args": [
                     "build",
@@ -102,7 +102,9 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "--compare"
+            ],
             "cwd": "${workspaceFolder}"
         }
     ]

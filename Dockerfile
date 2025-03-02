@@ -48,11 +48,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install golang
-RUN curl -sSfL "https://go.dev/dl/go1.23.5.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
+RUN curl -sSfL "https://go.dev/dl/go1.24.0.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
     && tar -C /usr/local -xf go.tar.gz
 
 # Install helm
-RUN curl -sSfL "https://get.helm.sh/helm-v3.17.0-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
+RUN curl -sSfL "https://get.helm.sh/helm-v3.17.1-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
     && tar -xf helm.tar.gz \
     && cp ./linux-${DOCKER_ARCH}/helm . \
     && chmod +x helm \
@@ -60,12 +60,12 @@ RUN curl -sSfL "https://get.helm.sh/helm-v3.17.0-linux-${DOCKER_ARCH}.tar.gz" -o
     && rm -rf ./*
 
 # Install kubectl
-RUN curl -sSfL "https://dl.k8s.io/release/v1.32.1/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
+RUN curl -sSfL "https://dl.k8s.io/release/v1.32.2/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
     && chmod +x ./kubectl \
     && cp kubectl /usr/local/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.10.5/terraform_1.10.5_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.11.0/terraform_1.11.0_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /usr/local/bin \
@@ -78,7 +78,7 @@ ENV PATH "/usr/local/go/bin:/app/.go/bin:/home/conesnake/.cargo/bin:/home/conesn
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-02-08
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-03-01
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \

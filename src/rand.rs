@@ -22,7 +22,7 @@ impl Rand for FastRand {
     }
 
     fn range(&mut self, min: i32, max: i32) -> i32 {
-        self.rng.gen_range(min..(max + 1))
+        self.rng.random_range(min..(max + 1))
     }
 
     fn shuffle<A>(&mut self, arr: &mut [A], n: usize) {

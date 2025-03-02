@@ -25,16 +25,17 @@ root-shell:
 
 .PHONY: build debug-build
 build debug-build:
-	docker compose run --rm snake cargo build
+	docker compose run --rm snake cargo build --all-targets
 
 .PHONY: release-build
 release-build:
-	docker compose run --rm snake cargo build --release
+	docker compose run --rm snake cargo build --all-targets --release
 
 .PHONY: profile-build
 profile-build:
 	docker compose run --rm snake bash -c ' \
-		RUSTFLAGS="-C force-frame-pointers=yes -Cllvm-args=--inline-threshold=999999" cargo build \
+		RUSTFLAGS="-C force-frame-pointers=yes" cargo build \
+			--all-targets \
 			-Z build-std \
 			--profile=release-with-debug \
 			--target x86_64-unknown-linux-gnu'
