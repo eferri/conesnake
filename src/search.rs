@@ -449,8 +449,8 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
             let node_guard = ctx.node_space[curr_idx].read().unwrap();
 
-            // We have reached a leaf that is end of the game
-            // OR reached node that hasn't been played out yet.
+            // Leaf node: we have reached a node that is end of the game
+            // OR reached node with a child that hasn't been played out yet.
             if game.over(&node_guard.board) || !node_guard.is_fully_expanded() {
                 // Still set the board for playout (evaluation) if we lost
                 scratch_guard.board.set_from(&node_guard.board);
@@ -462,10 +462,10 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             let mut max_idx_opt = None;
 
             for child_ptr in node_guard.children[0..node_guard.num_children as usize].iter() {
-                let simd_score = node_guard.duct_score_wrapper(&ctx.config, child_ptr.moves);
+                let duct_score = node_guard.duct_score_wrapper(&ctx.config, child_ptr.moves);
 
-                if simd_score > max_score || max_idx_opt.is_none() {
-                    max_score = simd_score;
+                if duct_score > max_score || max_idx_opt.is_none() {
+                    max_score = duct_score;
                     max_idx_opt = Some(child_ptr.index)
                 }
             }
@@ -627,11 +627,10 @@ fn expand_node<R: Rand>(
     debug_assert!(!game.over(&node.board));
 
     let mut num_expanded = 0;
-    let num_to_expand = 1;
     let mut last_child_idx = 0;
 
     // Iterate over permutations of moves for all alive snakes
-    'expand_loop: while num_expanded < num_to_expand && (node.num_move_perms as i32) < node.max_children() {
+    'expand_loop: while num_expanded < 1 && (node.num_move_perms as i32) < node.max_children() {
         let mut alive_index = 0;
 
         for s in 0..num_snakes {
