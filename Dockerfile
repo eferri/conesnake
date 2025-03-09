@@ -48,7 +48,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install golang
-RUN curl -sSfL "https://go.dev/dl/go1.24.0.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
+RUN curl -sSfL "https://go.dev/dl/go1.24.1.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
     && tar -C /usr/local -xf go.tar.gz
 
 # Install helm
@@ -65,7 +65,7 @@ RUN curl -sSfL "https://dl.k8s.io/release/v1.32.2/bin/linux/${DOCKER_ARCH}/kubec
     && cp kubectl /usr/local/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.11.0/terraform_1.11.0_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.11.1/terraform_1.11.1_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /usr/local/bin \
@@ -78,7 +78,7 @@ ENV PATH "/usr/local/go/bin:/app/.go/bin:/home/conesnake/.cargo/bin:/home/conesn
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-03-01
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-03-08
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \

@@ -186,7 +186,7 @@ fn expand_node_test() {
     ];
 
     let mut state = ctx.thread_state[0].lock().unwrap();
-    let mut root_state_guard = ctx.node_space[0].state.write().unwrap();
+    let mut root_state_guard = ctx.node_space[0].write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str_dims(
@@ -230,7 +230,7 @@ fn expand_node_test() {
 
             // Ignore status of snakes that are dead, not encoded in string
             {
-                let mut state_guard = ctx.node_space[idx + 1].state.write().unwrap();
+                let mut state_guard = ctx.node_space[idx + 1].write().unwrap();
                 for snake_idx in 0..state_guard.board.num_snakes() as usize {
                     let snake = &mut state_guard.board.snakes[snake_idx];
                     if !snake.alive() {
@@ -239,7 +239,7 @@ fn expand_node_test() {
                 }
             }
             assert_eq!(
-                ctx.node_space[idx + 1].state.read().unwrap().board,
+                ctx.node_space[idx + 1].read().unwrap().board,
                 Board::from_str_dims(
                     board,
                     &game,
@@ -371,7 +371,7 @@ fn arcade_maze_search_test() {
         // Ensure simd duct score produces same result as non-simd version
         #[cfg(feature = "simd")]
         {
-            let root_guard = ctx.node_space[0].state.read().unwrap();
+            let root_guard = ctx.node_space[0].read().unwrap();
 
             for child_ptr in root_guard.children[0..root_guard.num_children as usize].iter() {
                 let mut duct_sum = 0.0;

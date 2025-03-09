@@ -297,6 +297,22 @@ fn gen_board_ref_test() {
             Rules::Constrictor,
             Map::Standard,
         ),
+        (
+            "turn: 1 health: 100 health: 100 health: 100 health: 100
+            - - - - - - - - - - -
+            - - - - - - - - - - -
+            - - 0 - - - - - 1 - -
+            - - - - - - - - - - -
+            - - - - - - - - - - -
+            - - - - - - - - - - -
+            - - - - - - - - - - -
+            - - - - - - - - - - -
+            - - 2 - - - - - 3 - -
+            - - - - - - - - - - -
+            - - - - - - - - - - -",
+            Rules::Standard,
+            Map::Standard,
+        ),
     ];
 
     for (board_str, rules, map) in test_boards {

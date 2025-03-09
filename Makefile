@@ -71,7 +71,7 @@ profile: profile-build record report
 .PHONY: profile-mem
 profile-mem: profile-build record-mem report
 
-PROFILE_EXE ?= benchmark
+PROFILE_EXE ?= performance
 
 .PHONY: record
 record:
@@ -114,22 +114,24 @@ stat:
 # Performance
 
 ifdef COMPARE
-COMPARE_ARGS:=--compare
+COMPARE_ENV:=1
 else
-COMPARE_ARGS:=
+COMPARE_ENV:=0
 endif
 
 .PHONY: performance
 performance:
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
-		&& ./target-snake/release/performance --num-threads 8 $(COMPARE_ARGS)'
+		&& COMPARE=0 ./target-snake/release/performance --num-threads 8 $(COMPARE_ARGS)'
 
-.PHONY: bench
-bench:
-	docker compose run --rm snake bash -c ' \
-		cargo build --release \
-		&& ./target-snake/release/benchmark $(COMPARE_ARGS)'
+.PHONY: bench-search
+bench-search:
+	docker compose run --rm snake bash -c 'COMPARE=$(COMPARE_ENV) cargo bench search_bench'
+
+.PHONY: bench-playout
+bench-playout:
+	docker compose run --rm snake bash -c 'COMPARE=$(COMPARE_ENV) cargo bench playout_bench'
 
 .PHONY: compare
 compare:

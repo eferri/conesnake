@@ -11,7 +11,7 @@
                 "rust-lang.rust-analyzer",
                 "golang.go",
                 "ms-python.python",
-                "ms-vscode.cpptools",
+                "llvm-vs-code-extensions.vscode-clangd",
                 "ms-azuretools.vscode-docker",
                 "hashicorp.terraform",
                 "redhat.vscode-yaml",

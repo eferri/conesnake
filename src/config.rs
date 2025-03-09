@@ -16,7 +16,7 @@ pub enum Mode {
 }
 
 #[derive(Parser, Clone, Debug, Default)]
-#[clap(author, version, about = "conesnake", long_about = None)]
+#[clap(author, version, about = "conesnake", long_about = None, ignore_errors = true)]
 pub struct Config {
     #[clap(long, value_enum, default_value = "worker")]
     pub mode: Mode,
@@ -73,4 +73,10 @@ pub struct Config {
 
     #[clap(long, default_value_t = false)]
     pub strong_playout: bool,
+
+    #[clap(long, default_value_t = false)]
+    pub fixed_iter: bool,
+
+    #[clap(long, default_value_t = 1000)]
+    pub iter: i32,
 }

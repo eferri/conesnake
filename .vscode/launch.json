@@ -106,6 +106,29 @@
                 "--compare"
             ],
             "cwd": "${workspaceFolder}"
-        }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'search_bench'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bench=benchmark",
+                    "--no-run",
+                ],
+                "filter": {
+                    "name": "benchmark",
+                    "kind": "bench"
+                }
+            },
+            "args": [
+                "--bench"
+            ],
+            "env": {
+                "COMPARE": "0"
+            },
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }
