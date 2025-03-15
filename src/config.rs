@@ -8,6 +8,13 @@ pub const DEFAULT_WIN_VAL: f64 = 1.0;
 pub const DEFAULT_LOSS_VAL: f64 = 0.0;
 pub const DEFAULT_TIE_VAL: f64 = 0.0;
 
+// Board sizing
+
+pub const MAX_HEIGHT: usize = 11;
+pub const MAX_WIDTH: usize = 11;
+pub const MAX_BOARD_SIZE: usize = MAX_HEIGHT * MAX_WIDTH;
+pub const MAX_SNAKES: usize = 4;
+
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
     #[default]
@@ -38,15 +45,6 @@ pub struct Config {
 
     #[clap(long, default_value_t = 10000)]
     pub max_boards: usize,
-
-    #[clap(long, default_value_t = 11)]
-    pub max_width: i32,
-
-    #[clap(long, default_value_t = 11)]
-    pub max_height: i32,
-
-    #[clap(long, default_value_t = 5)]
-    pub max_snakes: i32,
 
     // Latencies are round trip time
     #[clap(long, default_value_t = 50)]

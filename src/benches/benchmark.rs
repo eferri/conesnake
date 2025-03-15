@@ -39,9 +39,6 @@ fn playout_bench(b: &mut Bencher) {
     log_test_init();
 
     cfg.max_boards = 1000;
-    cfg.max_snakes = 4;
-    cfg.max_width = 10;
-    cfg.max_height = 10;
 
     let res = env::var("COMPARE");
     cfg.compare = str::parse::<u32>(res.unwrap().as_str()).unwrap() == 1;
@@ -58,7 +55,7 @@ fn playout_bench(b: &mut Bencher) {
     let game = test_game();
     let start_board = Board::from_str(BOARD, &game).unwrap();
 
-    let mut ctx = ThreadContext::<FastRand>::new(&cfg);
+    let mut ctx = ThreadContext::<FastRand>::new();
 
     b.iter(|| {
         ctx.board = start_board.clone();
@@ -73,9 +70,6 @@ fn search_bench(b: &mut Bencher) {
     log_test_init();
 
     cfg.max_boards = 20000;
-    cfg.max_snakes = 4;
-    cfg.max_width = 11;
-    cfg.max_height = 11;
     cfg.num_threads = 8;
     cfg.latency = 0;
     cfg.fixed_iter = true;

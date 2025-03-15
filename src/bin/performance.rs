@@ -65,33 +65,6 @@ const TESTS: &[(&str, TestCase, Rules, Map)] = &[
         Map::Standard,
     ),
     (
-        "turn: 312 health: 45 health: 32 health: 89
-        * - * * * * * * * * * * * * * * * - *
-        * - - - - - - - - * - - - - - - - - *
-        * - * * - * * * - * - * * * - * * - *
-        * - - - > 2 - - - + - - - - - - - - *
-        * - * * ^ * - * * * * * - * - * * - *
-        * - - - ^ * - - d * - - - * - - - - *
-        * - - * ^ * * * v * - * * * - * - - *
-        * - - * ^ * v < < - - - - * - * - - *
-        * * * * ^ * v * - * - * - * - * * * *
-        - - - - ^ < < * - + - * - - - - - - -
-        * * * * - * - * - * - * - * - * * * *
-        * v < * - * - - - - - - - * - * - - *
-        * v ^ * - * - * * * * * - * - * - - *
-        * v ^ < < - - - - * - - - - - - - - *
-        * v * * ^ * * * - * - * * * - * * - *
-        * > v * ^ - 0 < < < < < < - - * - - *
-        * * v * c * - * * * * * ^ * - * - * *
-        * - > > 1 * b > v * > > ^ * - - - - *
-        * - * * * * * * v * ^ * * * * * * - *
-        * + - - - - - - > > ^ - - - - - - + *
-        * - * * * * * * * * * * * * * * * - *",
-        &[(0, true, Move::Left)],
-        Rules::Wrapped,
-        Map::ArcadeMaze,
-    ),
-    (
         "turn: 22 health: 80 health: 84 health: 89 health: 100
         * * - ^ * * * - - * *
         * - - ^ a * F > v - *
@@ -413,9 +386,6 @@ fn main() -> Result<(), Error> {
     let mut cfg = Config::parse();
 
     cfg.max_boards = 300000;
-    cfg.max_snakes = 4;
-    cfg.max_width = 19;
-    cfg.max_height = 21;
 
     let done_flag = Arc::new(AtomicBool::new(false));
     let flag = done_flag.clone();

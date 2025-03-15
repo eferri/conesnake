@@ -1,7 +1,6 @@
 use crate::search;
 
-use crate::board::Board;
-use crate::game::Map;
+use crate::board::{Board, Snake};
 use crate::log::log_test_init;
 use crate::pool::ThreadPool;
 use crate::tests::common::{get_context, get_deterministic_context, solo_game, test_game, wrapped_game};
@@ -189,14 +188,7 @@ fn expand_node_test() {
     let mut root_state_guard = ctx.node_space[0].write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
-        let start_board = Board::from_str_dims(
-            start_board,
-            &game,
-            ctx.config.max_width,
-            ctx.config.max_height,
-            ctx.config.max_snakes,
-        )
-        .unwrap();
+        let start_board = Board::from_str(start_board, &game).unwrap();
 
         ctx.reset();
         root_state_guard.reset();
@@ -234,21 +226,15 @@ fn expand_node_test() {
                 for snake_idx in 0..state_guard.board.num_snakes() as usize {
                     let snake = &mut state_guard.board.snakes[snake_idx];
                     if !snake.alive() {
-                        *snake = Default::default();
+                        *snake = Snake::new();
                     }
                 }
             }
-            assert_eq!(
-                ctx.node_space[idx + 1].read().unwrap().board,
-                Board::from_str_dims(
-                    board,
-                    &game,
-                    ctx.config.max_width,
-                    ctx.config.max_height,
-                    ctx.config.max_snakes,
-                )
-                .unwrap()
-            );
+
+            let mut compare_board = Board::new(0, 0);
+            compare_board.set_from(&ctx.node_space[idx + 1].read().unwrap().board);
+
+            assert_eq!(compare_board, Board::from_str(board, &game).unwrap());
         }
     }
 }
@@ -285,22 +271,24 @@ fn playout_test() {
 
     let start_board = Board::from_str(PLAYOUT_TRAPPED, &game).unwrap();
 
-    scratch_guard.play_scores.clear();
     scratch_guard.board = start_board;
 
     search::playout_game(&ctx.config, &mut scratch_guard, &game);
 
-    assert!(scratch_guard.play_scores.len() == 2);
-    check_scores(&scratch_guard.play_scores, &[ctx.config.win_val, ctx.config.loss_val]);
+    check_scores(
+        &scratch_guard.play_scores[0..2],
+        &[ctx.config.win_val, ctx.config.loss_val],
+    );
 
     let start_board = Board::from_str(PLAYOUT_WIN, &game).unwrap();
-    scratch_guard.play_scores.clear();
     scratch_guard.board = start_board;
 
     search::playout_game(&ctx.config, &mut scratch_guard, &game);
 
-    assert!(scratch_guard.play_scores.len() == 2);
-    check_scores(&scratch_guard.play_scores, &[ctx.config.win_val, ctx.config.loss_val]);
+    check_scores(
+        &scratch_guard.play_scores[0..2],
+        &[ctx.config.win_val, ctx.config.loss_val],
+    );
 }
 
 const SEARCH_SMALL: &str = "
@@ -327,29 +315,19 @@ fn small_search_test() {
     assert_eq!(search_result.total_nodes, 3);
 }
 
-const ARCADE_MAZE_BOARD: &str = "
-    turn: 3 health: 97 health: 97 health: 97
-    * - * * * * * * * * * * * * * * * v *
-    * - - - - - - - - * - - - - - - - 1 *
-    * - * * - * * * - * - * * * - * * - *
-    * 0 < a - - - - - - - - - - - - - - *
-    * - * * - * - * * * * * - * - * * - *
-    * - - - - * - - - * - - - * - - - - *
-    * - - * - * * * - * - * * * - * - - *
-    * - - * - * - - - - - - - * - * - - *
-    * * * * - * - * - * - * - * - * * * *
-    - - - - v a - * - - - * - - - - - - -
-    * * * * 2 * - * - * - * - * - * * * *
-    * - - * - * - - - - - - - * - * - - *
-    * - - * - * - * * * * * - * - * - - *
-    * - - - - - - - - * - - - - - - - - *
-    * - * * - * * * - * - * * * - * * - *
-    * - - * - - - - - - - - - - - * - - *
-    * * - * - * - * * * * * - * - * - * *
-    * - - - - * - - - * - - - * - - - - *
-    * - * * * * * * - * - * * * * * * - *
-    * - - - - - - - - - - - - - - - - - *
-    * - * * * * * * * * * * * * * * * d *
+const MAZE_BOARD: &str = "
+    turn: 3 health: 97 health: 97
+    * - * * - * * * * * *
+    * - - - - - - - - * *
+    * - * * - * * * - * *
+    * 0 < a - - - - - - -
+    * - * * - * - * * * *
+    * - - - - * - - - * *
+    * - - * - * * * - * *
+    * - - * - * - - - - *
+    * * * * - * - * - * *
+    - - - - v a - * - - *
+    * * * * 1 * - * - * *
 ";
 
 #[test]
@@ -359,9 +337,8 @@ fn arcade_maze_search_test() {
     let pool = ThreadPool::new(ctx.config.num_threads);
 
     for _ in 0..4 {
-        let mut game = wrapped_game();
-        game.api.map = Map::ArcadeMaze;
-        let board = Board::from_str(ARCADE_MAZE_BOARD, &game).unwrap();
+        let game = wrapped_game();
+        let board = Board::from_str(MAZE_BOARD, &game).unwrap();
 
         let search_result = search::mcts(ctx.clone(), &pool, &board, &game, Instant::now()).unwrap();
         let best_move = search::best_move(&ctx.config, 0, &search_result.scores, true);

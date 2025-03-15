@@ -1,4 +1,5 @@
 use crate::board::Board;
+use crate::config::MAX_BOARD_SIZE;
 use crate::game::{Map, Rules};
 use crate::rand::{MaxRand, Rand};
 use crate::tests::{common::test_game, ref_move::RefMove};
@@ -176,12 +177,12 @@ fn gen_board_ref_test() {
             Map::Standard,
         ),
         (
-            "turn: 3 health: 97 health: 97 health: 97 health: 97 health: 97
-            - - - - - - - v < a 4
-            - > > 1 b v - v - - ^
-            - ^ - - - v - v - - ^
-            - ^ - - - v - v - - ^
-            - ^ < < < < - > > > ^
+            "turn: 3 health: 97 health: 97 health: 97 health: 97
+            - - - - - - - - - - -
+            - > > 1 b v - - - - -
+            - ^ - - - v - - - - -
+            - ^ - - - v - - - - -
+            - ^ < < < < - - - - -
             - - - - v e - - - - -
             3 < < < v > > > > v -
             d - - ^ 0 ^ - - - v -
@@ -190,33 +191,6 @@ fn gen_board_ref_test() {
             > > > ^ - - - - - - - ",
             Rules::Standard,
             Map::Standard,
-        ),
-        (
-            // Arcade Maze
-            "turn: 3 health: 97 health: 97 health: 97
-            * - * * * * * * * * * * * * * * * v *
-            * - - - - - - - - * - - - - - - - 1 *
-            * - * * - * * * - * - * * * - * * - *
-            * 0 < a - - - - - - - - - - - - - - *
-            * - * * - * - * * * * * - * - * * - *
-            * - - - - * - - - * - - - * - - - - *
-            * - - * - * * * - * - * * * - * - - *
-            * - - * - * - - - - - - - * - * - - *
-            * * * * - * - * - * - * - * - * * * *
-            - - - - v a - * - - - * - - - - - - -
-            * * * * 2 * - * - * - * - * - * * * *
-            * - - * - * - - - - - - - * - * - - *
-            * - - * - * - * * * * * - * - * - - *
-            * - - - - - - - - * - - - - - - - - *
-            * - * * - * * * - * - * * * - * * - *
-            * - - * - - - - - - - - - - - * - - *
-            * * - * - * - * * * * * - * - * - * *
-            * - - - - * - - - * - - - * - - - - *
-            * - * * * * * * - * - * * * * * * - *
-            * - - - - - - - - - - - - - - - - - *
-            * - * * * * * * * * * * * * * * * d *",
-            Rules::Wrapped,
-            Map::ArcadeMaze,
         ),
         (
             // Head-to-head on food same length
@@ -328,7 +302,7 @@ fn gen_board_ref_test() {
         game.api.ruleset.name = rules_str;
 
         let board = Board::from_str(board_str, &game).unwrap();
-        let mut food_buff = Vec::with_capacity((board.width * board.height) as usize);
+        let mut food_buff = [Default::default(); MAX_BOARD_SIZE];
 
         if let Map::Royale = game.api.map {
             game.api.ruleset.settings.hazard_damage_per_turn = 16;
@@ -357,13 +331,17 @@ fn gen_board_ref_test() {
         for moves in moves_arr {
             let mut gen_board = board.clone();
             gen_board.gen_board(Move::encode(&moves), &game, &mut food_buff, &mut rng);
+
+            let mut compare_board = Board::new(0, 0);
+            compare_board.set_from(&gen_board);
+
             let ref_board = ref_gen.gen_ref_board(&game, &board, &moves);
 
-            if gen_board != ref_board {
+            if compare_board != ref_board {
                 println!("\nmoves: {moves:?}\ninput board:\n{board}");
-                println!("gen_board:\n{gen_board}\nref_board:\n{ref_board}\n-----");
+                println!("gen_board:\n{compare_board}\nref_board:\n{ref_board}\n-----");
             }
-            assert_eq!(gen_board, ref_board);
+            assert_eq!(compare_board, ref_board);
         }
     }
 }

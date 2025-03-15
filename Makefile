@@ -167,12 +167,9 @@ clean:
 
 .PHONY: veryclean
 veryclean: clean
-	( chmod 700 -R .go || true ) && \
 	rm -rf target* build* \
 		.go \
-		.cargo/registry \
-		.cargo/.package-cache \
-		.cargo/.package-cache-mutate \
+		.cargo \
 		terraform/.terraform
 
 # -------------------- production --------------------

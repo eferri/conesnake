@@ -1,12 +1,11 @@
 use crate::api::{Scores, SearchStats};
 use crate::board::Board;
-use crate::config::Config;
+use crate::config::{Config, MAX_BOARD_SIZE, MAX_SNAKES};
 use crate::game::Game;
 use crate::pool::ThreadPool;
 use crate::rand::Rand;
 use crate::util::{Coord, Error, Move};
 
-use deepsize::DeepSizeOf;
 use log::{error, info, warn};
 
 #[cfg(feature = "simd")]
@@ -41,12 +40,18 @@ pub struct ThreadContext<R: Rand> {
 
     rng: R,
 
-    food_buff: Vec<Coord>,
-    play_scores: Vec<f64>,
+    food_buff: [Coord; MAX_BOARD_SIZE],
+    play_scores: [f64; MAX_SNAKES],
+}
+
+impl<R: Rand> Default for ThreadContext<R> {
+    fn default() -> Self {
+        ThreadContext::new()
+    }
 }
 
 // Node in search tree
-#[derive(Clone, DeepSizeOf)]
+#[derive(Clone)]
 pub struct Node {
     board: Board,
 
@@ -68,7 +73,7 @@ pub struct Node {
     children: Vec<NodePtr>,
 }
 
-#[derive(Default, Debug, Clone, DeepSizeOf)]
+#[derive(Default, Debug, Clone)]
 struct NodeScoreCache {
     score: f64,
     games: i64,
@@ -79,20 +84,20 @@ struct NodeScoreCache {
 // Pointer to child nodes, with corresponding moves
 // 2-bit moves are encoded into "moves" u32 to save memory
 // In Royale map, shrink direction is encoded in last 2 bits
-#[derive(Clone, DeepSizeOf)]
+#[derive(Clone)]
 struct NodePtr {
     moves: u32,
     index: u32,
 }
 
 impl<R: Rand> ThreadContext<R> {
-    pub fn new(cfg: &Config) -> Self {
+    pub fn new() -> Self {
         ThreadContext {
             rng: R::new(),
-            board: Board::new(0, 0, cfg.max_width, cfg.max_height, cfg.max_snakes),
-            food_buff: Vec::with_capacity((cfg.max_width * cfg.max_height) as usize),
+            board: Board::new(0, 0),
+            food_buff: [Coord::new(0, 0); MAX_BOARD_SIZE],
 
-            play_scores: Vec::with_capacity(cfg.max_snakes as usize),
+            play_scores: [Default::default(); MAX_SNAKES],
         }
     }
 }
@@ -100,18 +105,10 @@ impl<R: Rand> ThreadContext<R> {
 impl<R: Rand> SearchContext<R> {
     pub fn new(config: &Config) -> Self {
         let mut node_space = Vec::with_capacity(config.max_boards);
-        node_space.resize_with(config.max_boards, || {
-            RwLock::new(Node::new(Board::new(
-                0,
-                0,
-                config.max_width,
-                config.max_height,
-                config.max_snakes,
-            )))
-        });
+        node_space.resize_with(config.max_boards, || RwLock::new(Node::new(Board::new(0, 0))));
 
         let mut thread_state = Vec::with_capacity(config.num_threads);
-        thread_state.resize_with(config.num_threads, || Mutex::new(ThreadContext::new(config)));
+        thread_state.resize_with(config.num_threads, || Mutex::new(ThreadContext::new()));
 
         SearchContext {
             config: config.clone(),
@@ -385,9 +382,13 @@ pub fn mcts<R: Rand>(
 
     let root_guard = ctx.node_space[0].read().unwrap();
 
-    let mut scores = Vec::with_capacity(ctx.config.max_snakes as usize);
+    let mut scores = [Default::default(); MAX_SNAKES];
 
-    for s_idx in 0..root_guard.board.num_snakes() as usize {
+    for (s_idx, score) in scores
+        .iter_mut()
+        .enumerate()
+        .take(root_guard.board.num_snakes() as usize)
+    {
         let mut snake_scores: Scores = Default::default();
 
         for (mv_idx, stats) in root_guard.cache[s_idx].iter().enumerate() {
@@ -397,7 +398,7 @@ pub fn mcts<R: Rand>(
             }
         }
 
-        scores.push(snake_scores);
+        *score = snake_scores;
     }
 
     let max_depth = root_guard.max_depth;
@@ -581,8 +582,6 @@ pub fn playout_game<R: Rand>(cfg: &Config, state: &mut ThreadContext<R>, game: &
     let mut playout_moves: u32 = 0;
     let mut num_moves = 0;
 
-    state.play_scores.clear();
-
     while !game.over(&state.board) {
         terminal = false;
 
@@ -609,7 +608,7 @@ pub fn playout_game<R: Rand>(cfg: &Config, state: &mut ThreadContext<R>, game: &
 
     for snake_idx in 0..state.board.num_snakes() as usize {
         let score = game.score(&state.board, cfg, snake_idx);
-        state.play_scores.push(score);
+        state.play_scores[snake_idx] = score;
     }
     (terminal, num_moves)
 }

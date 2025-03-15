@@ -1,3 +1,4 @@
+use crate::config::MAX_SNAKES;
 use crate::game::Map;
 use crate::util::{Coord, Move};
 
@@ -105,7 +106,7 @@ pub struct SearchStats {
     pub num_searches: i64,
     pub num_playouts: i64,
     pub max_depth: i32,
-    pub scores: Vec<Scores>,
+    pub scores: [Scores; MAX_SNAKES],
 }
 
 #[derive(Debug, Serialize, Deserialize)]

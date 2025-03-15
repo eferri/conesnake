@@ -45,10 +45,7 @@ async fn server_test() {
 
     let base_port = 4000;
 
-    let mut base_config = get_config();
-
-    base_config.max_height = 11;
-    base_config.max_width = 11;
+    let base_config = get_config();
 
     let mut relay_config = base_config.clone();
 

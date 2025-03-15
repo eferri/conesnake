@@ -17,7 +17,6 @@ jobs:
             echo "UID=$(id -u)" >> .env
             echo "GID=$(id -g)" >> .env
             echo "RUST_BACKTRACE=1" >> .env
-            echo "KERNEL_VER=6.11.0-13-generic" >> .env
       - run:
           name: docker build
           command: docker compose build snake

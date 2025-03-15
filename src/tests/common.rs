@@ -15,9 +15,6 @@ pub fn test_config() -> Config {
 
     config.num_threads = 1;
     config.max_boards = 10000;
-    config.max_width = 19;
-    config.max_height = 21;
-    config.max_snakes = 4;
     config.latency = 50;
 
     config
@@ -29,9 +26,6 @@ pub fn release_config() -> Config {
 
     config.num_threads = 8;
     config.max_boards = 350000;
-    config.max_width = 21;
-    config.max_height = 21;
-    config.max_snakes = 4;
 
     config
 }

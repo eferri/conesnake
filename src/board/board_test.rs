@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardSquare, HeadOnCol};
+use crate::config::MAX_BOARD_SIZE;
 use crate::rand::{FastRand, Rand};
 use crate::tests::common::{solo_game, test_game, test_snake, wrapped_game};
 use crate::util::{Coord, Move};
@@ -9,7 +10,7 @@ use pretty_assertions::assert_eq;
 pub fn basic_str_test() {
     let game = test_game();
 
-    let mut board = Board::new(7, 7, 7, 7, 4);
+    let mut board = Board::new(7, 7);
     board.turn = 4;
 
     let snake = test_snake(&[Coord::new(3, 4), Coord::new(4, 4), Coord::new(4, 3)], 87);
@@ -20,10 +21,8 @@ pub fn basic_str_test() {
 
     board.set_at(Coord::new(1, 3), BoardSquare::Hazard);
 
-    board.update_cache(&game);
-
     let board_string = board.to_string();
-    let parsed_board = Board::from_str_dims(board_string.as_str(), &game, 7, 7, 4).unwrap();
+    let parsed_board = Board::from_str(board_string.as_str(), &game).unwrap();
 
     assert_eq!(board, parsed_board);
 }
@@ -32,7 +31,7 @@ pub fn basic_str_test() {
 pub fn multiple_snake_str_test() {
     let game = test_game();
 
-    let mut board = Board::new(11, 11, 11, 11, 4);
+    let mut board = Board::new(11, 11);
     board.turn = 4;
 
     board.set_at(Coord::new(10, 7), BoardSquare::Food);
@@ -53,10 +52,8 @@ pub fn multiple_snake_str_test() {
     board.add_api_snake(&game, &snake_0).unwrap();
     board.add_api_snake(&game, &snake_1).unwrap();
 
-    board.update_cache(&game);
-
     let board_string = board.to_string();
-    let parsed_board = Board::from_str_dims(board_string.as_str(), &game, 11, 11, 4).unwrap();
+    let parsed_board = Board::from_str(board_string.as_str(), &game).unwrap();
 
     assert_eq!(board, parsed_board);
 }
@@ -65,15 +62,13 @@ pub fn multiple_snake_str_test() {
 pub fn stacked_str_test() {
     let game = test_game();
 
-    let mut board = Board::new(7, 7, 7, 7, 4);
+    let mut board = Board::new(7, 7);
 
     let snake = test_snake(&[Coord::new(3, 5), Coord::new(3, 5), Coord::new(3, 5)], 100);
     board.add_api_snake(&game, &snake).unwrap();
 
-    board.update_cache(&game);
-
     let board_string = board.to_string();
-    let parsed_board = Board::from_str_dims(board_string.as_str(), &game, 7, 7, 4).unwrap();
+    let parsed_board = Board::from_str(board_string.as_str(), &game).unwrap();
 
     assert_eq!(board, parsed_board);
 }
@@ -82,7 +77,7 @@ pub fn stacked_str_test() {
 pub fn hazard_str_test() {
     let game = test_game();
 
-    let mut board = Board::new(11, 11, 11, 11, 4);
+    let mut board = Board::new(11, 11);
 
     let snake = test_snake(
         &[Coord::new(3, 4), Coord::new(4, 4), Coord::new(4, 3), Coord::new(4, 2)],
@@ -95,10 +90,8 @@ pub fn hazard_str_test() {
 
     board.add_api_snake(&game, &snake).unwrap();
 
-    board.update_cache(&game);
-
     let board_string = board.to_string();
-    let parsed_board = Board::from_str_dims(board_string.as_str(), &game, 11, 11, 4).unwrap();
+    let parsed_board = Board::from_str(board_string.as_str(), &game).unwrap();
 
     assert_eq!(board, parsed_board);
 }
@@ -465,7 +458,7 @@ pub fn gen_board_food_test() {
     game.api.ruleset.settings.minimum_food = 5;
 
     let mut board_food = Board::from_str(BOARD_D, &game).unwrap();
-    let mut food_buff = Vec::with_capacity((board_food.width * board_food.height) as usize);
+    let mut food_buff = [Default::default(); MAX_BOARD_SIZE];
 
     board_food.gen_board(Move::Right as u32, &game, &mut food_buff, &mut rng);
 

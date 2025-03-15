@@ -1,38 +1,91 @@
 use crate::api::{BattleState, BoardApi, SnakeApi};
+use crate::config::{MAX_BOARD_SIZE, MAX_SNAKES};
 use crate::game::{Game, Map, Rules};
 use crate::util::{self};
 use crate::util::{Coord, Error, Move};
 
-use std::cmp::{min, min_by, Ordering};
-use std::{collections::VecDeque, fmt::Write, str};
+use std::cmp::{max, min, min_by, Ordering};
+use std::{fmt::Write, str};
 
-use deepsize::DeepSizeOf;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, DeepSizeOf)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Snake {
     pub health: i32,
     pub eliminated: bool,
-    pub head: Coord,
-    pub body: VecDeque<Coord>,
+    pub len: i32,
+    pub tail_ptr: i32,
+    pub head_ptr: i32,
+    pub body: [Coord; MAX_BOARD_SIZE],
+}
+
+impl Default for Snake {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Snake {
-    pub fn new(max_board_size: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             health: 0,
             eliminated: false,
-            head: Default::default(),
-            body: VecDeque::with_capacity(max_board_size + 2),
+            len: 0,
+            head_ptr: 0,
+            tail_ptr: 0,
+            body: [Coord::new(0, 0); MAX_BOARD_SIZE],
         }
     }
 
     pub fn alive(&self) -> bool {
         self.health > 0
     }
+
+    pub fn head_offset(&self, offset: i32) -> i32 {
+        let new_offset = self.head_ptr + offset;
+        new_offset.rem_euclid(MAX_BOARD_SIZE as i32)
+    }
+
+    pub fn tail_offset(&self, offset: i32) -> i32 {
+        let new_offset = self.tail_ptr + offset;
+        new_offset.rem_euclid(MAX_BOARD_SIZE as i32)
+    }
+
+    pub fn at_head_offset(&self, offset: i32) -> Coord {
+        self.body[self.head_offset(offset) as usize]
+    }
+
+    pub fn at_tail_offset(&self, offset: i32) -> Coord {
+        self.body[self.tail_offset(offset) as usize]
+    }
+
+    pub fn push_front(&mut self, coord: Coord) {
+        self.len += 1;
+        if self.len > 1 {
+            self.head_ptr = self.head_offset(-1);
+        }
+        self.body[self.head_ptr as usize] = coord;
+    }
+
+    pub fn push_back(&mut self, coord: Coord) {
+        self.len += 1;
+        if self.len > 1 {
+            self.tail_ptr = self.tail_offset(1);
+        }
+        self.body[self.tail_ptr as usize] = coord;
+    }
+
+    pub fn pop_back(&mut self) -> Coord {
+        self.len -= 1;
+        let old_tail = self.tail_ptr;
+        if self.len > 0 {
+            self.tail_ptr = self.tail_offset(-1);
+        }
+        self.body[old_tail as usize]
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum BoardSquare {
     Empty,
@@ -70,14 +123,14 @@ impl BoardSquare {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, DeepSizeOf)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeadOnCol {
     None,
     PossibleCollision,
     PossibleElimination,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, DeepSizeOf)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Board {
     pub width: i32,
     pub height: i32,
@@ -90,16 +143,14 @@ pub struct Board {
     pub royale_min_y: i32,
     pub royale_max_y: i32,
 
-    pub snakes: Vec<Snake>,
+    pub snakes: [Snake; MAX_SNAKES],
 
-    board_mat: Vec<BoardSquare>,
+    board_mat: [BoardSquare; MAX_BOARD_SIZE],
 }
 
 impl Board {
-    pub fn new(width: i32, height: i32, max_width: i32, max_height: i32, max_snakes: i32) -> Self {
-        let max_board_size = (max_width * max_height) as usize;
-        let max_snakes = max_snakes as usize;
-        let mut board = Self {
+    pub fn new(width: i32, height: i32) -> Self {
+        Self {
             width,
             height,
             turn: 1,
@@ -109,28 +160,17 @@ impl Board {
             royale_max_x: 0,
             royale_min_y: 0,
             royale_max_y: 0,
-            snakes: Vec::with_capacity(max_snakes),
-            board_mat: vec![BoardSquare::Empty; max_board_size],
-        };
-
-        // Don't use vec![] here so snake body capacity is reserved
-        board.snakes.resize_with(max_snakes, || Snake::new(max_board_size));
-
-        board
+            snakes: [Snake::new(); MAX_SNAKES],
+            board_mat: [BoardSquare::Empty; MAX_BOARD_SIZE],
+        }
     }
 
-    pub fn from_req(
-        game: &Game,
-        req: &BattleState,
-        max_width: i32,
-        max_height: i32,
-        max_snakes: i32,
-    ) -> Result<Board, Error> {
+    pub fn from_req(game: &Game, req: &BattleState) -> Result<Board, Error> {
         if req.board.snakes.is_empty() {
             return Err(Error::BadBoardReq("No snakes in request".to_owned()));
         }
 
-        let mut board = Board::new(req.board.width, req.board.height, max_width, max_height, max_snakes);
+        let mut board = Board::new(req.board.width, req.board.height);
         for coord in req.board.food.iter() {
             board.set_at(*coord, BoardSquare::Food);
             board.num_food += 1;
@@ -159,8 +199,6 @@ impl Board {
         if let Map::Royale = req.game.map {
             board.set_royale();
         }
-
-        board.update_cache(game);
 
         Ok(board)
     }
@@ -191,10 +229,16 @@ impl Board {
         }
 
         for idx in 0..self.num_snakes() as usize {
+            let mut snake_body = Vec::with_capacity(self.snakes[idx].len as usize);
+
+            for i in 0..self.snakes[idx].len {
+                snake_body.push(self.snakes[idx].at_head_offset(i));
+            }
+
             let api_snake = SnakeApi {
                 id: idx.to_string(),
                 name: idx.to_string(),
-                body: Vec::from(self.snakes[idx].body.clone()),
+                body: snake_body,
                 head: self.snakes[idx].body[0],
                 health: self.snakes[idx].health,
                 latency: "0".to_owned(),
@@ -222,25 +266,51 @@ impl Board {
     }
 
     pub fn set_from(&mut self, other: &Board) {
+        if std::ptr::eq(self, other) {
+            panic!("Cannot set from self");
+        }
+
         self.width = other.width;
         self.height = other.height;
         self.turn = other.turn;
         self.num_food = other.num_food;
         self.num_snakes = other.num_snakes;
 
+        self.royale_max_x = other.royale_max_x;
+        self.royale_min_x = other.royale_min_x;
+        self.royale_max_y = other.royale_max_y;
+        self.royale_min_y = other.royale_min_y;
+
         let board_len = (self.width * self.height) as usize;
 
         for s_idx in 0..other.num_snakes {
             let snake = &mut self.snakes[s_idx as usize];
-            let other = &other.snakes[s_idx as usize];
+            let other_snake = &other.snakes[s_idx as usize];
 
-            snake.health = other.health;
-            snake.eliminated = other.eliminated;
+            snake.health = other_snake.health;
+            snake.eliminated = other_snake.eliminated;
 
-            snake.head = other.head;
+            snake.len = other_snake.len;
+            snake.head_ptr = 0;
 
-            snake.body.clear();
-            snake.body.extend(&other.body);
+            if other_snake.len > 0 {
+                snake.tail_ptr = other_snake.len - 1;
+
+                if other_snake.head_ptr > other_snake.tail_ptr {
+                    let back_len = MAX_BOARD_SIZE as i32 - other_snake.head_ptr;
+                    snake.body[0..back_len as usize]
+                        .copy_from_slice(&other_snake.body[other_snake.head_ptr as usize..MAX_BOARD_SIZE]);
+                    snake.body[back_len as usize..other_snake.len as usize]
+                        .copy_from_slice(&other_snake.body[0..(other_snake.tail_ptr + 1) as usize]);
+                } else {
+                    snake.body[0..snake.len as usize].copy_from_slice(
+                        &other_snake.body[other_snake.head_ptr as usize..(other_snake.tail_ptr + 1) as usize],
+                    );
+                }
+            } else {
+                snake.len = 0;
+                snake.tail_ptr = 0;
+            }
         }
 
         self.board_mat[..board_len].copy_from_slice(&other.board_mat[..board_len]);
@@ -323,11 +393,6 @@ impl Board {
         self.width * self.height
     }
 
-    fn resize(&mut self, max_width: i32, max_height: i32) {
-        let mat_size = (max_width * max_height) as usize;
-        self.board_mat.resize(mat_size, BoardSquare::Empty);
-    }
-
     fn set_size(&mut self, w: i32, h: i32) {
         assert!(w * h <= self.board_mat.len() as i32);
 
@@ -336,15 +401,10 @@ impl Board {
     }
 
     fn add_snake(&mut self, body: &[Coord], health: i32) {
-        self.snakes[self.num_snakes as usize].body.clear();
-
-        for coord in body.iter() {
-            self.snakes[self.num_snakes as usize].body.push_back(*coord);
-        }
-
-        if !body.is_empty() {
-            self.snakes[self.num_snakes as usize].head = body[0];
-        }
+        self.snakes[self.num_snakes as usize].body[0..body.len()].copy_from_slice(&body[0..body.len()]);
+        self.snakes[self.num_snakes as usize].len = body.len() as i32;
+        self.snakes[self.num_snakes as usize].head_ptr = 0;
+        self.snakes[self.num_snakes as usize].tail_ptr = max(0, body.len() as i32 - 1);
 
         self.snakes[self.num_snakes as usize].health = health;
         self.snakes[self.num_snakes as usize].eliminated = false;
@@ -429,15 +489,15 @@ impl Board {
     }
 
     pub fn snake_head(&self, snake_idx: usize) -> Coord {
-        self.snakes[snake_idx].head
+        self.snakes[snake_idx].body[self.snakes[snake_idx].head_ptr as usize]
     }
 
     pub fn snake_tail(&self, snake_idx: usize) -> Coord {
-        *self.snakes[snake_idx].body.back().unwrap()
+        self.snakes[snake_idx].body[self.snakes[snake_idx].tail_ptr as usize]
     }
 
     pub fn snake_len(&self, snake_idx: usize) -> i32 {
-        self.snakes[snake_idx].body.len() as i32
+        self.snakes[snake_idx].len
     }
 
     pub fn at(&self, loc: Coord) -> BoardSquare {

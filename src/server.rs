@@ -1,6 +1,6 @@
 use crate::api::{BattleState, IndexResp, MoveResp, Scores};
 use crate::board::Board;
-use crate::config::{Config, Mode};
+use crate::config::{Config, Mode, MAX_HEIGHT, MAX_SNAKES, MAX_WIDTH};
 use crate::game::Game;
 use crate::pool::ThreadPool;
 use crate::rand::FastRand;
@@ -15,7 +15,6 @@ use axum::{
     routing::{get, post},
     serve, Json, Router,
 };
-use deepsize::DeepSizeOf;
 use futures::future;
 use log::{debug, error, info, warn};
 use reqwest::Client;
@@ -25,7 +24,7 @@ use tracing::Level;
 
 use std::{
     collections::HashMap,
-    env,
+    env, mem,
     net::SocketAddr,
     sync::atomic::{AtomicI64, Ordering},
     sync::Arc,
@@ -73,9 +72,7 @@ impl Server {
         }
 
         if config.mode != Mode::Relay && config.max_boards > 0 {
-            let test_node = Node::new(Board::new(0, 0, config.max_width, config.max_height, config.max_snakes));
-
-            let node_size = test_node.deep_size_of();
+            let node_size = mem::size_of::<Node>();
             let num_boards = config.max_boards;
             let space_size = node_size as i64 * num_boards as i64;
 
@@ -87,7 +84,7 @@ impl Server {
 
         info!(
             "Starting search space allocation max_boards: {}, width: {}, height: {}, max_snakes {}",
-            config.max_boards, config.max_width, config.max_height, config.max_snakes
+            config.max_boards, MAX_WIDTH, MAX_HEIGHT, MAX_SNAKES
         );
 
         let pod_name = match env::var("POD_NAME") {
@@ -291,17 +288,14 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
         }
     };
 
-    if state.config.max_width < game_width
-        || state.config.max_height < game_height
-        || state.config.max_snakes < game_snakes
-    {
+    if (MAX_WIDTH as i32) < game_width || (MAX_HEIGHT as i32) < game_height || (MAX_SNAKES as i32) < game_snakes {
         error!(
             "Server not configured for w: {} h: {} max_snakes: {}",
             game_width, game_height, game_snakes
         );
         error!(
             "Current settings are max_width: {} max_height: {} max_snakes: {}",
-            state.config.max_width, state.config.max_height, state.config.max_snakes
+            MAX_WIDTH, MAX_HEIGHT, MAX_SNAKES
         );
         return StatusCode::CONFLICT.into_response();
     }
@@ -310,13 +304,7 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
         info!("turn: {}", game_state.turn);
     }
 
-    let board = match Board::from_req(
-        &game,
-        &game_state,
-        state.config.max_width,
-        state.config.max_height,
-        state.config.max_snakes,
-    ) {
+    let board = match Board::from_req(&game, &game_state) {
         Err(e) => {
             error!("Error parsing board - {}", e);
             return StatusCode::BAD_REQUEST.into_response();

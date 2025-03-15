@@ -50,14 +50,7 @@ impl RefMove<'_> {
         assert_eq!(state_bytes.len(), written_bytes);
 
         let ref_state_res = self.ref_iter.next().unwrap();
-        let mut ref_board = Board::from_req(
-            game,
-            ref_state_res.as_ref().unwrap(),
-            board.width,
-            board.height,
-            board.max_snakes(),
-        )
-        .unwrap();
+        let mut ref_board = Board::from_req(game, ref_state_res.as_ref().unwrap()).unwrap();
 
         // Patch "eliminated" which is not in the API
         for snake_idx in 0..ref_board.num_snakes() as usize {

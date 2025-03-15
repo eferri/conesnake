@@ -1,7 +1,6 @@
 use crate::board::BoardSquare;
 use crate::rand::Rand;
 
-use deepsize::DeepSizeOf;
 use serde::{Deserialize, Serialize};
 
 use std::cmp::{Ord, PartialOrd};
@@ -9,7 +8,7 @@ use std::fmt::{Display, Formatter, Result};
 use std::io;
 
 // API structs
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub struct Coord {
     pub x: i8,
     pub y: i8,
@@ -28,7 +27,7 @@ impl Display for Coord {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Move {
     #[default]

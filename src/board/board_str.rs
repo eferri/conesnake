@@ -42,29 +42,29 @@ impl Board {
                 (BoardSquare::SnakeTail(_), x, Some(mv)) => {
                     self.set_at(curr_coord, BoardSquare::SnakeTail(snake_idx));
                     for _ in 0..(x + 1) {
-                        self.snakes[snake_idx as usize].body.push_back(curr_coord);
+                        self.snakes[snake_idx as usize].push_back(curr_coord);
                     }
                     mv
                 }
                 (BoardSquare::SnakeTailHazard(_), x, Some(mv)) => {
                     self.set_at(curr_coord, BoardSquare::SnakeTailHazard(snake_idx));
                     for _ in 0..(x + 1) {
-                        self.snakes[snake_idx as usize].body.push_back(curr_coord);
+                        self.snakes[snake_idx as usize].push_back(curr_coord);
                     }
                     mv
                 }
                 (BoardSquare::SnakeBody(_), _, Some(mv)) => {
                     self.set_at(curr_coord, BoardSquare::SnakeBody(snake_idx));
-                    self.snakes[snake_idx as usize].body.push_back(curr_coord);
+                    self.snakes[snake_idx as usize].push_back(curr_coord);
                     mv
                 }
                 (BoardSquare::SnakeBodyHazard(_), _, Some(mv)) => {
                     self.set_at(curr_coord, BoardSquare::SnakeBodyHazard(snake_idx));
-                    self.snakes[snake_idx as usize].body.push_back(curr_coord);
+                    self.snakes[snake_idx as usize].push_back(curr_coord);
                     mv
                 }
                 (BoardSquare::SnakeHead(_) | BoardSquare::SnakeHeadHazard(_), _, None) => {
-                    self.snakes[snake_idx as usize].body.push_back(curr_coord);
+                    self.snakes[snake_idx as usize].push_back(curr_coord);
                     break;
                 }
                 _ => panic!("Snake body was not contiguous or had unexpected form {self}"),
@@ -73,7 +73,8 @@ impl Board {
             curr_coord = self.move_to_coord(curr_coord, next_mv, rules);
         }
 
-        self.snakes[snake_idx as usize].body.make_contiguous().reverse();
+        let snake_len = self.snakes[snake_idx as usize].len as usize;
+        self.snakes[snake_idx as usize].body[0..snake_len].reverse();
 
         snake_idx
     }
@@ -106,11 +107,12 @@ impl Board {
 
             let mut prev_coord = self.snake_tail(s_idx);
             let mut num_stacked = 0;
-            for coord in self.snakes[s_idx].body.iter().rev().skip(1) {
-                if *coord == prev_coord {
+            for body_idx in 0..self.snakes[s_idx].len - 1 {
+                let coord = self.snakes[s_idx].at_tail_offset(-1 - body_idx);
+                if coord == prev_coord {
                     num_stacked += 1
                 } else {
-                    let (mv, secondary_mv) = self.coord_to_move(prev_coord, *coord, Rules::Wrapped);
+                    let (mv, secondary_mv) = self.coord_to_move(prev_coord, coord, Rules::Wrapped);
                     assert!(mv.is_some());
                     assert!(secondary_mv.is_none());
 
@@ -118,7 +120,7 @@ impl Board {
                     char_array[prev_coord_idx] = util::square_to_char(self.at(prev_coord), num_stacked, mv);
                     num_stacked = 0;
                 }
-                prev_coord = *coord;
+                prev_coord = coord;
             }
 
             // Set head
@@ -140,16 +142,6 @@ impl Board {
     }
 
     pub fn from_str(inp: &str, game: &Game) -> Result<Self, Error> {
-        Board::from_str_dims(inp, game, 0, 0, 0)
-    }
-
-    pub fn from_str_dims(
-        inp: &str,
-        game: &Game,
-        max_width: i32,
-        max_height: i32,
-        max_snakes: i32,
-    ) -> Result<Self, Error> {
         // Remove whitespace lines
         let lines: Vec<&str> = inp.lines().filter(|l| l.split_whitespace().next().is_some()).collect();
 
@@ -158,7 +150,7 @@ impl Board {
         assert_eq!(header.len() % 2, 0);
         assert!(header.len() >= 4);
 
-        let mut board = Board::new(0, 0, max_width, max_height, max_snakes);
+        let mut board = Board::new(0, 0);
 
         assert_eq!(header[0], "turn:", "Invalid board str header: turn field");
         board.turn = header[1].parse::<i32>().unwrap();
@@ -167,9 +159,6 @@ impl Board {
             match i % 2 {
                 0 => {
                     assert_eq!(*h, "health:", "Invalid board str header: health field");
-                    if max_snakes == 0 {
-                        board.snakes.push(Snake::new(0));
-                    }
                     board.add_snake(&[], 0);
                 }
                 1 => {
@@ -203,9 +192,6 @@ impl Board {
 
         let w = w_opt.unwrap() as i32;
 
-        if max_width == 0 && max_height == 0 && max_snakes == 0 {
-            board.resize(w, h);
-        }
         board.set_size(w, h);
 
         lines_vec.reverse();
@@ -253,11 +239,8 @@ impl Board {
             {
                 for _ in 0..3 {
                     let head = board.coord_from_idx(*found_heads.get(&(i as u8)).unwrap());
-                    board.snakes[i].body.push_back(head);
+                    board.snakes[i].push_back(head);
                 }
-            }
-            if !board.snakes[i].body.is_empty() {
-                board.snakes[i].head = *board.snakes[i].body.front().unwrap();
             }
         }
 
@@ -265,8 +248,6 @@ impl Board {
         if let Map::Royale = game.api.map {
             board.set_royale();
         }
-
-        board.update_cache(game);
 
         Ok(board)
     }

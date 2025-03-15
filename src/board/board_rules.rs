@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::game::{Game, Map, ARCADE_FOOD_COORDS};
+use crate::game::{Game, Map};
 use crate::rand::Rand;
 
 use std::cmp::max;
@@ -108,13 +108,13 @@ impl Board {
             | BoardSquare::SnakeBodyHazard(_) => false,
             BoardSquare::SnakeTail(i) => {
                 let idx = i as usize;
-                self.snake_tail(idx) != self.snakes[idx].body[self.snakes[idx].body.len() - 2]
+                self.snake_tail(idx) != self.snakes[idx].at_tail_offset(-1)
             }
             BoardSquare::SnakeTailHazard(i) => {
                 let idx = i as usize;
 
                 (self.snakes[snake_idx].health - game.api.ruleset.settings.hazard_damage_per_turn) > 0
-                    && self.snake_tail(idx) != self.snakes[idx].body[self.snakes[idx].body.len() - 2]
+                    && self.snake_tail(idx) != self.snakes[idx].at_tail_offset(-1)
             }
         }
     }
@@ -182,7 +182,7 @@ impl Board {
     // Battlesnake rules implementation
     //
 
-    pub fn gen_board(&mut self, moves: u32, game: &Game, food_buff: &mut Vec<Coord>, rng: &mut impl Rand) {
+    pub fn gen_board(&mut self, moves: u32, game: &Game, food_buff: &mut [Coord], rng: &mut impl Rand) {
         // Note: this is not done till later in rules
         self.turn += 1;
 
@@ -213,9 +213,6 @@ impl Board {
         // Apply map logic
         // Does not correspond to a rules stage
         self.update_board(game, food_buff, rng);
-
-        // Update cached board date
-        self.update_cache(game);
     }
 
     #[inline(always)]
@@ -232,11 +229,10 @@ impl Board {
             let old_head = self.snake_head(idx);
             let new_head = self.move_to_coord(old_head, mv, game.ruleset);
 
-            let old_tail = self.snakes[idx].body.pop_back().unwrap();
+            let old_tail = self.snakes[idx].pop_back();
             let new_tail = self.snake_tail(idx);
 
-            self.snakes[idx].body.push_front(new_head);
-            self.snakes[idx].head = new_head;
+            self.snakes[idx].push_front(new_head);
 
             match (self.at(old_tail), self.at(new_tail)) {
                 (BoardSquare::SnakeTail(old_idx), BoardSquare::SnakeTail(new_idx))
@@ -318,7 +314,7 @@ impl Board {
                     let tail = self.snake_tail(idx);
 
                     self.snakes[idx].health = 100;
-                    self.snakes[idx].body.push_back(tail);
+                    self.snakes[idx].push_back(tail);
                 }
                 BoardSquare::Hazard
                 | BoardSquare::SnakeHeadHazard(_)
@@ -351,7 +347,7 @@ impl Board {
             let mv = Move::extract(moves, idx as u32);
 
             // Update old head, even for eliminated snakes
-            let old_head = self.snakes[idx].body[1];
+            let old_head = self.snakes[idx].at_head_offset(1);
             if old_head != self.snake_tail(idx) {
                 match self.at(old_head) {
                     BoardSquare::SnakeHead(snake_idx) => {
@@ -457,8 +453,8 @@ impl Board {
                 continue;
             }
 
-            for body_idx in 0..self.snakes[idx].body.len() {
-                let coord = self.snakes[idx].body[body_idx];
+            for body_idx in 0..self.snakes[idx].len {
+                let coord = self.snakes[idx].at_head_offset(body_idx);
 
                 if !self.on_board(coord) {
                     continue;
@@ -484,7 +480,7 @@ impl Board {
     }
 
     #[inline(always)]
-    fn update_board(&mut self, game: &Game, food_buff: &mut Vec<Coord>, rng: &mut impl Rand) {
+    fn update_board(&mut self, game: &Game, food_buff: &mut [Coord], rng: &mut impl Rand) {
         let map = game.api.map;
         let rules = game.ruleset;
 
@@ -497,61 +493,47 @@ impl Board {
 
         let mut num_spawn = 0;
 
-        if let Map::ArcadeMaze = map {
-            let rand_val = rng.int_n(100);
-            if rand_val <= chance {
-                num_spawn = 1;
-            }
-        } else {
-            let rand_val = 100 - rng.int_n(100);
-            if self.num_food() < min_food {
-                num_spawn = (min_food - self.num_food()) as usize;
-            } else if rand_val < chance {
-                num_spawn = 1;
-            }
-        };
+        let rand_val = 100 - rng.int_n(100);
+        if self.num_food() < min_food {
+            num_spawn = (min_food - self.num_food()) as usize;
+        } else if rand_val < chance {
+            num_spawn = 1;
+        }
+
+        let mut num_unnocupied = 0;
 
         if num_spawn > 0 {
-            food_buff.clear();
+            for x in 0..self.width {
+                'coord_loop: for y in 0..self.height {
+                    let coord = Coord::new(x as i8, y as i8);
 
-            if let Map::ArcadeMaze = map {
-                for coord in &ARCADE_FOOD_COORDS {
-                    if self.at(*coord) == BoardSquare::Empty {
-                        food_buff.push(*coord);
+                    let square = self.at(coord);
+
+                    if square != BoardSquare::Empty && square != BoardSquare::Hazard {
+                        continue;
                     };
-                }
-            } else {
-                for x in 0..self.width {
-                    'coord_loop: for y in 0..self.height {
-                        let coord = Coord::new(x as i8, y as i8);
 
-                        let square = self.at(coord);
-
-                        if square != BoardSquare::Empty && square != BoardSquare::Hazard {
+                    // Potential Bug: GetUnoccupiedPoints excludes squares that may be moved to
+                    for idx in 0..self.num_snakes() as usize {
+                        if !self.snakes[idx].alive() {
                             continue;
-                        };
-
-                        // Potential Bug: GetUnoccupiedPoints excludes squares that may be moved to
-                        for idx in 0..self.num_snakes() as usize {
-                            if !self.snakes[idx].alive() {
-                                continue;
-                            }
-
-                            // Bug: maps don't consider possibility of wrapping.
-                            // Use standard ruleset here to match this behavior
-                            if self.next_to(self.snake_head(idx), coord, Rules::Standard) {
-                                continue 'coord_loop;
-                            }
                         }
 
-                        food_buff.push(coord);
+                        // Bug: maps don't consider possibility of wrapping.
+                        // Use standard ruleset here to match this behavior
+                        if self.next_to(self.snake_head(idx), coord, Rules::Standard) {
+                            continue 'coord_loop;
+                        }
                     }
+
+                    food_buff[num_unnocupied] = coord;
+                    num_unnocupied += 1;
                 }
             }
 
-            if !food_buff.is_empty() {
-                num_spawn = min(num_spawn, food_buff.len());
-                rng.shuffle(food_buff, num_spawn);
+            if num_unnocupied != 0 {
+                num_spawn = min(num_spawn, num_unnocupied);
+                rng.shuffle(&mut food_buff[0..num_unnocupied], num_spawn);
 
                 self.num_food += num_spawn as i32;
 
@@ -636,17 +618,12 @@ impl Board {
                 self.snakes[s_idx].health = 100;
             }
 
-            let snake_len = self.snakes[s_idx].body.len();
-
-            let tail = self.snakes[s_idx].body[snake_len - 1];
-            let sub_tail = self.snakes[s_idx].body[snake_len - 2];
+            let tail = self.snake_tail(s_idx);
+            let sub_tail = self.snakes[s_idx].at_tail_offset(-1);
 
             if tail != sub_tail {
-                self.snakes[s_idx].body.push_back(tail);
+                self.snakes[s_idx].push_back(tail);
             }
         }
     }
-
-    #[inline(always)]
-    pub fn update_cache(&mut self, _game: &Game) {}
 }

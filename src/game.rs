@@ -1,7 +1,7 @@
 use crate::api::GameApi;
 use crate::board::{Board, HeadOnCol};
 use crate::config::Config;
-use crate::util::{Coord, Error, Move};
+use crate::util::{Error, Move};
 
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +22,6 @@ pub enum Map {
     #[default]
     Standard,
     Empty,
-    ArcadeMaze,
     Royale,
     HzRiversBridges,
     HzRiversBridgesLg,
@@ -36,21 +35,6 @@ pub struct Game {
     pub ruleset: Rules,
     pub is_solo: bool,
 }
-
-pub const ARCADE_FOOD_COORDS: [Coord; 12] = [
-    Coord { x: 1, y: 1 },
-    Coord { x: 3, y: 11 },
-    Coord { x: 4, y: 7 },
-    Coord { x: 4, y: 17 },
-    Coord { x: 9, y: 1 },
-    Coord { x: 9, y: 5 },
-    Coord { x: 9, y: 11 },
-    Coord { x: 9, y: 17 },
-    Coord { x: 14, y: 7 },
-    Coord { x: 14, y: 17 },
-    Coord { x: 15, y: 11 },
-    Coord { x: 17, y: 1 },
-];
 
 impl Game {
     pub fn new(req_game: GameApi, solo: bool) -> Result<Self, Error> {
@@ -109,14 +93,14 @@ impl Game {
 
         let mut score = base_reward;
 
-        let our_len = board.snakes[snake_idx].body.len();
+        let our_len = board.snakes[snake_idx].len;
         let num_alive = board.num_alive_snakes();
 
         for s_idx in 0..board.num_snakes() as usize {
             if s_idx == snake_idx {
                 continue;
             }
-            if our_len > board.snakes[s_idx].body.len() {
+            if our_len > board.snakes[s_idx].len {
                 score += len_reward;
             }
 
