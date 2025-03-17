@@ -332,16 +332,13 @@ fn gen_board_ref_test() {
             let mut gen_board = board.clone();
             gen_board.gen_board(Move::encode(&moves), &game, &mut food_buff, &mut rng);
 
-            let mut compare_board = Board::new(0, 0);
-            compare_board.set_from(&gen_board);
-
             let ref_board = ref_gen.gen_ref_board(&game, &board, &moves);
 
-            if compare_board != ref_board {
+            if gen_board != ref_board {
                 println!("\nmoves: {moves:?}\ninput board:\n{board}");
-                println!("gen_board:\n{compare_board}\nref_board:\n{ref_board}\n-----");
+                println!("gen_board:\n{gen_board}\nref_board:\n{ref_board}\n-----");
             }
-            assert_eq!(compare_board, ref_board);
+            assert_eq!(gen_board, ref_board);
         }
     }
 }

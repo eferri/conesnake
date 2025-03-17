@@ -4,7 +4,6 @@
         ".go": true,
         "target*": true,
         "submodules/board": true,
-        "submodules/snork": true,
     },
     "files.watcherExclude": {
         ".cargo": true,

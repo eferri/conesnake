@@ -22,6 +22,7 @@ pub fn basic_str_test() {
     board.set_at(Coord::new(1, 3), BoardSquare::Hazard);
 
     let board_string = board.to_string();
+    println!("{}", board_string);
     let parsed_board = Board::from_str(board_string.as_str(), &game).unwrap();
 
     assert_eq!(board, parsed_board);
@@ -37,7 +38,7 @@ pub fn multiple_snake_str_test() {
     board.set_at(Coord::new(10, 7), BoardSquare::Food);
     board.num_food += 1;
 
-    let snake_0 = test_snake(&[Coord::new(3, 4), Coord::new(2, 4)], 87);
+    let snake_0 = test_snake(&[Coord::new(3, 4), Coord::new(2, 4), Coord::new(1, 4)], 87);
     let snake_1 = test_snake(
         &[
             Coord::new(5, 6),
@@ -273,29 +274,20 @@ pub fn coord_to_move_test() {
     let c = Coord { x: 0, y: 0 };
     let d = Coord { x: 1, y: 0 };
 
-    assert_eq!(board.coord_to_move(a, b, game.ruleset), (Some(Move::Up), None));
-    assert_eq!(board.coord_to_move(b, a, game.ruleset), (Some(Move::Down), None));
-    assert_eq!(board.coord_to_move(c, d, game.ruleset), (Some(Move::Right), None));
-    assert_eq!(board.coord_to_move(d, c, game.ruleset), (Some(Move::Left), None));
+    assert_eq!(board.coord_to_move(a, b, game.ruleset), Some(Move::Up));
+    assert_eq!(board.coord_to_move(b, a, game.ruleset), Some(Move::Down));
+    assert_eq!(board.coord_to_move(c, d, game.ruleset), Some(Move::Right));
+    assert_eq!(board.coord_to_move(d, c, game.ruleset), Some(Move::Left));
 
     // More than one coord away
     assert_eq!(
         board.coord_to_move(Coord::new(0, 3), Coord::new(5, 3), game.ruleset),
-        (Some(Move::Right), None)
+        Some(Move::Right)
     );
-    assert_eq!(
-        board.coord_to_move(Coord::new(0, 3), Coord::new(1, 4), game.ruleset),
-        (Some(Move::Right), Some(Move::Up))
-    );
-    assert_eq!(
-        board.coord_to_move(Coord::new(0, 3), Coord::new(1, 5), game.ruleset),
-        (Some(Move::Up), Some(Move::Right))
-    );
-
     // Equal
     assert_eq!(
         board.coord_to_move(Coord::new(0, 3), Coord::new(0, 3), game.ruleset),
-        (None, None)
+        None,
     );
 }
 
@@ -312,33 +304,25 @@ pub fn coord_to_move_wrapped_test() {
     let e = Coord { x: 5, y: 0 };
     let f = Coord { x: 0, y: 5 };
 
-    assert_eq!(board.coord_to_move(a, b, game.ruleset), (Some(Move::Up), None));
-    assert_eq!(board.coord_to_move(b, a, game.ruleset), (Some(Move::Down), None));
-    assert_eq!(board.coord_to_move(c, d, game.ruleset), (Some(Move::Right), None));
-    assert_eq!(board.coord_to_move(d, c, game.ruleset), (Some(Move::Left), None));
-    assert_eq!(board.coord_to_move(c, e, game.ruleset), (Some(Move::Left), None));
-    assert_eq!(board.coord_to_move(e, c, game.ruleset), (Some(Move::Right), None));
-    assert_eq!(board.coord_to_move(c, f, game.ruleset), (Some(Move::Down), None));
-    assert_eq!(board.coord_to_move(d, c, game.ruleset), (Some(Move::Left), None));
+    assert_eq!(board.coord_to_move(a, b, game.ruleset), Some(Move::Up));
+    assert_eq!(board.coord_to_move(b, a, game.ruleset), Some(Move::Down));
+    assert_eq!(board.coord_to_move(c, d, game.ruleset), Some(Move::Right));
+    assert_eq!(board.coord_to_move(d, c, game.ruleset), Some(Move::Left));
+    assert_eq!(board.coord_to_move(c, e, game.ruleset), Some(Move::Left));
+    assert_eq!(board.coord_to_move(e, c, game.ruleset), Some(Move::Right));
+    assert_eq!(board.coord_to_move(c, f, game.ruleset), Some(Move::Down));
+    assert_eq!(board.coord_to_move(d, c, game.ruleset), Some(Move::Left));
 
     // More than one coord away
     assert_eq!(
         board.coord_to_move(Coord::new(0, 3), Coord::new(5, 3), game.ruleset),
-        (Some(Move::Left), None)
-    );
-    assert_eq!(
-        board.coord_to_move(Coord::new(0, 3), Coord::new(5, 4), game.ruleset),
-        (Some(Move::Left), Some(Move::Up))
-    );
-    assert_eq!(
-        board.coord_to_move(Coord::new(0, 3), Coord::new(5, 5), game.ruleset),
-        (Some(Move::Up), Some(Move::Left))
+        Some(Move::Left)
     );
 
     // Equal
     assert_eq!(
         board.coord_to_move(Coord::new(0, 3), Coord::new(0, 3), game.ruleset),
-        (None, None)
+        None
     );
 }
 

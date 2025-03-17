@@ -40,7 +40,7 @@ RUN apt-get update \
     make \
     less \
     cmake \
-    lldb \
+    lldb-19 \
     g++ \
     unzip \
     jq \
@@ -60,7 +60,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && update-alternatives --install /usr/bin/clangd clangd /usr/bin/clangd-19 100 \
     && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-19 100 \
-    && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100
+    && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100 \
+    && update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-19 100
 
 RUN mkdir -p /tools/bin \
     && chown -R conesnake:conesnake /tools
@@ -97,7 +98,7 @@ ENV PATH "/tools/bin:/usr/lib/linux-tools/6.8.0-55-generic/:${PATH}"
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-03-14
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-03-13
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \

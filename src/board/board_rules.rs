@@ -104,17 +104,12 @@ impl Board {
             }
             BoardSquare::SnakeHead(_)
             | BoardSquare::SnakeHeadHazard(_)
-            | BoardSquare::SnakeBody(_)
-            | BoardSquare::SnakeBodyHazard(_) => false,
-            BoardSquare::SnakeTail(i) => {
-                let idx = i as usize;
-                self.snake_tail(idx) != self.snakes[idx].at_tail_offset(-1)
-            }
-            BoardSquare::SnakeTailHazard(i) => {
-                let idx = i as usize;
-
+            | BoardSquare::SnakeBody(_, _)
+            | BoardSquare::SnakeBodyHazard(_, _) => false,
+            BoardSquare::SnakeTail(i, _) => self.snakes[i as usize].num_stacked == 0,
+            BoardSquare::SnakeTailHazard(i, _) => {
                 (self.snakes[snake_idx].health - game.api.ruleset.settings.hazard_damage_per_turn) > 0
-                    && self.snake_tail(idx) != self.snakes[idx].at_tail_offset(-1)
+                    && self.snakes[i as usize].num_stacked == 0
             }
         }
     }
@@ -220,63 +215,71 @@ impl Board {
         // StageMovementStandard
         // Move snakes board_mat tails only, Compute location of move
         for idx in 0..(self.num_snakes() as usize) {
-            let snake = &self.snakes[idx];
-            if !snake.alive() {
+            if !self.snakes[idx].alive() {
                 continue;
             }
             let mv = Move::extract(moves, idx as u32);
 
-            let old_head = self.snake_head(idx);
-            let new_head = self.move_to_coord(old_head, mv, game.ruleset);
+            self.snakes[idx].old_head = self.snake_head(idx);
+            self.snakes[idx].head = self.move_to_coord(self.snakes[idx].old_head, mv, game.ruleset);
 
-            let old_tail = self.snakes[idx].pop_back();
-            let new_tail = self.snake_tail(idx);
-
-            self.snakes[idx].push_front(new_head);
+            let old_tail = self.snake_tail(idx);
+            let new_tail = if self.snakes[idx].num_stacked > 0 {
+                self.snakes[idx].num_stacked -= 1;
+                old_tail
+            } else {
+                match self.at(old_tail) {
+                    BoardSquare::SnakeTail(_, sqr_mv) | BoardSquare::SnakeTailHazard(_, sqr_mv) => {
+                        self.move_to_coord(old_tail, sqr_mv, game.ruleset)
+                    }
+                    x => panic!("LOGIC ERROR: snake {idx} unexpected BoardSquare: {x:?}\n{self}"),
+                }
+            };
+            self.snakes[idx].tail = new_tail;
 
             match (self.at(old_tail), self.at(new_tail)) {
-                (BoardSquare::SnakeTail(old_idx), BoardSquare::SnakeTail(new_idx))
-                | (BoardSquare::SnakeTailHazard(old_idx), BoardSquare::SnakeTailHazard(new_idx)) => {
+                (BoardSquare::SnakeTail(old_idx, _), BoardSquare::SnakeTail(new_idx, _))
+                | (BoardSquare::SnakeTailHazard(old_idx, _), BoardSquare::SnakeTailHazard(new_idx, _)) => {
                     debug_assert_eq!(old_idx, idx as u8);
                     debug_assert_eq!(new_idx, idx as u8);
                 }
-                (BoardSquare::SnakeTail(old_idx), BoardSquare::SnakeBody(new_idx)) => {
+                (BoardSquare::SnakeTail(old_idx, _), BoardSquare::SnakeBody(new_idx, sqr_mv)) => {
                     debug_assert_eq!(old_idx, idx as u8);
                     debug_assert_eq!(new_idx, idx as u8);
 
                     self.set_at(old_tail, BoardSquare::Empty);
-                    self.set_at(new_tail, BoardSquare::SnakeTail(new_idx));
+                    self.set_at(new_tail, BoardSquare::SnakeTail(new_idx, sqr_mv));
                 }
-                (BoardSquare::SnakeTail(old_idx), BoardSquare::SnakeBodyHazard(new_idx)) => {
+                (BoardSquare::SnakeTail(old_idx, _), BoardSquare::SnakeBodyHazard(new_idx, sqr_mv)) => {
                     debug_assert_eq!(old_idx, idx as u8);
                     debug_assert_eq!(new_idx, idx as u8);
 
                     self.set_at(old_tail, BoardSquare::Empty);
-                    self.set_at(new_tail, BoardSquare::SnakeTailHazard(new_idx));
+                    self.set_at(new_tail, BoardSquare::SnakeTailHazard(new_idx, sqr_mv));
                 }
-                (BoardSquare::SnakeTailHazard(old_idx), BoardSquare::SnakeBody(new_idx)) => {
+                (BoardSquare::SnakeTailHazard(old_idx, _), BoardSquare::SnakeBody(new_idx, sqr_mv)) => {
                     debug_assert_eq!(old_idx, idx as u8);
                     debug_assert_eq!(new_idx, idx as u8);
 
                     self.set_at(old_tail, BoardSquare::Hazard);
-                    self.set_at(new_tail, BoardSquare::SnakeTail(new_idx));
+                    self.set_at(new_tail, BoardSquare::SnakeTail(new_idx, sqr_mv));
                 }
-                (BoardSquare::SnakeTailHazard(old_idx), BoardSquare::SnakeBodyHazard(new_idx)) => {
+                (BoardSquare::SnakeTailHazard(old_idx, _), BoardSquare::SnakeBodyHazard(new_idx, sqr_mv)) => {
                     debug_assert_eq!(old_idx, idx as u8);
                     debug_assert_eq!(new_idx, idx as u8);
 
                     self.set_at(old_tail, BoardSquare::Hazard);
-                    self.set_at(new_tail, BoardSquare::SnakeTailHazard(new_idx));
+                    self.set_at(new_tail, BoardSquare::SnakeTailHazard(new_idx, sqr_mv));
                 }
                 // Special cases: Snake was head only. This should only happen on first move
                 (BoardSquare::SnakeHead(old_idx), _) => {
                     debug_assert_eq!(old_idx, idx as u8);
 
-                    self.set_at(old_tail, BoardSquare::SnakeTail(old_idx));
+                    self.set_at(old_tail, BoardSquare::SnakeTail(old_idx, mv));
                 }
                 (BoardSquare::SnakeHeadHazard(old_idx), _) => {
                     debug_assert_eq!(old_idx, idx as u8);
-                    self.set_at(old_tail, BoardSquare::SnakeTailHazard(old_idx));
+                    self.set_at(old_tail, BoardSquare::SnakeTailHazard(old_idx, mv));
                 }
                 (old_val, new_val) => panic!(
                     "LOGIC ERROR: snake {idx} tails set to invalid BoardSquare:\nold: {old_val:?}, new: {new_val:?}\n{self}"
@@ -311,15 +314,14 @@ impl Board {
             let dest_square = self.at(dest);
             match dest_square {
                 BoardSquare::Food | BoardSquare::FoodHazard => {
-                    let tail = self.snake_tail(idx);
-
                     self.snakes[idx].health = 100;
-                    self.snakes[idx].push_back(tail);
+                    self.snakes[idx].num_stacked += 1;
+                    self.snakes[idx].len += 1;
                 }
                 BoardSquare::Hazard
                 | BoardSquare::SnakeHeadHazard(_)
-                | BoardSquare::SnakeBodyHazard(_)
-                | BoardSquare::SnakeTailHazard(_) => {
+                | BoardSquare::SnakeBodyHazard(_, _)
+                | BoardSquare::SnakeTailHazard(_, _) => {
                     let damage = game.api.ruleset.settings.hazard_damage_per_turn;
                     self.snakes[idx].health = max(self.snakes[idx].health - damage, 0);
                 }
@@ -347,24 +349,25 @@ impl Board {
             let mv = Move::extract(moves, idx as u32);
 
             // Update old head, even for eliminated snakes
-            let old_head = self.snakes[idx].at_head_offset(1);
+            let old_head = self.snakes[idx].old_head;
             if old_head != self.snake_tail(idx) {
                 match self.at(old_head) {
                     BoardSquare::SnakeHead(snake_idx) => {
                         debug_assert_eq!(snake_idx, idx_byte);
 
-                        self.set_at(old_head, BoardSquare::SnakeBody(snake_idx));
+                        self.set_at(old_head, BoardSquare::SnakeBody(snake_idx, mv));
                     }
                     BoardSquare::SnakeHeadHazard(snake_idx) => {
                         debug_assert_eq!(snake_idx, idx_byte);
 
-                        self.set_at(old_head, BoardSquare::SnakeBodyHazard(snake_idx));
+                        self.set_at(old_head, BoardSquare::SnakeBodyHazard(snake_idx, mv));
                     }
                     _ => panic!("LOGIC ERROR: snake {idx} head set to invalid BoardSquare:\n{self}"),
                 }
             }
 
             let new_head = self.move_to_coord(old_head, mv, game.ruleset);
+            self.snakes[idx].old_head = Default::default();
 
             // Track collisions by only setting new head if snake is alive
             match self.at(new_head) {
@@ -402,22 +405,22 @@ impl Board {
                         self.set_at(new_head, BoardSquare::Empty);
                     }
                 }
-                BoardSquare::SnakeTail(s) => {
+                BoardSquare::SnakeTail(s, _) => {
                     if self.snakes[s as usize].eliminated {
                         self.set_at(new_head, BoardSquare::SnakeHead(idx_byte));
                     }
                 }
-                BoardSquare::SnakeTailHazard(s) => {
+                BoardSquare::SnakeTailHazard(s, _) => {
                     if self.snakes[s as usize].eliminated {
                         self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
                     }
                 }
-                BoardSquare::SnakeBody(s) => {
+                BoardSquare::SnakeBody(s, _) => {
                     if self.snakes[s as usize].eliminated {
                         self.set_at(new_head, BoardSquare::SnakeHead(idx_byte));
                     }
                 }
-                BoardSquare::SnakeBodyHazard(s) => {
+                BoardSquare::SnakeBodyHazard(s, _) => {
                     if self.snakes[s as usize].eliminated {
                         self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
                     }
@@ -453,22 +456,24 @@ impl Board {
                 continue;
             }
 
-            for body_idx in 0..self.snakes[idx].len {
-                let coord = self.snakes[idx].at_head_offset(body_idx);
+            self.snakes[idx].old_head = Default::default();
+
+            for board_idx in 0..self.len() as usize {
+                let coord = self.coord_from_idx(board_idx);
 
                 if !self.on_board(coord) {
                     continue;
                 }
 
                 match self.at(coord) {
-                    BoardSquare::SnakeHead(s) | BoardSquare::SnakeBody(s) | BoardSquare::SnakeTail(s) => {
+                    BoardSquare::SnakeHead(s) | BoardSquare::SnakeBody(s, _) | BoardSquare::SnakeTail(s, _) => {
                         if s as usize == idx {
                             self.set_at(coord, BoardSquare::Empty)
                         }
                     }
                     BoardSquare::SnakeHeadHazard(s)
-                    | BoardSquare::SnakeBodyHazard(s)
-                    | BoardSquare::SnakeTailHazard(s) => {
+                    | BoardSquare::SnakeBodyHazard(s, _)
+                    | BoardSquare::SnakeTailHazard(s, _) => {
                         if s as usize == idx {
                             self.set_at(coord, BoardSquare::Hazard)
                         }
@@ -597,8 +602,8 @@ impl Board {
                 BoardSquare::Empty => BoardSquare::Hazard,
                 BoardSquare::Food => BoardSquare::FoodHazard,
                 BoardSquare::SnakeHead(x) => BoardSquare::SnakeHeadHazard(x),
-                BoardSquare::SnakeBody(x) => BoardSquare::SnakeBodyHazard(x),
-                BoardSquare::SnakeTail(x) => BoardSquare::SnakeTailHazard(x),
+                BoardSquare::SnakeBody(x, mv) => BoardSquare::SnakeBodyHazard(x, mv),
+                BoardSquare::SnakeTail(x, mv) => BoardSquare::SnakeTailHazard(x, mv),
                 _ => curr_val,
             };
 
@@ -618,12 +623,8 @@ impl Board {
                 self.snakes[s_idx].health = 100;
             }
 
-            let tail = self.snake_tail(s_idx);
-            let sub_tail = self.snakes[s_idx].at_tail_offset(-1);
-
-            if tail != sub_tail {
-                self.snakes[s_idx].push_back(tail);
-            }
+            self.snakes[s_idx].num_stacked += 1;
+            self.snakes[s_idx].len += 1;
         }
     }
 }

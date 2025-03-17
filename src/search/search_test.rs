@@ -231,10 +231,10 @@ fn expand_node_test() {
                 }
             }
 
-            let mut compare_board = Board::new(0, 0);
-            compare_board.set_from(&ctx.node_space[idx + 1].read().unwrap().board);
-
-            assert_eq!(compare_board, Board::from_str(board, &game).unwrap());
+            assert_eq!(
+                ctx.node_space[idx + 1].read().unwrap().board,
+                Board::from_str(board, &game).unwrap()
+            );
         }
     }
 }
@@ -331,7 +331,7 @@ const MAZE_BOARD: &str = "
 ";
 
 #[test]
-fn arcade_maze_search_test() {
+fn maze_search_test() {
     log_test_init();
     let ctx = Arc::new(get_context());
     let pool = ThreadPool::new(ctx.config.num_threads);

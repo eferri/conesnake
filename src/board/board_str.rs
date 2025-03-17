@@ -6,7 +6,7 @@ use std::fmt;
 
 impl Board {
     // Assumes snake is not just a head (first turn)
-    fn set_snake_idxs(&mut self, board_chars: &[char], tail_idx: usize, rules: Rules) -> u8 {
+    fn populate_snake(&mut self, board_chars: &[char], tail_idx: usize, rules: Rules) -> u8 {
         let mut found = false;
         let mut snake_idx = 0;
         let mut snake_len = 0;
@@ -15,16 +15,18 @@ impl Board {
         let mut curr_coord = tail_coord;
         let mut next_mv;
 
+        // First iteration: find snake index
         while snake_len < self.height * self.width {
             let next_mv = match util::char_to_square(board_chars[self.idx_from_coord(curr_coord)]) {
-                (BoardSquare::SnakeTail(_) | BoardSquare::SnakeTailHazard(_), _, Some(mv)) => mv,
-                (BoardSquare::SnakeBody(_) | BoardSquare::SnakeBodyHazard(_), _, Some(mv)) => mv,
-                (BoardSquare::SnakeHead(idx) | BoardSquare::SnakeHeadHazard(idx), _, None) => {
+                (BoardSquare::SnakeTail(_, mv) | BoardSquare::SnakeTailHazard(_, mv), _) => mv,
+                (BoardSquare::SnakeBody(_, mv) | BoardSquare::SnakeBodyHazard(_, mv), _) => mv,
+                (BoardSquare::SnakeHead(idx) | BoardSquare::SnakeHeadHazard(idx), _) => {
                     snake_idx = idx;
                     found = true;
+                    snake_len += 1;
                     break;
                 }
-                _ => panic!("Snake body {curr_coord} had unexpected form {self}"),
+                _ => panic!("Snake body {curr_coord} had unexpected form \n{self}"),
             };
 
             curr_coord = self.move_to_coord(curr_coord, next_mv, rules);
@@ -35,36 +37,33 @@ impl Board {
             panic!("Could not find snake given tail_idx {tail_idx}");
         }
 
+        self.snakes[snake_idx as usize].head = curr_coord;
+        self.snakes[snake_idx as usize].old_head = Default::default();
+        self.snakes[snake_idx as usize].tail = tail_coord;
+
         // Set index in snake squares, add body segments
         curr_coord = tail_coord;
         loop {
             next_mv = match util::char_to_square(board_chars[self.idx_from_coord(curr_coord)]) {
-                (BoardSquare::SnakeTail(_), x, Some(mv)) => {
-                    self.set_at(curr_coord, BoardSquare::SnakeTail(snake_idx));
-                    for _ in 0..(x + 1) {
-                        self.snakes[snake_idx as usize].push_back(curr_coord);
-                    }
+                (BoardSquare::SnakeTail(_, mv), num_stacked) => {
+                    self.set_at(curr_coord, BoardSquare::SnakeTail(snake_idx, mv));
+                    self.snakes[snake_idx as usize].num_stacked = num_stacked;
                     mv
                 }
-                (BoardSquare::SnakeTailHazard(_), x, Some(mv)) => {
-                    self.set_at(curr_coord, BoardSquare::SnakeTailHazard(snake_idx));
-                    for _ in 0..(x + 1) {
-                        self.snakes[snake_idx as usize].push_back(curr_coord);
-                    }
+                (BoardSquare::SnakeTailHazard(_, mv), num_stacked) => {
+                    self.set_at(curr_coord, BoardSquare::SnakeTailHazard(snake_idx, mv));
+                    self.snakes[snake_idx as usize].num_stacked = num_stacked;
                     mv
                 }
-                (BoardSquare::SnakeBody(_), _, Some(mv)) => {
-                    self.set_at(curr_coord, BoardSquare::SnakeBody(snake_idx));
-                    self.snakes[snake_idx as usize].push_back(curr_coord);
+                (BoardSquare::SnakeBody(_, mv), _) => {
+                    self.set_at(curr_coord, BoardSquare::SnakeBody(snake_idx, mv));
                     mv
                 }
-                (BoardSquare::SnakeBodyHazard(_), _, Some(mv)) => {
-                    self.set_at(curr_coord, BoardSquare::SnakeBodyHazard(snake_idx));
-                    self.snakes[snake_idx as usize].push_back(curr_coord);
+                (BoardSquare::SnakeBodyHazard(_, mv), _) => {
+                    self.set_at(curr_coord, BoardSquare::SnakeBodyHazard(snake_idx, mv));
                     mv
                 }
-                (BoardSquare::SnakeHead(_) | BoardSquare::SnakeHeadHazard(_), _, None) => {
-                    self.snakes[snake_idx as usize].push_back(curr_coord);
+                (BoardSquare::SnakeHead(_) | BoardSquare::SnakeHeadHazard(_), _) => {
                     break;
                 }
                 _ => panic!("Snake body was not contiguous or had unexpected form {self}"),
@@ -73,8 +72,7 @@ impl Board {
             curr_coord = self.move_to_coord(curr_coord, next_mv, rules);
         }
 
-        let snake_len = self.snakes[snake_idx as usize].len as usize;
-        self.snakes[snake_idx as usize].body[0..snake_len].reverse();
+        self.snakes[snake_idx as usize].len = snake_len + self.snakes[snake_idx as usize].num_stacked;
 
         snake_idx
     }
@@ -96,37 +94,16 @@ impl Board {
         #[allow(clippy::needless_range_loop)]
         for idx in 0..self.len() as usize {
             let square = self.board_mat[idx];
-            char_array[idx] = util::square_to_char(square, 0, None);
+            char_array[idx] = util::square_to_char(square, 0);
         }
 
-        // Fill snake moves from snakes
+        // Update tail if stacked
         for s_idx in 0..self.num_snakes() as usize {
-            if self.snakes[s_idx].eliminated {
-                continue;
+            let tail = self.snake_tail(s_idx);
+            let tail_idx = self.idx_from_coord(tail);
+            if self.snakes[s_idx].num_stacked > 0 {
+                char_array[tail_idx] = util::square_to_char(self.at(tail), self.snakes[s_idx].num_stacked);
             }
-
-            let mut prev_coord = self.snake_tail(s_idx);
-            let mut num_stacked = 0;
-            for body_idx in 0..self.snakes[s_idx].len - 1 {
-                let coord = self.snakes[s_idx].at_tail_offset(-1 - body_idx);
-                if coord == prev_coord {
-                    num_stacked += 1
-                } else {
-                    let (mv, secondary_mv) = self.coord_to_move(prev_coord, coord, Rules::Wrapped);
-                    assert!(mv.is_some());
-                    assert!(secondary_mv.is_none());
-
-                    let prev_coord_idx = self.idx_from_coord(prev_coord);
-                    char_array[prev_coord_idx] = util::square_to_char(self.at(prev_coord), num_stacked, mv);
-                    num_stacked = 0;
-                }
-                prev_coord = coord;
-            }
-
-            // Set head
-            let head_coord = self.snake_head(s_idx);
-            let head_idx = self.idx_from_coord(head_coord);
-            char_array[head_idx] = util::square_to_char(self.at(head_coord), 0, None);
         }
 
         for y in (0..self.height).rev() {
@@ -200,7 +177,7 @@ impl Board {
 
         // Populate board matrix
         for (idx, char) in chars_vec.iter().enumerate() {
-            let (board_square, ..) = util::char_to_square(*char);
+            let (board_square, _) = util::char_to_square(*char);
             board.board_mat[idx] = board_square;
 
             match board_square {
@@ -214,14 +191,14 @@ impl Board {
 
         // Populate board stats and snake indices
         for (square_idx, char) in chars_vec.iter().enumerate() {
-            let (board_square, _, mv_opt) = util::char_to_square(*char);
+            let (board_square, _) = util::char_to_square(*char);
 
-            match (board_square, mv_opt) {
-                (BoardSquare::SnakeHead(idx), None) | (BoardSquare::SnakeHeadHazard(idx), None) => {
+            match board_square {
+                BoardSquare::SnakeHead(idx) | BoardSquare::SnakeHeadHazard(idx) => {
                     found_heads.insert(idx, square_idx);
                 }
-                (BoardSquare::SnakeTail(_), _) | (BoardSquare::SnakeTailHazard(_), _) => {
-                    let indexed_snake = board.set_snake_idxs(&chars_vec, square_idx, game.ruleset);
+                BoardSquare::SnakeTail(_, _) | BoardSquare::SnakeTailHazard(_, _) => {
+                    let indexed_snake = board.populate_snake(&chars_vec, square_idx, game.ruleset);
                     found_tails.insert(indexed_snake, square_idx);
                 }
                 _ => (),
@@ -239,7 +216,11 @@ impl Board {
             {
                 for _ in 0..3 {
                     let head = board.coord_from_idx(*found_heads.get(&(i as u8)).unwrap());
-                    board.snakes[i].push_back(head);
+                    board.snakes[i].head = head;
+                    board.snakes[i].old_head = Default::default();
+                    board.snakes[i].tail = head;
+                    board.snakes[i].num_stacked = 2;
+                    board.snakes[i].len = 3;
                 }
             }
         }

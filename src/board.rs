@@ -4,7 +4,7 @@ use crate::game::{Game, Map, Rules};
 use crate::util::{self};
 use crate::util::{Coord, Error, Move};
 
-use std::cmp::{max, min, min_by, Ordering};
+use std::cmp::{min, min_by, Ordering};
 use std::{fmt::Write, str};
 
 use serde::{Deserialize, Serialize};
@@ -14,9 +14,10 @@ pub struct Snake {
     pub health: i32,
     pub eliminated: bool,
     pub len: i32,
-    pub tail_ptr: i32,
-    pub head_ptr: i32,
-    pub body: [Coord; MAX_BOARD_SIZE],
+    pub tail: Coord,
+    pub num_stacked: i32,
+    pub head: Coord,
+    pub old_head: Coord,
 }
 
 impl Default for Snake {
@@ -31,57 +32,15 @@ impl Snake {
             health: 0,
             eliminated: false,
             len: 0,
-            head_ptr: 0,
-            tail_ptr: 0,
-            body: [Coord::new(0, 0); MAX_BOARD_SIZE],
+            head: Coord::new(0, 0),
+            tail: Coord::new(0, 0),
+            num_stacked: 0,
+            old_head: Coord::new(0, 0),
         }
     }
 
     pub fn alive(&self) -> bool {
         self.health > 0
-    }
-
-    pub fn head_offset(&self, offset: i32) -> i32 {
-        let new_offset = self.head_ptr + offset;
-        new_offset.rem_euclid(MAX_BOARD_SIZE as i32)
-    }
-
-    pub fn tail_offset(&self, offset: i32) -> i32 {
-        let new_offset = self.tail_ptr + offset;
-        new_offset.rem_euclid(MAX_BOARD_SIZE as i32)
-    }
-
-    pub fn at_head_offset(&self, offset: i32) -> Coord {
-        self.body[self.head_offset(offset) as usize]
-    }
-
-    pub fn at_tail_offset(&self, offset: i32) -> Coord {
-        self.body[self.tail_offset(offset) as usize]
-    }
-
-    pub fn push_front(&mut self, coord: Coord) {
-        self.len += 1;
-        if self.len > 1 {
-            self.head_ptr = self.head_offset(-1);
-        }
-        self.body[self.head_ptr as usize] = coord;
-    }
-
-    pub fn push_back(&mut self, coord: Coord) {
-        self.len += 1;
-        if self.len > 1 {
-            self.tail_ptr = self.tail_offset(1);
-        }
-        self.body[self.tail_ptr as usize] = coord;
-    }
-
-    pub fn pop_back(&mut self) -> Coord {
-        self.len -= 1;
-        let old_tail = self.tail_ptr;
-        if self.len > 0 {
-            self.tail_ptr = self.tail_offset(-1);
-        }
-        self.body[old_tail as usize]
     }
 }
 
@@ -89,38 +48,15 @@ impl Snake {
 #[repr(u8)]
 pub enum BoardSquare {
     Empty,
-    SnakeHead(u8),       // index of snake
-    SnakeHeadHazard(u8), // index of snake
-    SnakeBody(u8),       // index of snake
-    SnakeBodyHazard(u8), // index of snake
-    SnakeTail(u8),       // index of snake
-    SnakeTailHazard(u8), // index of snake
+    SnakeHead(u8),             // index of snake
+    SnakeHeadHazard(u8),       // index of snake
+    SnakeBody(u8, Move),       // index of snake
+    SnakeBodyHazard(u8, Move), // index of snake
+    SnakeTail(u8, Move),       // index of snake
+    SnakeTailHazard(u8, Move), // index of snake
     Food,
     FoodHazard,
     Hazard,
-}
-
-impl BoardSquare {
-    pub fn tag_val(&self) -> u16 {
-        // https://rust-lang.github.io/unsafe-code-guidelines/layout/enums.html#explicit-repr-annotation-without-c-compatibility
-        let sqr_ptr = self as *const BoardSquare as *const u8;
-        unsafe { *sqr_ptr as u16 }
-    }
-
-    pub fn idx_val(&self) -> u16 {
-        let sqr_ptr = self as *const BoardSquare as *const u8;
-        unsafe { *(sqr_ptr.offset(1)) as u16 }
-    }
-
-    pub fn from_raw(tag: u16, idx: u16) -> Self {
-        let mut sqr = BoardSquare::Empty;
-        let sqr_ptr = &mut sqr as *mut BoardSquare as *mut u8;
-        unsafe {
-            *sqr_ptr = tag as u8;
-            *sqr_ptr.offset(1) = idx as u8;
-        }
-        sqr
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,8 +150,8 @@ impl Board {
                 BoardSquare::Food => food.push(coord),
                 BoardSquare::Hazard
                 | BoardSquare::SnakeHeadHazard(_)
-                | BoardSquare::SnakeBodyHazard(_)
-                | BoardSquare::SnakeTailHazard(_) => hazards.push(coord),
+                | BoardSquare::SnakeBodyHazard(_, _)
+                | BoardSquare::SnakeTailHazard(_, _) => hazards.push(coord),
                 BoardSquare::FoodHazard => {
                     food.push(coord);
                     hazards.push(coord);
@@ -229,18 +165,44 @@ impl Board {
         }
 
         for idx in 0..self.num_snakes() as usize {
-            let mut snake_body = Vec::with_capacity(self.snakes[idx].len as usize);
+            let snake = &self.snakes[idx];
 
-            for i in 0..self.snakes[idx].len {
-                snake_body.push(self.snakes[idx].at_head_offset(i));
+            let mut api_snake_body = Vec::with_capacity(snake.len as usize);
+
+            let mut curr_coord = snake.tail;
+            loop {
+                let mv = match self.at(curr_coord) {
+                    BoardSquare::SnakeHead(_) | BoardSquare::SnakeHeadHazard(_) => {
+                        // All heads case
+                        let n = if snake.head == snake.tail { 3 } else { 1 };
+                        for _ in 0..n {
+                            api_snake_body.push(curr_coord);
+                        }
+                        break;
+                    }
+                    BoardSquare::SnakeBody(_, mv) | BoardSquare::SnakeBodyHazard(_, mv) => {
+                        api_snake_body.push(curr_coord);
+                        mv
+                    }
+                    BoardSquare::SnakeTail(_, mv) | BoardSquare::SnakeTailHazard(_, mv) => {
+                        for _ in 0..(snake.num_stacked + 1) {
+                            api_snake_body.push(curr_coord);
+                        }
+                        mv
+                    }
+                    _ => return Err(Error::BadBoard("Snake was not contiguous".to_owned())),
+                };
+                curr_coord = self.move_to_coord(curr_coord, mv, game.ruleset);
             }
+
+            api_snake_body.reverse();
 
             let api_snake = SnakeApi {
                 id: idx.to_string(),
                 name: idx.to_string(),
-                body: snake_body,
-                head: self.snakes[idx].body[0],
-                health: self.snakes[idx].health,
+                body: api_snake_body,
+                head: snake.head,
+                health: snake.health,
                 latency: "0".to_owned(),
                 length: self.snake_len(idx),
                 shout: None,
@@ -291,26 +253,10 @@ impl Board {
             snake.eliminated = other_snake.eliminated;
 
             snake.len = other_snake.len;
-            snake.head_ptr = 0;
-
-            if other_snake.len > 0 {
-                snake.tail_ptr = other_snake.len - 1;
-
-                if other_snake.head_ptr > other_snake.tail_ptr {
-                    let back_len = MAX_BOARD_SIZE as i32 - other_snake.head_ptr;
-                    snake.body[0..back_len as usize]
-                        .copy_from_slice(&other_snake.body[other_snake.head_ptr as usize..MAX_BOARD_SIZE]);
-                    snake.body[back_len as usize..other_snake.len as usize]
-                        .copy_from_slice(&other_snake.body[0..(other_snake.tail_ptr + 1) as usize]);
-                } else {
-                    snake.body[0..snake.len as usize].copy_from_slice(
-                        &other_snake.body[other_snake.head_ptr as usize..(other_snake.tail_ptr + 1) as usize],
-                    );
-                }
-            } else {
-                snake.len = 0;
-                snake.tail_ptr = 0;
-            }
+            snake.head = other_snake.head;
+            snake.tail = other_snake.tail;
+            snake.num_stacked = other_snake.num_stacked;
+            snake.old_head = other_snake.old_head;
         }
 
         self.board_mat[..board_len].copy_from_slice(&other.board_mat[..board_len]);
@@ -348,8 +294,8 @@ impl Board {
                         BoardSquare::Empty
                         | BoardSquare::Food
                         | BoardSquare::SnakeHead(_)
-                        | BoardSquare::SnakeBody(_)
-                        | BoardSquare::SnakeTail(_) => {
+                        | BoardSquare::SnakeBody(_, _)
+                        | BoardSquare::SnakeTail(_, _) => {
                             continue 'side_loop;
                         }
                         _ => (),
@@ -401,10 +347,23 @@ impl Board {
     }
 
     fn add_snake(&mut self, body: &[Coord], health: i32) {
-        self.snakes[self.num_snakes as usize].body[0..body.len()].copy_from_slice(&body[0..body.len()]);
         self.snakes[self.num_snakes as usize].len = body.len() as i32;
-        self.snakes[self.num_snakes as usize].head_ptr = 0;
-        self.snakes[self.num_snakes as usize].tail_ptr = max(0, body.len() as i32 - 1);
+
+        assert!(body.len() != 1 && body.len() != 2);
+
+        if body.len() > 2 {
+            self.snakes[self.num_snakes as usize].head = body[0];
+            self.snakes[self.num_snakes as usize].old_head = Default::default();
+            self.snakes[self.num_snakes as usize].tail = body[body.len() - 1];
+
+            for i in (1..body.len()).rev() {
+                if body[i] == body[i - 1] {
+                    self.snakes[self.num_snakes as usize].num_stacked += 1;
+                } else {
+                    break;
+                }
+            }
+        }
 
         self.snakes[self.num_snakes as usize].health = health;
         self.snakes[self.num_snakes as usize].eliminated = false;
@@ -421,79 +380,109 @@ impl Board {
             return Ok(());
         }
 
-        let mut prev_coord: Option<Coord> = None;
+        let mut next_coord = Some(api_snake.body[api_snake.body.len() - 2]);
 
-        for (i, coord) in api_snake.body.iter().enumerate() {
-            if let Some(p) = prev_coord {
-                if *coord != p && !self.next_to(*coord, p, game.ruleset) {
-                    return Err(Error::BadBoard("Snake was not contiguous".to_owned()));
-                }
+        for (i, coord) in api_snake.body.iter().rev().copied().enumerate() {
+            if next_coord.is_some()
+                && coord != next_coord.unwrap()
+                && !self.next_to(coord, next_coord.unwrap(), game.ruleset)
+            {
+                return Err(Error::BadBoard("Snake was not contiguous".to_owned()));
             }
 
-            let coord_idx = self.idx_from_coord(*coord);
+            let mv = match next_coord {
+                Some(next) => self.coord_to_move(coord, next, game.ruleset),
+                None => None,
+            };
 
-            match (self.board_mat[coord_idx], i) {
+            match (self.at(coord), i) {
                 (BoardSquare::Empty, 0) => {
-                    self.board_mat[coord_idx] = BoardSquare::SnakeHead(snake_idx);
+                    if self.snakes[snake_idx as usize].head == self.snakes[snake_idx as usize].tail {
+                        // All-heads case
+                        self.set_at(coord, BoardSquare::SnakeHead(snake_idx));
+                    } else if self.snakes[snake_idx as usize].num_stacked > 0 {
+                        // First block of stacked tail case
+                        self.set_at(coord, BoardSquare::SnakeTail(snake_idx, Move::Left));
+                    } else {
+                        self.set_at(coord, BoardSquare::SnakeTail(snake_idx, mv.unwrap()));
+                    }
                 }
                 (BoardSquare::Hazard, 0) => {
-                    self.board_mat[coord_idx] = BoardSquare::SnakeHeadHazard(snake_idx);
+                    if self.snakes[snake_idx as usize].head == self.snakes[snake_idx as usize].tail {
+                        self.set_at(coord, BoardSquare::SnakeHeadHazard(snake_idx));
+                    } else if self.snakes[snake_idx as usize].num_stacked > 0 {
+                        self.set_at(coord, BoardSquare::SnakeTailHazard(snake_idx, Move::Left));
+                    } else {
+                        self.set_at(coord, BoardSquare::SnakeTailHazard(snake_idx, mv.unwrap()));
+                    }
                 }
                 (BoardSquare::Empty, x) => {
                     if x < api_snake.body.len() - 1 {
-                        self.board_mat[coord_idx] = BoardSquare::SnakeBody(snake_idx);
+                        self.set_at(coord, BoardSquare::SnakeBody(snake_idx, mv.unwrap()));
                     } else {
-                        self.board_mat[coord_idx] = BoardSquare::SnakeTail(snake_idx);
+                        self.set_at(coord, BoardSquare::SnakeHead(snake_idx));
                     }
                 }
                 (BoardSquare::Hazard, x) => {
                     if x < api_snake.body.len() - 1 {
-                        self.board_mat[coord_idx] = BoardSquare::SnakeBodyHazard(snake_idx);
+                        self.set_at(coord, BoardSquare::SnakeBodyHazard(snake_idx, mv.unwrap()));
                     } else {
-                        self.board_mat[coord_idx] = BoardSquare::SnakeTailHazard(snake_idx);
+                        self.set_at(coord, BoardSquare::SnakeHeadHazard(snake_idx));
                     }
                 }
-                (BoardSquare::Food, _) | (BoardSquare::FoodHazard, _) => {
-                    return Err(Error::BadBoard("Snake square conflicts with Food".to_owned()))
-                }
-                (BoardSquare::SnakeBody(idx), _) => {
+                (BoardSquare::SnakeTail(idx, _), _) => {
                     if idx != snake_idx {
                         return Err(Error::BadBoard(
-                            "Snake square conflicts with other SnakeBody".to_owned(),
+                            "Snake square conflicts with other SnakeTail".to_owned(),
                         ));
                     }
-                    self.board_mat[coord_idx] = BoardSquare::SnakeTail(snake_idx);
+                    // last block of stacked tail case
+                    if let Some(next_mv) = mv {
+                        self.set_at(coord, BoardSquare::SnakeTail(snake_idx, next_mv));
+                    }
                 }
-                (BoardSquare::SnakeBodyHazard(idx), _) => {
+                (BoardSquare::SnakeTailHazard(idx, _), _) => {
                     if idx != snake_idx {
                         return Err(Error::BadBoard(
-                            "Snake square conflicts with other SnakeBodyHazard".to_owned(),
+                            "Snake square conflicts with other SnakeTailHazard".to_owned(),
                         ));
                     }
-                    self.board_mat[coord_idx] = BoardSquare::SnakeTailHazard(snake_idx);
+                    if let Some(next_mv) = mv {
+                        self.set_at(coord, BoardSquare::SnakeTailHazard(snake_idx, next_mv));
+                    }
                 }
-                (BoardSquare::SnakeHead(idx), _)
-                | (BoardSquare::SnakeHeadHazard(idx), _)
-                | (BoardSquare::SnakeTail(idx), _)
-                | (BoardSquare::SnakeTailHazard(idx), _) => {
+                (BoardSquare::SnakeHead(idx), _) | (BoardSquare::SnakeHeadHazard(idx), _) => {
                     if idx != snake_idx {
                         return Err(Error::BadBoard(
                             "Snake square conflicts with other SnakeHead/SnakeTail".to_owned(),
                         ));
                     }
                 }
+                (BoardSquare::Food, _) | (BoardSquare::FoodHazard, _) => {
+                    return Err(Error::BadBoard("Snake square conflicts with Food".to_owned()))
+                }
+                (BoardSquare::SnakeBody(_, _), _) | (BoardSquare::SnakeBodyHazard(_, _), _) => {
+                    return Err(Error::BadBoard(
+                        "Snake square conflicts with other SnakeBody".to_owned(),
+                    ));
+                }
             }
-            prev_coord = Some(*coord);
+
+            if i < api_snake.body.len() - 2 {
+                next_coord = Some(api_snake.body[api_snake.body.len() - i - 3]);
+            } else {
+                next_coord = None;
+            }
         }
         Ok(())
     }
 
     pub fn snake_head(&self, snake_idx: usize) -> Coord {
-        self.snakes[snake_idx].body[self.snakes[snake_idx].head_ptr as usize]
+        self.snakes[snake_idx].head
     }
 
     pub fn snake_tail(&self, snake_idx: usize) -> Coord {
-        self.snakes[snake_idx].body[self.snakes[snake_idx].tail_ptr as usize]
+        self.snakes[snake_idx].tail
     }
 
     pub fn snake_len(&self, snake_idx: usize) -> i32 {
@@ -541,7 +530,7 @@ impl Board {
         square
     }
 
-    pub fn coord_to_move(&self, orig: Coord, dest: Coord, rules: Rules) -> (Option<Move>, Option<Move>) {
+    pub fn coord_to_move(&self, orig: Coord, dest: Coord, rules: Rules) -> Option<Move> {
         let mut diff_x = dest.x as i32 - orig.x as i32;
         let mut diff_y = dest.y as i32 - orig.y as i32;
 
@@ -562,22 +551,20 @@ impl Board {
             diff_y = min_by(diff_y, diff_y_wrapped, |a, b| a.abs().cmp(&b.abs()));
         }
 
-        let mv_x = match diff_x.cmp(&0) {
-            Ordering::Greater => Some(Move::Right),
-            Ordering::Less => Some(Move::Left),
-            Ordering::Equal => None,
-        };
+        assert!(diff_x == 0 || diff_y == 0);
 
-        let mv_y = match diff_y.cmp(&0) {
-            Ordering::Greater => Some(Move::Up),
-            Ordering::Less => Some(Move::Down),
-            Ordering::Equal => None,
-        };
-
-        if diff_y.abs() > diff_x.abs() {
-            (mv_y, mv_x)
+        if diff_y == 0 {
+            match diff_x.cmp(&0) {
+                Ordering::Greater => Some(Move::Right),
+                Ordering::Less => Some(Move::Left),
+                Ordering::Equal => None,
+            }
         } else {
-            (mv_x, mv_y)
+            match diff_y.cmp(&0) {
+                Ordering::Greater => Some(Move::Up),
+                Ordering::Less => Some(Move::Down),
+                Ordering::Equal => None,
+            }
         }
     }
 

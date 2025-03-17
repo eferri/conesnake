@@ -1,0 +1,16 @@
+baseline
+49053383301e50cfad082ba28222ceb004ab3a5f
+
+21,727.43 ns     - playout bench
+44,495,246.10 ns - search bench
+
+with snake bodies in separate arr
+7749021f2d01238f3e68ef223f3723c6c3cbf923
+
+19,853.78 ns     - playout bench
+31,317,350.40 ns - search bench
+
+unified board matrix
+
+53,806.90 ns     - playout bench
+63,699,348.30 ns - search bench

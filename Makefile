@@ -167,7 +167,8 @@ clean:
 
 .PHONY: veryclean
 veryclean: clean
-	rm -rf target* build* \
+	( chmod 700 -R .go || true ) \
+	 && rm -rf target* build* \
 		.go \
 		.cargo \
 		terraform/.terraform
