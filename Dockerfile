@@ -13,6 +13,9 @@ RUN usermod -m -d /home/conesnake --uid ${UID} --shell=/bin/bash -l conesnake ub
 # Runtime dependencies
 RUN apt-get update && apt-get install --no-install-recommends -y \
     libssl3 \
+    curl \
+    iproute2 \
+    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------
@@ -40,7 +43,7 @@ RUN apt-get update \
     make \
     less \
     cmake \
-    lldb \
+    lldb-19 \
     g++ \
     unzip \
     jq \
@@ -60,7 +63,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && update-alternatives --install /usr/bin/clangd clangd /usr/bin/clangd-19 100 \
     && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-19 100 \
-    && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100
+    && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100 \
+    && update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-19 100
 
 RUN mkdir -p /tools/bin \
     && chown -R conesnake:conesnake /tools
@@ -95,6 +99,13 @@ RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.11.2/terraform_1.11.2
 ENV PATH "/tools/go/bin:/app/.go/bin:/home/conesnake/.cargo/bin:/home/conesnake/.venv/bin:${PATH}"
 ENV PATH "/tools/bin:/usr/lib/linux-tools/6.8.0-55-generic/:${PATH}"
 
+COPY requirements.txt .
+
+# Python development tools
+RUN python3 -m venv /home/conesnake/.venv \
+    && python3 -m pip install -r requirements.txt \
+    && rm -rf ~/.cache/pip
+
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
     && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-03-14
@@ -102,13 +113,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \
     && cargo install cargo-show-asm
-
-COPY requirements.txt .
-
-# Python development tools
-RUN python3 -m venv /home/conesnake/.venv \
-    && python3 -m pip install -r requirements.txt \
-    && rm -rf ~/.cache/pip
 
 WORKDIR /app
 

@@ -78,7 +78,7 @@ record:
 	docker compose run --rm snake \
 		perf record \
 			--call-graph fp \
-			-e sched \
+			-e cycles \
 			-F 1000 \
 			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/$(PROFILE_EXE)
 
@@ -167,7 +167,8 @@ clean:
 
 .PHONY: veryclean
 veryclean: clean
-	rm -rf target* build* \
+	( chmod 700 -R .go || true ) \
+	&& rm -rf target* build* \
 		.go \
 		.cargo \
 		terraform/.terraform
@@ -194,8 +195,8 @@ regcred-secret:
 	&& kubectl delete secret --namespace conesnake --ignore-not-found regcred \
 	&& kubectl --namespace conesnake create secret docker-registry regcred \
 		--docker-server=https://us-west1-docker.pkg.dev \
-		--docker-email=$(shell gcloud iam service-accounts list \
-			--filter=displayName="conesnake_registry_service_account" --format="get(email)" 2>/dev/null) \ 
+		--docker-email="$(shell gcloud iam service-accounts list \
+			--filter=displayName='conesnake_registry_service_account' --format='get(email)' 2>/dev/null)" \
 		--docker-username=_json_key \
 		--docker-password='\''$(shell cat ./service_key.json)'\'' \
 	'
@@ -263,15 +264,6 @@ terraform-destroy:
 		-v "$(HOME)/.kube:/home/conesnake/.kube" \
 		snake \
 	terraform -chdir=terraform destroy
-
-.PHONY: terraform-output-secret
-terraform-output-secret:
-	docker compose run --rm \
-		-v "$(HOME)/.config/gcloud:/home/conesnake/.config/gcloud" \
-		-v "$(HOME)/.ssh:/home/conesnake/.ssh" \
-		-v "$(HOME)/.kube:/home/conesnake/.kube" \
-		snake \
-	terraform -chdir=terraform output -raw conesnake_secret_access_key | base64 --decode | gpg --decrypt
 
 .PHONY: terraform-destroy-wg
 terraform-destroy-wg:

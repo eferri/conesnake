@@ -1,5 +1,5 @@
 {{- define "creds_common" -}}
-serviceAccountName: "{{ .Release.Name }}-sa-ecr-creds"
+serviceAccountName: "{{ .Release.Name }}-saccount-ecr-creds"
 nodeSelector:
   mode: relay
 restartPolicy: Never

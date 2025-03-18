@@ -14,6 +14,10 @@ variable "region" {
   type = string
 }
 
+variable "wg_port" {
+  type = number
+}
+
 locals {
   deployment = "conesnake"
   http_port  = 31757

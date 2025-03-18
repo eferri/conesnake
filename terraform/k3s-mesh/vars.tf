@@ -6,6 +6,10 @@ variable "local_ip" {
   type = string
 }
 
+variable "wg_port" {
+  type = string
+}
+
 variable "local_nodes" {
   type = map(object({
     private_ip  = string

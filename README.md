@@ -21,29 +21,41 @@ A tree search-based battlesnake.
 
 1. Create an GCP cloud bucket named "conesnake-tf-state" to store terraform state. Restrict public access
 
+1. Install the google cloud CLI and run:
+```
+gcloud init
+gcloud auth application-default login
+```
+
 1. Generate ssh key for aws instance access:
     ```
     ssh-keygen -t ed25519 -C "" -f ~/.ssh/conesnake_ed25519 -N ""
     cat ~/.ssh/conesnake_ed25519.pub
     ```
 
-1. Ensure all local nodes configured in terraform/vars.tf have password-less ssh access configured in ~/.ssh/config
-   SSH host alias should match the `local_nodes`` map key in terraform/vars.tf
+1. Populate terraform variables
+    ```
+    cp terraform/vars.tf.template terraform/vars.tf
+    ```
+
+1. Ensure all local nodes configured in terraform/vars.tf have password-less ssh access configured
+   Configure a SSH host alias in ~/.ssh/config that matches key of the `local_nodes`` map in terraform/vars.tf
 
 1. Install wireguard on all local nodes:
     ```
     ssh <local-node>
-    sudo apt-get update && sudo apt-get install -no-install-recommends -y wireguard
+    sudo apt-get update && sudo apt-get install --no-install-recommends -y wireguard
     ```
 
 1. Deploy infrastructure with terraform:
     ```
-    cp terraform/vars.tf.example terraform/vars.tf
+    make terraform-init
     make terraform-apply
     ```
 
 1. Create a service account key for the "conesnake_registry" service account.
    Copy it to a file named `service_key.json` in the repo root
+
 
 1. Create the regcred secret in k8s for pulling container images:
     ```

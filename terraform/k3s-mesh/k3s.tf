@@ -23,6 +23,7 @@ resource "null_resource" "wg_mesh" {
     LOCAL_IP    = var.local_ip
     LOCAL_NODES = jsonencode(var.local_nodes)
     CLOUD_NODES = jsonencode(local.cloud_nodes)
+    WG_PORT     = var.wg_port
   }
 
   provisioner "local-exec" {

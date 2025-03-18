@@ -7,7 +7,7 @@ CURR_DIR="$(pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 cd "$SCRATCH_DIR"
 
-SSH_ARGS="-q -i ~/.ssh/conesnake_ed25519"
+SSH_ARGS="-o StrictHostKeyChecking=no -q -i ~/.ssh/conesnake_ed25519"
 
 CLOUD_HOSTS="$(echo "$CLOUD_NODES" | jq -r 'keys[]')"
 LOCAL_HOSTS="$(echo "$LOCAL_NODES" | jq -r 'keys[]')"
@@ -25,7 +25,7 @@ do
 
     wg-meshconf addpeer \
         --address "$NODE_ADDRESS/32" \
-        --listenport 59203 \
+        --listenport "$WG_PORT" \
         --endpoint "$NODE_PRIV_IP" \
         --persistentkeepalive 15 \
         "$NODE_HOST"
@@ -59,21 +59,27 @@ do
 
     wg-meshconf genconfig -o . "$NODE_HOST"
 
-    while ! ssh $SSH_ARGS -o StrictHostKeyChecking=no "ubuntu@$NODE_PUBLIC_IP" echo 'server_alive'
+    while ! ssh $SSH_ARGS "ubuntu@$NODE_PUBLIC_IP" echo 'server alive'
     do
         echo "Waiting for server..."
         sleep 1
     done
 
     # Give ec2 instance time to start
-    sleep 10
+    sleep 5
 
     TEMP_DIR="$(ssh $SSH_ARGS ubuntu@$NODE_PUBLIC_IP mktemp -d </dev/null)"
     scp $SSH_ARGS "./$NODE_HOST.conf" "ubuntu@$NODE_PUBLIC_IP":"$TEMP_DIR"
     ssh $SSH_ARGS "ubuntu@$NODE_PUBLIC_IP" 'sh -s' <<EOF
 set -eu
+
+export DEBIAN_FRONTEND='noninteractive'
+
 sudo apt-get update
-DEBIAN_FRONTEND='noninteractive' sudo apt-get install --no-install-recommends -y wireguard
+sudo apt-get upgrade -y
+sudo apt-get install --no-install-recommends -y \
+    wireguard \
+    iptables
 sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
 sudo sysctl -p /etc/sysctl.conf
 sudo mkdir -p /etc/wireguard

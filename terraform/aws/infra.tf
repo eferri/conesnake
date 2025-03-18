@@ -82,8 +82,8 @@ resource "aws_security_group" "conesnake_base" {
 
   ingress {
     description = "wireguard"
-    from_port   = 59203
-    to_port     = 59203
+    from_port   = var.wg_port
+    to_port     = var.wg_port
     protocol    = "udp"
     cidr_blocks = ["0.0.0.0/0"]
   }

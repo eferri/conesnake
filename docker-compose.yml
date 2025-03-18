@@ -13,9 +13,6 @@ services:
       - NUM_THREADS
       - NUM_WORKERS
       - MAX_BOARDS
-      - MAX_WIDTH
-      - MAX_HEIGHT
-      - MAX_SNAKES
     volumes:
       - ".:/app"
     ports:
@@ -27,9 +24,6 @@ services:
       scripts/entrypoint_relay.sh \
         --port 8080 \
         --max-boards 0 \
-        --max-width ${MAX_WIDTH:-11} \
-        --max-height ${MAX_HEIGHT:-11} \
-        --max-snakes ${MAX_SNAKES:-4} \
         --num-parallel-reqs 1 \
         --worker-node worker \
         --worker-pod http://worker-0:8081 \
@@ -48,9 +42,6 @@ services:
         --port 8081 \
         --num-threads ${NUM_THREADS:-4} \
         --max-boards ${MAX_BOARDS:-10000} \
-        --max-width ${MAX_WIDTH:-11} \
-        --max-height ${MAX_HEIGHT:-11} \
-        --max-snakes ${MAX_SNAKES:-4} \
         --mode worker
 
   worker-1:
@@ -68,9 +59,6 @@ services:
         --port 8082 \
         --num-threads ${NUM_THREADS:-4} \
         --max-boards ${MAX_BOARDS:-10000} \
-        --max-width ${MAX_WIDTH:-11} \
-        --max-height ${MAX_HEIGHT:-11} \
-        --max-snakes ${MAX_SNAKES:-4} \
         --mode worker
     ports:
       - "8082:8082"

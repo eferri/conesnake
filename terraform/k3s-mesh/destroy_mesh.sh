@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-SSH_ARGS="-q -i ~/.ssh/conesnake_ed25519"
+SSH_ARGS="-o StrictHostKeyChecking=no -q -i ~/.ssh/conesnake_ed25519"
 
 CLOUD_HOSTS="$(echo "$CLOUD_NODES" | jq -r 'keys[]')"
 LOCAL_HOSTS="$(echo "$LOCAL_NODES" | jq -r 'keys[]')"

@@ -5,15 +5,16 @@ SERVER_INSTALL_FILES=" \
   ./traefik-config.yaml \
 "
 
-INSTALL_K3S_VERSION="v1.29.0+k3s1"
+K3S_SHASUM="9d5fc42bf825d3e8dcc8682c8bac071b1de18019af81f85519ccbe5c919e0896"
+INSTALL_K3S_VERSION="v1.32.2+k3s1"
 
 CLOUD_SSH_ARGS="-q -o StrictHostKeyChecking=no -i ~/.ssh/conesnake_ed25519"
-
+LOCAL_SSH_ARGS="-q -o StrictHostKeyChecking=no"
 
 uninstall_k3s_server()
 {
   echo "Uninstalling k3s server $HOST..."
-  ssh -q "$HOST" 'sh -s' <<EOF
+  ssh $LOCAL_SSH_ARGS "$HOST" 'sh -s' <<EOF
 k3s-uninstall.sh 2>/dev/null || true
 EOF
 }
@@ -31,7 +32,7 @@ EOF
 uninstall_k3s_worker()
 {
   echo "Uninstalling k3s worker $HOST..."
-  ssh -q "$HOST" 'sh -s' <<EOF
+  ssh $LOCAL_SSH_ARGS "$HOST" 'sh -s' <<EOF
 k3s-agent-uninstall.sh 2>/dev/null || true
 EOF
 }
@@ -43,8 +44,8 @@ install_k3s_primary_server()
   echo "Installing k3s primary server..."
   TEMP_DIR="$(ssh -q $HOST mktemp -d)"
 
-  scp -q $SERVER_INSTALL_FILES "$HOST":"$TEMP_DIR"
-  ssh -q $HOST 'sh -s' <<EOF
+  scp $LOCAL_SSH_ARGS $SERVER_INSTALL_FILES "$HOST":"$TEMP_DIR"
+  ssh $LOCAL_SSH_ARGS $HOST 'sh -s' <<EOF
 set -eu
 
 sudo mkdir -p /var/lib/rancher/k3s/server/manifests
@@ -53,8 +54,8 @@ sudo cp $TEMP_DIR/*.yaml /var/lib/rancher/k3s/server/manifests/
 export INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION
 
 curl -sfL https://get.k3s.io > k3s.sh \\
-  && sha256sum k3s.sh | grep 9d5fc42bf825d3e8dcc8682c8bac071b1de18019af81f85519ccbe5c919e0896 \\
-  && sh -s - server \\
+  && sha256sum k3s.sh | grep $K3S_SHASUM \\
+  && sh k3s.sh server \\
     --cluster-init \\
     --node-label mode=server \\
     --node-name $HOST \\
@@ -80,7 +81,9 @@ set -eu
 
 export INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION
 
-curl -sfL https://get.k3s.io | sh -s - agent \\
+curl -sfL https://get.k3s.io > k3s.sh \\
+  && sha256sum k3s.sh | grep $K3S_SHASUM \\
+  && sh k3s.sh agent \\
   --node-label mode=relay \\
   --node-label svccontroller.k3s.cattle.io/enablelb=true \\
   --node-name $HOST \\
@@ -97,12 +100,14 @@ install_k3s_worker()
 {
   echo "Installing k3s agent for worker node..."
 
-  ssh -q "$HOST" 'sh -s' <<EOF
+  ssh $LOCAL_SSH_ARGS "$HOST" 'sh -s' <<EOF
 set -eu
 
 export INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION
 
-curl -sfL https://get.k3s.io | sh -s - agent \\
+curl -sfL https://get.k3s.io > k3s.sh \\
+  && sha256sum k3s.sh | grep $K3S_SHASUM \\
+  && sh k3s.sh agent \\
   --node-taint AppPodsOnly=true:NoExecute \\
   --node-label mode=worker \\
   --node-name $HOST \\
@@ -118,7 +123,7 @@ EOF
 get_token()
 {
   K3S_TOKEN="$( \
-  ssh -q -t "$PRIMARY_HOST" \
+  ssh $LOCAL_SSH_ARGS -t "$PRIMARY_HOST" \
     sudo cat /var/lib/rancher/k3s/server/node-token | sed 's/\r$//' \
   )"
 }
@@ -126,7 +131,7 @@ get_token()
 
 install_config()
 {
-  KUBE_CONFIG="$(ssh -q $HOST sudo cat /etc/rancher/k3s/k3s.yaml | sed 's/127.0.0.1/'$INTERNAL_IP'/')"
+  KUBE_CONFIG="$(ssh $LOCAL_SSH_ARGS $HOST sudo cat /etc/rancher/k3s/k3s.yaml | sed 's/127.0.0.1/'$INTERNAL_IP'/')"
   echo "$KUBE_CONFIG" > ~/.kube/config
   chmod 600 ~/.kube/config
 }

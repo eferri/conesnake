@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 1.7.0"
+  required_version = "~> 1.11.0"
 
   backend "gcs" {
     bucket = "conesnake-tf-state"
@@ -26,12 +26,12 @@ provider "null" {}
 module "gcp" {
   source = "./gcp"
 
-  local_ip           = var.local_ip
-  ssh_public_key     = var.ssh_public_key
-  notification_email = var.notification_email
-  region             = var.region
-  zone               = var.zone
-  project            = var.project
+  local_ip       = var.local_ip
+  ssh_public_key = var.ssh_public_key
+  region         = var.region
+  zone           = var.zone
+  project        = var.project
+  wg_port        = var.wg_port
 }
 
 module "k3s_mesh" {
@@ -39,6 +39,7 @@ module "k3s_mesh" {
   primary_host           = var.primary_host
   local_ip               = var.local_ip
   local_nodes            = var.local_nodes
+  wg_port                = var.wg_port
   cloud_node_public_ip   = module.gcp.cloud_node_public_ip
   cloud_node_private_ip  = module.gcp.cloud_node_private_ip
   cloud_node_instance_id = module.gcp.cloud_node_instance_id

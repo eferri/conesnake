@@ -18,9 +18,6 @@ BASE_PORT = 8090
 
 async def start_snake(index, opt_args=None):
     max_boards = os.environ["MAX_BOARDS"]
-    max_width = os.environ["MAX_WIDTH"]
-    max_height = os.environ["MAX_HEIGHT"]
-    max_snakes = os.environ["MAX_SNAKES"]
     num_threads = os.environ["NUM_THREADS"]
 
     snake_port = BASE_PORT + index * (NUM_WORKERS + 1)
@@ -28,9 +25,6 @@ async def start_snake(index, opt_args=None):
     snake_args = [
         "--port", f"{snake_port}",
         "--max-boards", "0",
-        "--max-width", max_width,
-        "--max-height", max_height,
-        "--max-snakes", max_snakes,
         "--num-parallel-reqs", "1",
         "--worker-node", "127.0.0.1",
         "--worker-pod", f"http://127.0.0.1:{snake_port + 1}",
@@ -53,9 +47,6 @@ async def start_snake(index, opt_args=None):
     worker_args = [
         "--num-threads", num_threads,
         "--max-boards", max_boards,
-        "--max-width", max_width,
-        "--max-height", max_height,
-        "--max-snakes", max_snakes,
         "--latency", "10",
         "--mode", "worker",
     ]

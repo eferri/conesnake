@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: "{{ .Release.Name }}-sa-creds"
+  name: "{{ .Release.Name }}-saccount-creds"
   labels:
     {{- include "common_labels" . | nindent 4 }}
 ---
@@ -25,7 +25,7 @@ metadata:
     {{- include "common_labels" . | nindent 4 }}
 subjects:
 - kind: ServiceAccount
-  name: "{{ .Release.Name }}-sa-creds"
+  name: "{{ .Release.Name }}-saccount-creds"
   apiGroup: ""
 roleRef:
   kind: Role

@@ -1,6 +1,5 @@
 .cargo/*
 .go
-!.cargo/config.toml
 target*
 build*
 
@@ -22,6 +21,8 @@ build*
 *.gpg
 *.perf
 *.json
+!.vscode/*.json
+!.devcontainer/*.json
 perf.data
 perf.data.*
 nohup.out

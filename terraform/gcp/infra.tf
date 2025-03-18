@@ -14,7 +14,7 @@ resource "google_project_service" "compute_engine" {
 # Artifact Registry
 
 resource "google_service_account" "conesnake_registry" {
-  account_id   = "${local.deployment}-registry-sa"
+  account_id   = "${local.deployment}-registry-saccount"
   display_name = "${local.deployment}_registry_service_account"
 }
 
@@ -98,7 +98,7 @@ resource "google_compute_firewall" "wireguard" {
 
   allow {
     protocol = "udp"
-    ports    = ["59203"]
+    ports    = [var.wg_port]
   }
 
   target_tags = [local.deployment]
@@ -113,7 +113,7 @@ resource "google_compute_address" "conesnake_instance" {
 # GCE Instances
 
 resource "google_service_account" "conesnake_instance" {
-  account_id   = "${local.deployment}-instance-sa"
+  account_id   = "${local.deployment}-instance-saccount"
   display_name = "${local.deployment}_instance_service_account"
 }
 
@@ -128,7 +128,7 @@ resource "google_compute_instance" "conesnake_relay" {
 
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-minimal-2204-jammy-v20240119"
+      image = "ubuntu-os-cloud/ubuntu-minimal-2404-noble-amd64-v20250313"
 
       type = "pd-balanced"
 
@@ -150,12 +150,6 @@ resource "google_compute_instance" "conesnake_relay" {
   metadata = {
     ssh-keys = "ubuntu:${var.ssh_public_key}"
   }
-
-  metadata_startup_script = <<-EOF
-    #!/bin/bash
-    sudo apt update
-    sudo apt upgrade -y
-  EOF
 
   service_account {
     email  = google_service_account.conesnake_instance.email

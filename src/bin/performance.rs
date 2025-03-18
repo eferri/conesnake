@@ -406,7 +406,7 @@ fn main() -> Result<(), Error> {
     }
 
     let num_runs = 1;
-    let num_workers = 1;
+    let num_workers = 4;
 
     let mut ctxs = Vec::new();
     let mut pools = Vec::new();
@@ -468,7 +468,9 @@ fn main() -> Result<(), Error> {
                     results.max_nodes = search_result.total_nodes;
                 }
 
-                for (snake_idx, mv_scores) in search_result.scores.iter().enumerate() {
+                for snake_idx in 0..board.num_snakes() as usize {
+                    let mv_scores = search_result.scores[snake_idx];
+
                     for (mv_idx, scores) in mv_scores.iter().enumerate() {
                         summed_scores[snake_idx][mv_idx].games += scores.games;
                         summed_scores[snake_idx][mv_idx].score += scores.score;

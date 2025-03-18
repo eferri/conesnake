@@ -430,27 +430,25 @@ impl Board {
                 }
             }
 
-            let coord_idx = self.idx_from_coord(*coord);
-
-            match (self.board_mat[coord_idx], i) {
+            match (self.at(*coord), i) {
                 (BoardSquare::Empty, 0) => {
-                    self.board_mat[coord_idx] = BoardSquare::SnakeHead(snake_idx);
+                    self.set_at(*coord, BoardSquare::SnakeHead(snake_idx));
                 }
                 (BoardSquare::Hazard, 0) => {
-                    self.board_mat[coord_idx] = BoardSquare::SnakeHeadHazard(snake_idx);
+                    self.set_at(*coord, BoardSquare::SnakeHeadHazard(snake_idx));
                 }
                 (BoardSquare::Empty, x) => {
                     if x < api_snake.body.len() - 1 {
-                        self.board_mat[coord_idx] = BoardSquare::SnakeBody(snake_idx);
+                        self.set_at(*coord, BoardSquare::SnakeBody(snake_idx));
                     } else {
-                        self.board_mat[coord_idx] = BoardSquare::SnakeTail(snake_idx);
+                        self.set_at(*coord, BoardSquare::SnakeTail(snake_idx));
                     }
                 }
                 (BoardSquare::Hazard, x) => {
                     if x < api_snake.body.len() - 1 {
-                        self.board_mat[coord_idx] = BoardSquare::SnakeBodyHazard(snake_idx);
+                        self.set_at(*coord, BoardSquare::SnakeBodyHazard(snake_idx));
                     } else {
-                        self.board_mat[coord_idx] = BoardSquare::SnakeTailHazard(snake_idx);
+                        self.set_at(*coord, BoardSquare::SnakeTailHazard(snake_idx));
                     }
                 }
                 (BoardSquare::Food, _) | (BoardSquare::FoodHazard, _) => {
@@ -462,7 +460,7 @@ impl Board {
                             "Snake square conflicts with other SnakeBody".to_owned(),
                         ));
                     }
-                    self.board_mat[coord_idx] = BoardSquare::SnakeTail(snake_idx);
+                    self.set_at(*coord, BoardSquare::SnakeTail(snake_idx));
                 }
                 (BoardSquare::SnakeBodyHazard(idx), _) => {
                     if idx != snake_idx {
@@ -470,7 +468,7 @@ impl Board {
                             "Snake square conflicts with other SnakeBodyHazard".to_owned(),
                         ));
                     }
-                    self.board_mat[coord_idx] = BoardSquare::SnakeTailHazard(snake_idx);
+                    self.set_at(*coord, BoardSquare::SnakeTailHazard(snake_idx));
                 }
                 (BoardSquare::SnakeHead(idx), _)
                 | (BoardSquare::SnakeHeadHazard(idx), _)

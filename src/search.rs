@@ -256,7 +256,7 @@ impl Node {
     pub fn duct_score_wrapper(&self, cfg: &Config, moves: u32) -> f64 {
         #[cfg(not(feature = "simd"))]
         {
-            let mut score;
+            let mut score = 0.0;
             for snake_idx in 0..self.board.num_snakes() {
                 let mv = Move::extract(moves, snake_idx as u32);
                 let mv_duct_score = self.duct_score(cfg, snake_idx as usize, mv);
@@ -479,8 +479,6 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         // Expand the node. Note that if the game is over we don't set the playout lock
         if !game.over(&scratch_guard.board) {
             let mut node_guard = ctx.node_space[curr_idx].write().unwrap();
-
-            debug_assert!(!node_guard.is_fully_expanded());
 
             let expand_opt = expand_node(&ctx, game, &mut scratch_guard, &mut node_guard, curr_idx);
             if expand_opt.is_none() {

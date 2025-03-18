@@ -72,9 +72,6 @@ spec:
             memory: {{ .Values.relay.mem }}
         args:
         - "--port=8080"
-        - "--max-width={{ .Values.max_width }}"
-        - "--max-height={{ .Values.max_height }}"
-        - "--max-snakes={{ .Values.max_snakes }}"
         - "--max-boards=0"
         - "--num-parallel-reqs={{ .Values.relay.parallel_reqs }}"
         - "--latency={{ .Values.relay.latency }}"
@@ -135,9 +132,6 @@ spec:
             memory: {{ $.Values.worker.mem }}
         args:
         - "--port=8080"
-        - "--max-width={{ $.Values.max_width }}"
-        - "--max-height={{ $.Values.max_height }}"
-        - "--max-snakes={{ $.Values.max_snakes }}"
         - "--max-boards={{ $.Values.worker.boards }}"
         - "--latency={{ $.Values.worker.latency }}"
         - "--num-threads={{ $.Values.worker.num_threads }}"
