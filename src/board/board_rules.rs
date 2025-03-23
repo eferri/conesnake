@@ -6,8 +6,7 @@ use crate::rand::Rand;
 use std::cmp::max;
 
 impl Board {
-    // Move heuristics applied to each move in random playout
-
+    // generate a random valid move for a snake
     pub fn gen_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
         let mut valid_moves = [Move::Left; 4];
         let mut num_valid = 0;
@@ -21,16 +20,12 @@ impl Board {
             }
         }
 
-        let best_move = match num_valid.cmp(&1) {
-            Ordering::Equal => Some(valid_moves[0]),
-            Ordering::Greater => {
-                let mv_idx = rng.range(0, num_valid - 1);
-                Some(valid_moves[mv_idx as usize])
-            }
-            Ordering::Less => None,
-        };
-
-        best_move.unwrap_or(Move::Left)
+        if num_valid > 0 {
+            let mv_idx = rng.range(0, num_valid - 1);
+            valid_moves[mv_idx as usize]
+        } else {
+            Move::Left
+        }
     }
 
     pub fn gen_strong_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {

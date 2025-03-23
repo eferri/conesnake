@@ -6,7 +6,7 @@ SERVER_INSTALL_FILES=" \
 "
 
 K3S_SHASUM="9d5fc42bf825d3e8dcc8682c8bac071b1de18019af81f85519ccbe5c919e0896"
-INSTALL_K3S_VERSION="v1.32.2+k3s1"
+INSTALL_K3S_VERSION="v1.32.3+k3s1"
 
 CLOUD_SSH_ARGS="-q -o StrictHostKeyChecking=no -i ~/.ssh/conesnake_ed25519"
 LOCAL_SSH_ARGS="-q -o StrictHostKeyChecking=no"

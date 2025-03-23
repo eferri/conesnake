@@ -13,6 +13,7 @@
     "editor.inlayHints.enabled": "offUnlessPressed",
     "debug.allowBreakpointsEverywhere": true,
     "python.analysis.useLibraryCodeForTypes": true,
+    "python.defaultInterpreterPath": "~/.venv/bin/python",
     "rust-analyzer.completion.autoimport.enable": true,
     "rust-analyzer.debug.engine": "vadimcn.vscode-lldb",
     "rust-analyzer.debug.openDebugPane": true,

@@ -13,9 +13,6 @@ RUN usermod -m -d /home/conesnake --uid ${UID} --shell=/bin/bash -l conesnake ub
 # Runtime dependencies
 RUN apt-get update && apt-get install --no-install-recommends -y \
     libssl3 \
-    curl \
-    iproute2 \
-    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------
@@ -33,7 +30,7 @@ RUN apt-get update \
 RUN curl -sSfL "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb" -o cuda.deb \
     && dpkg -i cuda.deb \
     && apt-get update \
-    && apt-get install --no-install-recommends -y cuda-toolkit 
+    && apt-get install --no-install-recommends -y cuda-toolkit
 
 # Debugger, other development tools
 RUN apt-get update \
@@ -86,12 +83,12 @@ RUN curl -sSfL "https://get.helm.sh/helm-v3.17.2-linux-${DOCKER_ARCH}.tar.gz" -o
     && mv helm /tools/bin
 
 # Install kubectl
-RUN curl -sSfL "https://dl.k8s.io/release/v1.32.2/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
+RUN curl -sSfL "https://dl.k8s.io/release/v1.32.3/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
     && chmod +x ./kubectl \
     && mv kubectl /tools/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.11.2/terraform_1.11.2_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.11.3/terraform_1.11.3_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /tools/bin
@@ -108,7 +105,7 @@ RUN python3 -m venv /home/conesnake/.venv \
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-03-14
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-03-28
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \

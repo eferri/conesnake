@@ -104,7 +104,7 @@ pub type Scores = [SearchScore; 4];
 pub struct SearchStats {
     pub total_nodes: i64,
     pub num_searches: i64,
-    pub num_playouts: i64,
+    pub total_playouts: i64,
     pub max_depth: i32,
     pub scores: [Scores; MAX_SNAKES],
 }

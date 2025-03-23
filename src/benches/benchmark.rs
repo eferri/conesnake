@@ -40,8 +40,8 @@ fn playout_bench(b: &mut Bencher) {
 
     cfg.max_boards = 1000;
 
-    let res = env::var("COMPARE");
-    cfg.compare = str::parse::<u32>(res.unwrap().as_str()).unwrap() == 1;
+    let res = env::var("COMPARE").unwrap_or("0".to_string());
+    cfg.compare = str::parse::<u32>(&res).unwrap() == 1;
 
     #[cfg(feature = "simd")]
     info!("using simd");
@@ -75,8 +75,8 @@ fn search_bench(b: &mut Bencher) {
     cfg.fixed_iter = true;
     cfg.iter = 1000;
 
-    let res = env::var("COMPARE");
-    cfg.compare = str::parse::<u32>(res.unwrap().as_str()).unwrap() == 1;
+    let res = env::var("COMPARE").unwrap_or("0".to_string());
+    cfg.compare = str::parse::<u32>(&res).unwrap() == 1;
 
     #[cfg(feature = "simd")]
     info!("using simd");

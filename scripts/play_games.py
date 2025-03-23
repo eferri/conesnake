@@ -27,8 +27,9 @@ async def start_snake(index, opt_args=None):
         "--max-boards", "0",
         "--num-parallel-reqs", "1",
         "--worker-node", "127.0.0.1",
-        "--worker-pod", f"http://127.0.0.1:{snake_port + 1}",
-        "--worker-pod", f"http://127.0.0.1:{snake_port + 2}",
+    ] + list(itertools.chain.from_iterable([
+        "--worker-pod", f"http://127.0.0.1:{snake_port + 1 + i}",
+    ] for i in range(NUM_WORKERS))) + [
         "--latency", "10",
         "--mode", "relay",
     ]
@@ -73,9 +74,9 @@ async def start_snake(index, opt_args=None):
 
 async def start_rules(snakes, game_type="standard", map="standard"):
     rules_args = [
-        "--timeout", "250",
-        "--width", "8",
-        "--height", "8",
+        "--timeout", "500",
+        "--width", "11",
+        "--height", "11",
         "--gametype", game_type,
         "--map", map,
         "--foodSpawnChance", "15",
@@ -112,7 +113,7 @@ async def get_status(session, url):
         return 500
 
 
-async def run_games(num_games=500, num_opponents=1, **kwargs):
+async def run_games(num_games=500, num_opponents=3, **kwargs):
     opt_args = []
     for key, value in kwargs.items():
         if isinstance(value, bool):

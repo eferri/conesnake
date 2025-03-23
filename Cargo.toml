@@ -7,10 +7,6 @@ edition = "2021"
 name = "conesnake"
 path = "./src/bin/conesnake.rs"
 
-[[bin]]
-name = "performance"
-path = "./src/bin/performance.rs"
-
 [[bench]]
 name = "benchmark"
 path = "./src/benches/benchmark.rs"
@@ -32,7 +28,6 @@ rand = { version = "~0.9", features = ["small_rng"] }
 clap = { version = "~4.5", features = ["derive"] }
 log = "~0.4"
 env_logger = "~0.11"
-deepsize = "~0.2"
 nix = "~0.29"
 
 [dev-dependencies]
@@ -45,7 +40,8 @@ default = ["simd"]
 simd = []
 
 [profile.release]
-lto = "thin"
+lto = "fat"
+opt-level = 3
 
 [profile.release-with-debug]
 inherits = "release"

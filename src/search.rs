@@ -30,7 +30,7 @@ pub struct SearchContext<R: Rand> {
     done_barrier: Barrier,
     total_nodes: AtomicI64,
     num_searches: AtomicI64,
-    num_playouts: AtomicI64,
+    total_playouts: AtomicI64,
     playout_ns: AtomicI64,
 }
 
@@ -123,7 +123,7 @@ impl<R: Rand> SearchContext<R> {
             done_barrier: Barrier::new(config.num_threads + 1),
             total_nodes: AtomicI64::new(0),
             num_searches: AtomicI64::new(0),
-            num_playouts: AtomicI64::new(0),
+            total_playouts: AtomicI64::new(0),
             playout_ns: AtomicI64::new(0),
         }
     }
@@ -131,7 +131,7 @@ impl<R: Rand> SearchContext<R> {
     pub fn reset(&self) {
         self.total_nodes.store(0, Ordering::Release);
         self.num_searches.store(0, Ordering::Release);
-        self.num_playouts.store(0, Ordering::Release);
+        self.total_playouts.store(0, Ordering::Release);
         self.search_timeout.store(false, Ordering::Release);
         self.playout_ns.store(0, Ordering::Release);
     }
@@ -190,7 +190,7 @@ impl Node {
     pub fn duct_score(&self, cfg: &Config, snake_idx: usize, mv: Move) -> f64 {
         let mcts_scores = &self.cache[snake_idx][mv.idx()];
 
-        if mcts_scores.games < cfg.min_playouts || (self.games as i64) < cfg.min_playouts {
+        if mcts_scores.games == 0 || (self.games as i64) == 0 {
             f64::MAX
         } else {
             let ln_parent_games = (self.games as f64).ln();
@@ -221,7 +221,7 @@ impl Node {
             let mv = Move::extract(mvs, snake_idx as u32);
             let mcts_scores = &self.cache[snake_idx][mv.idx()];
 
-            if mcts_scores.games < cfg.min_playouts || (self.games as i64) < cfg.min_playouts {
+            if mcts_scores.games == 0 || (self.games as i64) == 0 {
                 results[snake_idx] = f64::MAX
             } else {
                 op_mask.set(snake_idx, true);
@@ -404,23 +404,23 @@ pub fn mcts<R: Rand>(
     let max_depth = root_guard.max_depth;
     let total_nodes = ctx.total_nodes.load(Ordering::Acquire);
     let num_searches = ctx.num_searches.load(Ordering::Acquire);
-    let num_playouts = ctx.num_playouts.load(Ordering::Acquire);
-    let num_terminal = num_searches - num_playouts;
+    let total_playouts = ctx.total_playouts.load(Ordering::Acquire);
+    let num_terminal = num_searches - total_playouts;
     let playout_ns = ctx.playout_ns.load(Ordering::Acquire);
-    let avg_playout_us = (playout_ns as f64 / num_playouts as f64) / (1000.0);
+    let avg_playout_us = (playout_ns as f64 / total_playouts as f64) / (1000.0);
 
     if !ctx.config.fixed_iter {
         info!("search max depth: {}", max_depth);
         info!("search total nodes: {}", total_nodes);
         info!("search num games: {}", num_searches);
-        info!("search num playouts: {}", num_playouts);
+        info!("search num playouts: {}", total_playouts);
         info!("search num terminal: {}", num_terminal);
         info!("Average playout us: {}", avg_playout_us);
     }
 
     Ok(SearchStats {
         total_nodes,
-        num_playouts,
+        total_playouts,
         num_searches,
         max_depth,
         scores,
@@ -500,11 +500,17 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
         // Perform rollout
         let start_time = Instant::now();
-        let (is_terminal, _) = playout_game(&ctx.config, &mut scratch_guard, game);
+        let mut is_terminal = false;
+        let num_playouts = if ctx.config.compare { 5 } else { 1 };
+
+        for _ in 0..num_playouts {
+            let (is_curr_terminal, _) = playout_game(&ctx.config, &mut scratch_guard, game);
+            is_terminal |= is_curr_terminal;
+        }
         let dur_ns = (Instant::now() - start_time).as_nanos() as i64;
 
         if !is_terminal {
-            ctx.num_playouts.fetch_add(1, Ordering::Relaxed);
+            ctx.total_playouts.fetch_add(num_playouts, Ordering::Relaxed);
             ctx.playout_ns.fetch_add(dur_ns, Ordering::Relaxed);
         }
         ctx.num_searches.fetch_add(1, Ordering::Relaxed);

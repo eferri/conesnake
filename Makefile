@@ -31,14 +31,12 @@ build debug-build:
 release-build:
 	docker compose run --rm snake cargo build --all-targets --release
 
+PROFILE_ARGS := -Z build-std --profile=release-with-debug --target x86_64-unknown-linux-gnu
+
 .PHONY: profile-build
 profile-build:
 	docker compose run --rm snake bash -c ' \
-		RUSTFLAGS="-C force-frame-pointers=yes" cargo build \
-			--all-targets \
-			-Z build-std \
-			--profile=release-with-debug \
-			--target x86_64-unknown-linux-gnu'
+		RUSTFLAGS="-C force-frame-pointers=yes" cargo build --all-targets $(PROFILE_ARGS)'
 
 .PHONY: lint
 lint:
@@ -71,25 +69,31 @@ profile: profile-build record report
 .PHONY: profile-mem
 profile-mem: profile-build record-mem report
 
-PROFILE_EXE ?= performance
+PROFILE_EXE := \
+	RUSTFLAGS="-C force-frame-pointers=yes" cargo test $(PROFILE_ARGS) \
+		--no-run --bench=benchmark 2>&1 | grep -Eo "target[^\(\)]+"
+
+PROFILE_BENCH ?= playout_bench
 
 .PHONY: record
 record:
-	docker compose run --rm snake \
-		perf record \
+	docker compose run --rm snake bash -c '\
+		PROFILE_PATH="$$($(PROFILE_EXE))" \
+		&& perf record \
 			--call-graph fp \
 			-e cycles \
 			-F 1000 \
-			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/$(PROFILE_EXE)
+			"$$PROFILE_PATH" --bench $(PROFILE_BENCH)'
 
 .PHONY: record-mem
 record-mem:
-	docker compose run --rm snake \
-		perf record \
+	docker compose run --rm snake bash -c '\
+		PROFILE_PATH="$$($(PROFILE_EXE))" \
+		&& perf record \
 			--call-graph fp \
 			-e cache-misses \
 			-F 1000 \
-			./target-snake/x86_64-unknown-linux-gnu/release-with-debug/$(PROFILE_EXE)
+			"$$PROFILE_PATH" --bench $(PROFILE_BENCH)'
 
 .PHONY: report
 report:
@@ -119,12 +123,6 @@ else
 COMPARE_ENV:=0
 endif
 
-.PHONY: performance
-performance:
-	docker compose run --rm snake bash -c ' \
-		cargo build --release \
-		&& COMPARE=0 ./target-snake/release/performance --num-threads 8 $(COMPARE_ARGS)'
-
 .PHONY: bench-search
 bench-search:
 	docker compose run --rm snake bash -c 'COMPARE=$(COMPARE_ENV) cargo bench search_bench'
@@ -134,7 +132,7 @@ bench-playout:
 	docker compose run --rm snake bash -c 'COMPARE=$(COMPARE_ENV) cargo bench playout_bench'
 
 .PHONY: compare
-compare:
+compare: rules
 	docker compose run --rm snake bash -c ' \
 		cargo build --release \
 		&& python3 -u ./scripts/play_games.py --mode compare 2>&1 | tee compare.log'
