@@ -433,10 +433,10 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
     let game_guard = ctx.game.read().unwrap();
     let game = game_guard.as_ref().unwrap();
 
-    let mut num_iter = 0;
-
     'main_loop: loop {
-        if ctx.search_timeout.load(Ordering::Acquire) || (ctx.config.fixed_iter && num_iter >= ctx.config.iter) {
+        if ctx.search_timeout.load(Ordering::Acquire)
+            || (ctx.config.fixed_iter && ctx.num_searches.load(Ordering::Acquire) >= ctx.config.iter)
+        {
             break 'main_loop;
         }
 
@@ -513,7 +513,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             ctx.total_playouts.fetch_add(num_playouts, Ordering::Relaxed);
             ctx.playout_ns.fetch_add(dur_ns, Ordering::Relaxed);
         }
-        ctx.num_searches.fetch_add(1, Ordering::Relaxed);
+        ctx.num_searches.fetch_add(1, Ordering::AcqRel);
 
         // Update rollout node score, get parent node for backpropagation
         let mut curr_move_idx;
@@ -575,8 +575,6 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                 curr_move_idx = state_guard.parent_move_idx;
             }
         }
-
-        num_iter += 1;
     }
     ctx.done_barrier.wait();
 }

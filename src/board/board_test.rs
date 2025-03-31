@@ -7,6 +7,12 @@ use crate::util::{Coord, Move};
 use pretty_assertions::assert_eq;
 
 #[test]
+pub fn boardsquare_sizing_test() {
+    assert_eq!(size_of::<BoardSquare>(), 2);
+    assert_eq!(align_of::<BoardSquare>(), 2);
+}
+
+#[test]
 pub fn basic_str_test() {
     let game = test_game();
 

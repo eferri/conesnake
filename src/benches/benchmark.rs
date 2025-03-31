@@ -73,7 +73,7 @@ fn search_bench(b: &mut Bencher) {
     cfg.num_threads = 8;
     cfg.latency = 0;
     cfg.fixed_iter = true;
-    cfg.iter = 1000;
+    cfg.iter = 4000;
 
     let res = env::var("COMPARE").unwrap_or("0".to_string());
     cfg.compare = str::parse::<u32>(&res).unwrap() == 1;

@@ -37,7 +37,7 @@ cargo-show-asm = "~0.2.48"
 
 [features]
 default = ["simd"]
-simd = []
+simd = ["rand/simd_support"]
 
 [profile.release]
 lto = "fat"

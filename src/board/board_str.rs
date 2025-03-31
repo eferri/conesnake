@@ -95,7 +95,7 @@ impl Board {
         // Fill board from board_mat
         #[allow(clippy::needless_range_loop)]
         for idx in 0..self.len() as usize {
-            let square = self.board_mat[idx];
+            let square = self.at_idx(idx);
             char_array[idx] = util::square_to_char(square, 0, None);
         }
 
@@ -201,7 +201,7 @@ impl Board {
         // Populate board matrix
         for (idx, char) in chars_vec.iter().enumerate() {
             let (board_square, ..) = util::char_to_square(*char);
-            board.board_mat[idx] = board_square;
+            board.set_at_idx(idx, board_square);
 
             match board_square {
                 BoardSquare::Food | BoardSquare::FoodHazard => board.num_food += 1,

@@ -76,5 +76,5 @@ pub struct Config {
     pub fixed_iter: bool,
 
     #[clap(long, default_value_t = 1000)]
-    pub iter: i32,
+    pub iter: i64,
 }

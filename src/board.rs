@@ -86,7 +86,7 @@ impl Snake {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(u8)]
+#[repr(u8, align(2))]
 pub enum BoardSquare {
     Empty,
     SnakeHead(u8),       // index of snake
@@ -101,25 +101,29 @@ pub enum BoardSquare {
 }
 
 impl BoardSquare {
-    pub fn tag_val(&self) -> u16 {
+    pub fn tag_val(&self) -> u8 {
         // https://rust-lang.github.io/unsafe-code-guidelines/layout/enums.html#explicit-repr-annotation-without-c-compatibility
         let sqr_ptr = self as *const BoardSquare as *const u8;
-        unsafe { *sqr_ptr as u16 }
+        unsafe { *sqr_ptr }
     }
 
-    pub fn idx_val(&self) -> u16 {
+    pub fn idx_val(&self) -> u8 {
         let sqr_ptr = self as *const BoardSquare as *const u8;
-        unsafe { *(sqr_ptr.offset(1)) as u16 }
+        unsafe { *(sqr_ptr.offset(1)) }
     }
 
-    pub fn from_raw(tag: u16, idx: u16) -> Self {
+    pub fn from_raw(val: u16) -> Self {
         let mut sqr = BoardSquare::Empty;
-        let sqr_ptr = &mut sqr as *mut BoardSquare as *mut u8;
+        let sqr_ptr = &mut sqr as *mut BoardSquare as *mut u16;
         unsafe {
-            *sqr_ptr = tag as u8;
-            *sqr_ptr.offset(1) = idx as u8;
+            *sqr_ptr = val;
         }
         sqr
+    }
+
+    pub fn to_raw(&self) -> u16 {
+        let sqr_ptr = self as *const BoardSquare as *const u16;
+        unsafe { *sqr_ptr }
     }
 }
 
@@ -130,7 +134,7 @@ pub enum HeadOnCol {
     PossibleElimination,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 pub struct Board {
     pub width: i32,
     pub height: i32,
@@ -145,7 +149,29 @@ pub struct Board {
 
     pub snakes: [Snake; MAX_SNAKES],
 
-    board_mat: [BoardSquare; MAX_BOARD_SIZE],
+    board_mat: [u16; MAX_BOARD_SIZE],
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        let mut result = self.width == other.width
+            && self.height == other.height
+            && self.turn == other.turn
+            && self.num_snakes == other.num_snakes
+            && self.num_food == other.num_food
+            && self.royale_min_x == other.royale_min_x
+            && self.royale_max_x == other.royale_max_x
+            && self.royale_min_y == other.royale_min_y
+            && self.royale_max_y == other.royale_max_y
+            && self.snakes == other.snakes;
+
+        for idx in 0..MAX_BOARD_SIZE {
+            let sqr = BoardSquare::from(self.at_idx(idx as usize));
+            let other_sqr = BoardSquare::from(other.at_idx(idx as usize));
+            result = result && (sqr == other_sqr);
+        }
+        result
+    }
 }
 
 impl Board {
@@ -161,7 +187,7 @@ impl Board {
             royale_min_y: 0,
             royale_max_y: 0,
             snakes: [Snake::new(); MAX_SNAKES],
-            board_mat: [BoardSquare::Empty; MAX_BOARD_SIZE],
+            board_mat: [0; MAX_BOARD_SIZE],
         }
     }
 
@@ -394,7 +420,7 @@ impl Board {
     }
 
     fn set_size(&mut self, w: i32, h: i32) {
-        assert!(w * h <= self.board_mat.len() as i32);
+        debug_assert!(w * h <= self.board_mat.len() as i32);
 
         self.width = w;
         self.height = h;
@@ -499,7 +525,11 @@ impl Board {
     }
 
     pub fn at(&self, loc: Coord) -> BoardSquare {
-        self.board_mat[self.idx_from_coord(loc)]
+        BoardSquare::from_raw(self.board_mat[self.idx_from_coord(loc)])
+    }
+
+    pub fn at_idx(&self, idx: usize) -> BoardSquare {
+        BoardSquare::from_raw(self.board_mat[idx])
     }
 
     fn idx_from_coord(&self, loc: Coord) -> usize {
@@ -515,7 +545,11 @@ impl Board {
 
     pub fn set_at(&mut self, loc: Coord, val: BoardSquare) {
         let idx = self.idx_from_coord(loc);
-        self.board_mat[idx] = val;
+        self.board_mat[idx] = val.to_raw();
+    }
+
+    pub fn set_at_idx(&mut self, idx: usize, val: BoardSquare) {
+        self.board_mat[idx] = val.to_raw();
     }
 
     pub fn on_board(&self, square: Coord) -> bool {
@@ -604,6 +638,9 @@ impl Board {
 
 pub mod board_rules;
 pub mod board_str;
+
+#[cfg(feature = "simd")]
+pub mod board_simd;
 
 #[cfg(test)]
 mod board_test;
