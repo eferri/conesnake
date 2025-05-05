@@ -5,8 +5,8 @@ SERVER_INSTALL_FILES=" \
   ./traefik-config.yaml \
 "
 
-K3S_SHASUM="9d5fc42bf825d3e8dcc8682c8bac071b1de18019af81f85519ccbe5c919e0896"
-INSTALL_K3S_VERSION="v1.32.3+k3s1"
+K3S_SHASUM="9ca7930c31179d83bc13de20078fd8ad3e1ee00875b31f39a7e524ca4ef7d9de"
+INSTALL_K3S_VERSION="v1.32.4+k3s1"
 
 CLOUD_SSH_ARGS="-q -o StrictHostKeyChecking=no -i ~/.ssh/conesnake_ed25519"
 LOCAL_SSH_ARGS="-q -o StrictHostKeyChecking=no"

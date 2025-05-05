@@ -14,15 +14,15 @@ resource "google_project_service" "compute_engine" {
 # Artifact Registry
 
 resource "google_service_account" "conesnake_registry" {
-  account_id   = "${local.deployment}-registry-saccount"
-  display_name = "${local.deployment}_registry_service_account"
+  account_id   = "${var.deployment}-registry-saccount"
+  display_name = "${var.deployment}_registry_service_account"
 }
 
 resource "google_artifact_registry_repository" "conesnake" {
   provider      = google-beta
   project       = var.project
   location      = var.region
-  repository_id = local.deployment
+  repository_id = "conesnake"
   format        = "DOCKER"
 
   cleanup_policy_dry_run = false
@@ -46,7 +46,7 @@ resource "google_artifact_registry_repository" "conesnake" {
   }
 
   labels = {
-    app = local.deployment
+    app = var.deployment
   }
 }
 
@@ -58,7 +58,7 @@ resource "google_compute_network" "vpc_network" {
 }
 
 resource "google_compute_subnetwork" "conesnake_subnet" {
-  name          = "${local.deployment}-subnet"
+  name          = "${var.deployment}-subnet"
   ip_cidr_range = "10.8.0.0/24"
   network       = google_compute_network.vpc_network.id
 }
@@ -73,7 +73,7 @@ resource "google_compute_firewall" "http" {
     ports    = [local.http_port]
   }
 
-  target_tags = [local.deployment]
+  target_tags = [var.deployment]
 
   source_ranges = ["0.0.0.0/0"]
 }
@@ -87,7 +87,7 @@ resource "google_compute_firewall" "ssh" {
     ports    = ["22"]
   }
 
-  target_tags = [local.deployment]
+  target_tags = [var.deployment]
 
   source_ranges = ["${var.local_ip}/32"]
 }
@@ -101,20 +101,20 @@ resource "google_compute_firewall" "wireguard" {
     ports    = [var.wg_port]
   }
 
-  target_tags = [local.deployment]
+  target_tags = [var.deployment]
 
   source_ranges = ["0.0.0.0/0"]
 }
 
 resource "google_compute_address" "conesnake_instance" {
-  name = "${local.deployment}-instance"
+  name = "${var.deployment}-instance"
 }
 
 # GCE Instances
 
 resource "google_service_account" "conesnake_instance" {
-  account_id   = "${local.deployment}-instance-saccount"
-  display_name = "${local.deployment}_instance_service_account"
+  account_id   = "${var.deployment}-instance-saccount"
+  display_name = "${var.deployment}_instance_service_account"
 }
 
 resource "google_compute_instance" "conesnake_relay" {
@@ -122,7 +122,7 @@ resource "google_compute_instance" "conesnake_relay" {
   machine_type = local.node_type
   zone         = "${var.region}-${var.zone}"
 
-  tags = [local.deployment]
+  tags = [var.deployment]
 
   allow_stopping_for_update = true
 
@@ -133,7 +133,7 @@ resource "google_compute_instance" "conesnake_relay" {
       type = "pd-balanced"
 
       labels = {
-        app = local.deployment
+        app = var.deployment
       }
     }
   }
@@ -157,6 +157,6 @@ resource "google_compute_instance" "conesnake_relay" {
   }
 
   labels = {
-    app = local.deployment
+    app = var.deployment
   }
 }

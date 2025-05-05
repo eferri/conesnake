@@ -22,11 +22,14 @@ variable "wg_port" {
   type = string
 }
 
+variable "deployment" {
+  type = string
+}
+
 locals {
-  deployment = "conesnake"
-  http_port  = 31757
-  node_name  = "relay"
-  node_type  = "e2-micro"
+  http_port = 31757
+  node_name = "relay"
+  node_type = "e2-micro"
 }
 
 output "cloud_node_public_ip" {

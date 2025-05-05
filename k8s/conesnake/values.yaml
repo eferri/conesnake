@@ -4,10 +4,10 @@ use_gcp: true
 relay:
   mem: "50Mi"
   latency: 20
-  parallel_reqs: 2
+  parallel_reqs: 3
 
 worker:
   mem: "4500Mi"
-  boards: 500000
-  latency: 30
+  boards: 800000
+  latency: 50
   num_threads: 8

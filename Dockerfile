@@ -84,7 +84,7 @@ RUN curl -sSfL "https://get.helm.sh/helm-v3.17.3-linux-${DOCKER_ARCH}.tar.gz" -o
     && mv helm /tools/bin
 
 # Install kubectl
-RUN curl -sSfL "https://dl.k8s.io/release/v1.33.0/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
+RUN curl -sSfL "https://dl.k8s.io/release/v1.32.4/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
     && chmod +x ./kubectl \
     && mv kubectl /tools/bin
 

@@ -26,6 +26,7 @@ provider "null" {}
 module "gcp" {
   source = "./gcp"
 
+  deployment     = var.deployment
   local_ip       = var.local_ip
   ssh_public_key = var.ssh_public_key
   region         = var.region

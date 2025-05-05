@@ -27,19 +27,21 @@ gcloud init
 gcloud auth application-default login
 ```
 
-1. Generate ssh key for aws instance access:
+1. Generate ssh key for cloud instance access:
     ```
     ssh-keygen -t ed25519 -C "" -f ~/.ssh/conesnake_ed25519 -N ""
     cat ~/.ssh/conesnake_ed25519.pub
     ```
 
-1. Populate terraform variables
+1. Populate terraform variables:
     ```
-    cp terraform/vars.tf.template terraform/vars.tf
+    cp terraform/vars-secrets.tf.template terraform/vars-secrets.tf
     ```
+   Ensure that the `internal_ip`s chosen don't conflict with the default used by the relay cloud node, `10.9.1.0`
 
-1. Ensure all local nodes configured in terraform/vars.tf have password-less ssh access configured
-   Configure a SSH host alias in ~/.ssh/config that matches key of the `local_nodes`` map in terraform/vars.tf
+1. Ensure all local nodes configured in terraform/vars.tf have password-less ssh access configured.
+   Configure a SSH host alias in ~/.ssh/config that matches key of the `local_nodes`` map in terraform/vars.tf.
+   Ensure ssh config `User` and `HostName` fields are set for each host so defaults aren't used
 
 1. Install wireguard on all local nodes:
     ```
@@ -64,8 +66,9 @@ gcloud auth application-default login
 
 1. Create a secrets file for the helm chart:
     ```
-    cp k8s/conesnake/values.secrets.yaml.template k8s/conesnake/values.secrets.yaml
+    cp k8s/conesnake/values-secrets.yaml.template k8s/conesnake/values-secrets.yaml
     ```
+    populate the values in `values-secrets.yaml`
 
 1. Build and push production docker images:
     ```

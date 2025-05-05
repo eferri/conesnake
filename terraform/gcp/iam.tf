@@ -7,8 +7,8 @@ resource "google_project_iam_binding" "conesnake_instance" {
 }
 
 resource "google_project_iam_custom_role" "conesnake_instance" {
-  role_id = "${local.deployment}_instance"
-  title   = "${local.deployment}_instance"
+  role_id = "${var.deployment}_instance"
+  title   = "${var.deployment}_instance"
   permissions = [
     "compute.addresses.use"
   ]
@@ -23,8 +23,8 @@ resource "google_project_iam_binding" "conesnake_registry" {
 }
 
 resource "google_project_iam_custom_role" "conesnake_registry" {
-  role_id = "${local.deployment}_registry"
-  title   = "${local.deployment}_registry"
+  role_id = "${var.deployment}_registry"
+  title   = "${var.deployment}_registry"
   permissions = [
     "artifactregistry.dockerimages.get",
     "artifactregistry.dockerimages.list",
