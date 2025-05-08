@@ -2,6 +2,7 @@ use crate::api::{Scores, SearchStats};
 use crate::board::Board;
 use crate::config::{Config, MAX_BOARD_SIZE, MAX_SNAKES};
 use crate::game::Game;
+use crate::game::Rules;
 use crate::pool::ThreadPool;
 use crate::rand::Rand;
 use crate::util::{Coord, Error, Move};
@@ -187,7 +188,19 @@ impl Node {
         self.num_move_perms as i32 >= self.max_children()
     }
 
-    pub fn duct_score(&self, cfg: &Config, snake_idx: usize, mv: Move) -> f64 {
+    pub fn temperature(&self, cfg: &Config, game: &Game) -> f64 {
+        if game.ruleset == Rules::Constrictor {
+            cfg.temperature_constrictor
+        } else {
+            match self.board.num_alive_snakes() {
+                4 => cfg.temperature_four,
+                3 => cfg.temperature_three,
+                _ => cfg.temperature_two,
+            }
+        }
+    }
+
+    pub fn duct_score(&self, cfg: &Config, game: &Game, snake_idx: usize, mv: Move) -> f64 {
         let mcts_scores = &self.cache[snake_idx][mv.idx()];
 
         if mcts_scores.games == 0 || (self.games as i64) == 0 {
@@ -204,12 +217,12 @@ impl Node {
             let var_ucb = variance + (2.0 * ln_parent_games / mcts_scores.games as f64).sqrt();
             let uct_score = ((0.25_f64.min(var_ucb) * ln_parent_games) / mcts_scores.games as f64).sqrt();
 
-            (mcts_scores.score / mcts_scores.games as f64) + cfg.temperature * uct_score
+            (mcts_scores.score / mcts_scores.games as f64) + self.temperature(cfg, game) * uct_score
         }
     }
 
     #[cfg(feature = "simd")]
-    pub fn duct_scores_simd(&self, cfg: &Config, mvs: u32) -> f64x4 {
+    pub fn duct_scores_simd(&self, cfg: &Config, game: &Game, mvs: u32) -> f64x4 {
         let mut op_mask = mask64x4::splat(false);
 
         let mut results = f64x4::splat(0.0);
@@ -250,16 +263,19 @@ impl Node {
             f64x4::splat(0.0),
         );
 
-        op_mask.select((scores / games) + f64x4::splat(cfg.temperature) * uct_score, results)
+        op_mask.select(
+            (scores / games) + f64x4::splat(self.temperature(cfg, game)) * uct_score,
+            results,
+        )
     }
 
-    pub fn duct_score_wrapper(&self, cfg: &Config, moves: u32) -> f64 {
+    pub fn duct_score_wrapper(&self, cfg: &Config, game: &Game, moves: u32) -> f64 {
         #[cfg(not(feature = "simd"))]
         {
             let mut score = 0.0;
             for snake_idx in 0..self.board.num_snakes() {
                 let mv = Move::extract(moves, snake_idx as u32);
-                let mv_duct_score = self.duct_score(cfg, snake_idx as usize, mv);
+                let mv_duct_score = self.duct_score(cfg, game, snake_idx as usize, mv);
 
                 score += mv_duct_score;
             }
@@ -268,7 +284,7 @@ impl Node {
 
         #[cfg(feature = "simd")]
         {
-            let duct_scores = self.duct_scores_simd(cfg, moves);
+            let duct_scores = self.duct_scores_simd(cfg, game, moves);
 
             duct_scores.reduce_sum()
         }
@@ -463,7 +479,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             let mut max_idx_opt = None;
 
             for child_ptr in node_guard.children[0..node_guard.num_children as usize].iter() {
-                let duct_score = node_guard.duct_score_wrapper(&ctx.config, child_ptr.moves);
+                let duct_score = node_guard.duct_score_wrapper(&ctx.config, game, child_ptr.moves);
 
                 if duct_score > max_score || max_idx_opt.is_none() {
                     max_score = duct_score;

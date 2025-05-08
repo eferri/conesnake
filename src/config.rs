@@ -2,7 +2,10 @@ use clap::{Parser, ValueEnum};
 
 // Hyperparameters
 
-pub const DEFAULT_TEMP: f64 = 2.0;
+pub const DEFAULT_TEMP_FOUR: f64 = 3.5;
+pub const DEFAULT_TEMP_THREE: f64 = 2.5;
+pub const DEFAULT_TEMP_TWO: f64 = 2.0;
+pub const DEFAULT_TEMP_CONSTRICTOR: f64 = 4.0;
 pub const DEFAULT_NUM_PLAYOUTS: i64 = 1;
 pub const DEFAULT_WIN_VAL: f64 = 1.0;
 pub const DEFAULT_LOSS_VAL: f64 = 0.0;
@@ -54,8 +57,17 @@ pub struct Config {
     pub compare: bool,
 
     // Algorithm parameters
-    #[clap(long, default_value_t = DEFAULT_TEMP)]
-    pub temperature: f64,
+    #[clap(long, default_value_t = DEFAULT_TEMP_FOUR)]
+    pub temperature_four: f64,
+
+    #[clap(long, default_value_t = DEFAULT_TEMP_THREE)]
+    pub temperature_three: f64,
+
+    #[clap(long, default_value_t = DEFAULT_TEMP_TWO)]
+    pub temperature_two: f64,
+
+    #[clap(long, default_value_t = DEFAULT_TEMP_CONSTRICTOR)]
+    pub temperature_constrictor: f64,
 
     #[clap(long, default_value_t = DEFAULT_NUM_PLAYOUTS)]
     pub num_playouts: i64,

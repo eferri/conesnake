@@ -14,7 +14,7 @@ pub fn test_config() -> Config {
     let mut config = Config::parse_from(["".to_owned()]);
 
     config.num_threads = 1;
-    config.max_boards = 10000;
+    config.max_boards = 20000;
     config.latency = 50;
 
     config

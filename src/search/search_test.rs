@@ -355,10 +355,12 @@ fn arcade_maze_search_test() {
 
                 for snake_idx in 0..root_guard.board.num_snakes() as usize {
                     let mv = Move::extract(child_ptr.moves, snake_idx as u32);
-                    duct_sum += root_guard.duct_score(&ctx.config, snake_idx, mv)
+                    duct_sum += root_guard.duct_score(&ctx.config, &game, snake_idx, mv)
                 }
 
-                let duct_sum_simd = root_guard.duct_scores_simd(&ctx.config, child_ptr.moves).reduce_sum();
+                let duct_sum_simd = root_guard
+                    .duct_scores_simd(&ctx.config, &game, child_ptr.moves)
+                    .reduce_sum();
 
                 assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-5);
             }
