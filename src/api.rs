@@ -4,6 +4,8 @@ use crate::util::{Coord, Move};
 
 use serde::{Deserialize, Serialize};
 
+use std::fmt;
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoyaleSettings {
@@ -104,9 +106,51 @@ pub type Scores = [SearchScore; 4];
 pub struct SearchStats {
     pub total_nodes: i64,
     pub num_searches: i64,
+    pub num_terminal: i64,
     pub total_playouts: i64,
+    pub total_turns: i64,
+    pub avg_playout_ns: f64,
+    pub avg_turn_ns: f64,
     pub max_depth: i32,
+    pub num_snakes: i32,
     pub scores: [Scores; MAX_SNAKES],
+}
+
+impl fmt::Display for SearchStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "total_nodes: {}\n", self.total_nodes)?;
+        write!(f, "num_searches: {}\n", self.num_searches)?;
+        write!(f, "num_terminal: {}\n", self.num_terminal)?;
+        write!(f, "total_playouts: {}\n", self.total_playouts)?;
+        write!(f, "total_turns: {}\n", self.total_turns)?;
+        write!(f, "avg_playout_ns: {:.2}\n", self.avg_playout_ns)?;
+        write!(f, "avg_turn_ns: {:.2}\n", self.avg_turn_ns)?;
+        write!(f, "max_depth: {}\n", self.max_depth)?;
+        write!(f, "num_snakes: {}\n", self.num_snakes)?;
+
+        for i in 0..self.num_snakes {
+            write!(f, "snake {}:\n", i)?;
+            for j in 0..4 {
+                let mv_str = match j {
+                    0 => "left",
+                    1 => "right",
+                    2 => "up",
+                    _ => "down",
+                };
+                let score = self.scores[i as usize][j].score;
+                let games = self.scores[i as usize][j].games;
+                let avg = if games > 0 { score / games as f64 } else { 0.0 };
+
+                write!(
+                    f,
+                    "    {} score: {:.1} games: {} avg: {:.5}\n",
+                    mv_str, score, games, avg
+                )?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

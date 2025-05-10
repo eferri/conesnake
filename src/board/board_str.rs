@@ -141,9 +141,12 @@ impl Board {
         board_str
     }
 
-    pub fn from_str(inp: &str, game: &Game) -> Result<Self, Error> {
+    pub fn from_str(board_str: &str, game: &Game) -> Result<Self, Error> {
         // Remove whitespace lines
-        let lines: Vec<&str> = inp.lines().filter(|l| l.split_whitespace().next().is_some()).collect();
+        let lines: Vec<&str> = board_str
+            .lines()
+            .filter(|l| l.split_whitespace().next().is_some())
+            .collect();
 
         let header: Vec<&str> = lines[0].split_whitespace().collect();
 

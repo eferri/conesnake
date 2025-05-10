@@ -406,10 +406,6 @@ impl Board {
         alive
     }
 
-    pub fn max_snakes(&self) -> i32 {
-        self.snakes.len() as i32
-    }
-
     pub fn num_food(&self) -> i32 {
         self.num_food
     }

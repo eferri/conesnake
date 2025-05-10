@@ -316,7 +316,7 @@ fn small_search_test() {
 }
 
 const MAZE_BOARD: &str = "
-    turn: 3 health: 97 health: 97
+    turn: 3 health: 97 health: 97 health: 0
     * - * * - * * * * * *
     * - - - - - - - - * *
     * - * * - * * * - * *
@@ -354,6 +354,9 @@ fn arcade_maze_search_test() {
                 let mut duct_sum = 0.0;
 
                 for snake_idx in 0..root_guard.board.num_snakes() as usize {
+                    if !root_guard.board.snakes[snake_idx].alive() {
+                        continue;
+                    }
                     let mv = Move::extract(child_ptr.moves, snake_idx as u32);
                     duct_sum += root_guard.duct_score(&ctx.config, &game, snake_idx, mv)
                 }

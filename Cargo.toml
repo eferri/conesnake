@@ -7,6 +7,14 @@ edition = "2021"
 name = "conesnake"
 path = "./src/bin/conesnake.rs"
 
+[[bin]]
+name = "performance"
+path = "./src/bin/performance.rs"
+
+[[bin]]
+name = "performance_old"
+path = "./src/bin/performance_old.rs"
+
 [[bench]]
 name = "benchmark"
 path = "./src/benches/benchmark.rs"

@@ -43,7 +43,7 @@ impl Move {
         MOVES[idx]
     }
 
-    pub fn num_perm(num_snakes: i32) -> u32 {
+    pub const fn num_perm(num_snakes: i32) -> u32 {
         // Equivalent to 4^(max_snakes)
         1 << (2 * num_snakes as u32)
     }
@@ -61,6 +61,7 @@ impl Move {
         ((mv as u32) << (2 * snake_idx)) | (!(0x3 << (2 * snake_idx)) & moves)
     }
 
+    // Encode a list of snake-moves in a u32
     pub fn encode(moves: &[Self]) -> u32 {
         let mut encoded_moves = 0;
         for (idx, mv) in moves.iter().enumerate() {

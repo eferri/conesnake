@@ -32,6 +32,7 @@ pub struct SearchContext<R: Rand> {
     total_nodes: AtomicI64,
     num_searches: AtomicI64,
     total_playouts: AtomicI64,
+    total_turns: AtomicI64,
     playout_ns: AtomicI64,
 }
 
@@ -63,29 +64,28 @@ pub struct Node {
     max_depth: i32,
 
     games: i32,
-    score: Vec<f64>,
+    score: [f64; MAX_SNAKES],
 
-    cache: Vec<[NodeScoreCache; 4]>,
+    cache: [[NodeScoreCache; 4]; MAX_SNAKES],
 
     num_children: u32,
     num_move_perms: u32,
     // This uses a LOT of memory
     // each node has 4^max_snakes child nodes
-    children: Vec<NodePtr>,
+    children: [NodePtr; max_possible_children(MAX_SNAKES as i32)],
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Copy)]
 struct NodeScoreCache {
     score: f64,
     games: i64,
-    variance_sum: f64,
     pruned: bool,
 }
 
 // Pointer to child nodes, with corresponding moves
 // 2-bit moves are encoded into "moves" u32 to save memory
 // In Royale map, shrink direction is encoded in last 2 bits
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct NodePtr {
     moves: u32,
     index: u32,
@@ -125,6 +125,7 @@ impl<R: Rand> SearchContext<R> {
             total_nodes: AtomicI64::new(0),
             num_searches: AtomicI64::new(0),
             total_playouts: AtomicI64::new(0),
+            total_turns: AtomicI64::new(0),
             playout_ns: AtomicI64::new(0),
         }
     }
@@ -140,7 +141,6 @@ impl<R: Rand> SearchContext<R> {
 
 impl Node {
     pub fn new(board: Board) -> Self {
-        let max_snakes = board.max_snakes();
         Node {
             board,
             parent_node_idx: 0,
@@ -148,11 +148,11 @@ impl Node {
             depth: 0,
             max_depth: 0,
             games: 0,
-            score: vec![0.0; max_snakes as usize],
-            cache: vec![Default::default(); max_snakes as usize],
+            score: [0.0; MAX_SNAKES],
+            cache: [[Default::default(); 4]; MAX_SNAKES],
             num_children: 0,
             num_move_perms: 0,
-            children: vec![NodePtr { moves: 0, index: 0 }; max_children(max_snakes)],
+            children: [NodePtr { moves: 0, index: 0 }; max_possible_children(MAX_SNAKES as i32)],
         }
     }
 
@@ -192,11 +192,7 @@ impl Node {
         if game.ruleset == Rules::Constrictor {
             cfg.temperature_constrictor
         } else {
-            match self.board.num_alive_snakes() {
-                4 => cfg.temperature_four,
-                3 => cfg.temperature_three,
-                _ => cfg.temperature_two,
-            }
+            cfg.temperature
         }
     }
 
@@ -206,18 +202,8 @@ impl Node {
         if mcts_scores.games == 0 || (self.games as i64) == 0 {
             f64::MAX
         } else {
-            let ln_parent_games = (self.games as f64).ln();
-
-            let variance = if mcts_scores.games < 2 {
-                0.0
-            } else {
-                (mcts_scores.variance_sum) / (mcts_scores.games - 1) as f64
-            };
-
-            let var_ucb = variance + (2.0 * ln_parent_games / mcts_scores.games as f64).sqrt();
-            let uct_score = ((0.25_f64.min(var_ucb) * ln_parent_games) / mcts_scores.games as f64).sqrt();
-
-            (mcts_scores.score / mcts_scores.games as f64) + self.temperature(cfg, game) * uct_score
+            let uct_score = self.temperature(cfg, game) * ((self.games as f64).ln() / mcts_scores.games as f64).sqrt();
+            (mcts_scores.score / mcts_scores.games as f64) + uct_score
         }
     }
 
@@ -226,11 +212,15 @@ impl Node {
         let mut op_mask = mask64x4::splat(false);
 
         let mut results = f64x4::splat(0.0);
-        let mut variance_sums = f64x4::splat(0.0);
         let mut games = f64x4::splat(0.0);
         let mut scores = f64x4::splat(0.0);
 
         for snake_idx in 0..self.board.num_snakes() as usize {
+            if !self.board.snakes[snake_idx].alive() {
+                results[snake_idx] = 0.0;
+                continue;
+            }
+
             let mv = Move::extract(mvs, snake_idx as u32);
             let mcts_scores = &self.cache[snake_idx][mv.idx()];
 
@@ -238,7 +228,6 @@ impl Node {
                 results[snake_idx] = f64::MAX
             } else {
                 op_mask.set(snake_idx, true);
-                variance_sums[snake_idx] = mcts_scores.variance_sum;
                 games[snake_idx] = mcts_scores.games as f64;
                 scores[snake_idx] = mcts_scores.score;
             }
@@ -248,25 +237,12 @@ impl Node {
             return results;
         }
 
-        let ln_parent_games = (self.games as f64).ln();
-
-        let variance_mask = op_mask & games.gt(&f64x4::splat(1.0));
-
-        let variances = variance_mask.select(variance_sums / (games - f64x4::splat(1.0)), f64x4::splat(0.0));
-        let var_ucb = op_mask.select(
-            variances + (f64x4::splat(2.0 * ln_parent_games) / games).sqrt(),
-            f64x4::splat(0.0),
-        );
-
         let uct_score = op_mask.select(
-            ((f64x4::splat(0.25).simd_min(var_ucb) * f64x4::splat(ln_parent_games)) / games).sqrt(),
+            f64x4::splat(self.temperature(cfg, game)) * (f64x4::splat(self.games as f64).ln() / games).sqrt(),
             f64x4::splat(0.0),
         );
 
-        op_mask.select(
-            (scores / games) + f64x4::splat(self.temperature(cfg, game)) * uct_score,
-            results,
-        )
+        op_mask.select((scores / games) + uct_score, results)
     }
 
     pub fn duct_score_wrapper(&self, cfg: &Config, game: &Game, moves: u32) -> f64 {
@@ -274,6 +250,11 @@ impl Node {
         {
             let mut score = 0.0;
             for snake_idx in 0..self.board.num_snakes() {
+                if !self.board.snakes[snake_idx].alive() {
+                    results[snake_idx] = 0.0;
+                    continue;
+                }
+
                 let mv = Move::extract(moves, snake_idx as u32);
                 let mv_duct_score = self.duct_score(cfg, game, snake_idx as usize, mv);
 
@@ -324,12 +305,7 @@ pub fn best_move(cfg: &Config, snake_idx: usize, scores: &[Scores], print_summar
         }
     }
 
-    // Only use the game count if we are trapped
-    let best_move = if best_score == cfg.loss_val {
-        best_move_games
-    } else {
-        best_move_score
-    };
+    let best_move = best_move_games;
 
     if print_summary {
         search_str.push_str(&format!("\nSearch best move: {best_move}"));
@@ -383,8 +359,8 @@ pub fn mcts<R: Rand>(
         if !search_dur.is_zero() {
             sleep(search_dur);
             info!(
-                "Startup time {}us, Slept {}us",
-                startup_dur.as_micros(),
+                "Startup time {}ns, Slept {}us",
+                startup_dur.as_nanos(),
                 search_dur.as_micros()
             )
         } else {
@@ -399,12 +375,9 @@ pub fn mcts<R: Rand>(
     let root_guard = ctx.node_space[0].read().unwrap();
 
     let mut scores = [Default::default(); MAX_SNAKES];
+    let num_snakes = root_guard.board.num_alive_snakes();
 
-    for (s_idx, score) in scores
-        .iter_mut()
-        .enumerate()
-        .take(root_guard.board.num_snakes() as usize)
-    {
+    for (s_idx, score) in scores.iter_mut().enumerate().take(num_snakes as usize) {
         let mut snake_scores: Scores = Default::default();
 
         for (mv_idx, stats) in root_guard.cache[s_idx].iter().enumerate() {
@@ -421,26 +394,30 @@ pub fn mcts<R: Rand>(
     let total_nodes = ctx.total_nodes.load(Ordering::Acquire);
     let num_searches = ctx.num_searches.load(Ordering::Acquire);
     let total_playouts = ctx.total_playouts.load(Ordering::Acquire);
+    let total_turns = ctx.total_turns.load(Ordering::Acquire);
     let num_terminal = num_searches - total_playouts;
     let playout_ns = ctx.playout_ns.load(Ordering::Acquire);
-    let avg_playout_us = (playout_ns as f64 / total_playouts as f64) / (1000.0);
+    let avg_playout_ns = playout_ns as f64 / total_playouts as f64;
+    let avg_turn_ns = playout_ns as f64 / total_turns as f64;
+
+    let stats = SearchStats {
+        total_nodes,
+        num_searches,
+        total_playouts,
+        total_turns,
+        num_terminal,
+        avg_playout_ns,
+        avg_turn_ns,
+        max_depth,
+        num_snakes,
+        scores,
+    };
 
     if !ctx.config.fixed_iter {
-        info!("search max depth: {}", max_depth);
-        info!("search total nodes: {}", total_nodes);
-        info!("search num games: {}", num_searches);
-        info!("search num playouts: {}", total_playouts);
-        info!("search num terminal: {}", num_terminal);
-        info!("Average playout us: {}", avg_playout_us);
+        info!("search:\n{}", stats);
     }
 
-    Ok(SearchStats {
-        total_nodes,
-        total_playouts,
-        num_searches,
-        max_depth,
-        scores,
-    })
+    Ok(stats)
 }
 
 fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
@@ -517,11 +494,13 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         // Perform rollout
         let start_time = Instant::now();
         let mut is_terminal = false;
+        let mut num_total_turns = 0;
         let num_playouts = if ctx.config.compare { 5 } else { 1 };
 
         for _ in 0..num_playouts {
-            let (is_curr_terminal, _) = playout_game(&ctx.config, &mut scratch_guard, game);
+            let (is_curr_terminal, num_turns) = playout_game(&ctx.config, &mut scratch_guard, game);
             is_terminal |= is_curr_terminal;
+            num_total_turns += num_turns;
         }
         let dur_ns = (Instant::now() - start_time).as_nanos() as i64;
 
@@ -529,6 +508,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             ctx.total_playouts.fetch_add(num_playouts, Ordering::Relaxed);
             ctx.playout_ns.fetch_add(dur_ns, Ordering::Relaxed);
         }
+        ctx.total_turns.fetch_add(num_total_turns as i64, Ordering::Relaxed);
         ctx.num_searches.fetch_add(1, Ordering::AcqRel);
 
         // Update rollout node score, get parent node for backpropagation
@@ -571,17 +551,8 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
                 let cache = &mut state_guard.cache[snake_idx][snake_mv.idx()];
 
-                let old_score = cache.score;
-                let old_games = cache.games;
-
                 cache.score += snake_score;
                 cache.games += 1;
-
-                if old_games > 0 {
-                    let old_mean = old_score / old_games as f64;
-                    let new_mean = cache.score / cache.games as f64;
-                    cache.variance_sum += (snake_score - old_mean) * (snake_score - new_mean);
-                }
             }
 
             if curr_idx == 0 {
@@ -658,8 +629,11 @@ fn expand_node<R: Rand>(
             let snake_mv_idx = Move::extract_idx(node.num_move_perms, alive_index) as usize;
             let snake_move = Move::from_idx(snake_mv_idx);
 
-            // If this is a bad move for the snake and it is not trapped, prune the node
-            // Otherwise expand a single node for the snakes death
+            // If this node is pruned, continue
+            // Else if this is a bad move for the snake and it is not trapped,
+            //  Or it is trapped but not a left move, prune the node.
+            //  Expand a single node (left move) for the snake's death
+            // Else expand the node
             if node.cache[s][snake_mv_idx].pruned {
                 node.num_move_perms += 1;
                 continue 'expand_loop;
@@ -710,7 +684,7 @@ fn expand_node<R: Rand>(
     Some((num_expanded, last_child_idx))
 }
 
-pub fn max_children(max_snakes: i32) -> usize {
+pub const fn max_possible_children(max_snakes: i32) -> usize {
     Move::num_perm(max_snakes) as usize
 }
 
