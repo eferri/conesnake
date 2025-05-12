@@ -1,4 +1,4 @@
-use crate::api::{BattleState, BoardApi, SnakeApi};
+use crate::api::{ApiCoord, BattleState, BoardApi, SnakeApi};
 use crate::config::{MAX_BOARD_SIZE, MAX_SNAKES};
 use crate::game::{Game, Map, Rules};
 use crate::util::{self};
@@ -198,14 +198,14 @@ impl Board {
 
         let mut board = Board::new(req.board.width, req.board.height);
         for coord in req.board.food.iter() {
-            board.set_at(*coord, BoardSquare::Food);
+            board.set_at(coord.to_internal(), BoardSquare::Food);
             board.num_food += 1;
         }
 
         for coord in req.board.hazards.iter() {
-            match board.at(*coord) {
-                BoardSquare::Empty => board.set_at(*coord, BoardSquare::Hazard),
-                BoardSquare::Food => board.set_at(*coord, BoardSquare::FoodHazard),
+            match board.at(coord.to_internal()) {
+                BoardSquare::Empty => board.set_at(coord.to_internal(), BoardSquare::Hazard),
+                BoardSquare::Food => board.set_at(coord.to_internal(), BoardSquare::FoodHazard),
                 _ => (),
             };
         }
@@ -237,14 +237,14 @@ impl Board {
         for i in 0..self.len() {
             let coord = self.coord_from_idx(i as usize);
             match self.at(coord) {
-                BoardSquare::Food => food.push(coord),
+                BoardSquare::Food => food.push(coord.to_api()),
                 BoardSquare::Hazard
                 | BoardSquare::SnakeHeadHazard(_)
                 | BoardSquare::SnakeBodyHazard(_)
-                | BoardSquare::SnakeTailHazard(_) => hazards.push(coord),
+                | BoardSquare::SnakeTailHazard(_) => hazards.push(coord.to_api()),
                 BoardSquare::FoodHazard => {
-                    food.push(coord);
-                    hazards.push(coord);
+                    food.push(coord.to_api());
+                    hazards.push(coord.to_api());
                 }
                 _ => (),
             }
@@ -258,14 +258,14 @@ impl Board {
             let mut snake_body = Vec::with_capacity(self.snakes[idx].len as usize);
 
             for i in 0..self.snakes[idx].len {
-                snake_body.push(self.snakes[idx].at_head_offset(i));
+                snake_body.push(self.snakes[idx].at_head_offset(i).to_api());
             }
 
             let api_snake = SnakeApi {
                 id: idx.to_string(),
                 name: idx.to_string(),
                 body: snake_body,
-                head: self.snakes[idx].body[0],
+                head: self.snakes[idx].body[0].to_api(),
                 health: self.snakes[idx].health,
                 latency: "0".to_owned(),
                 length: self.snake_len(idx),
@@ -422,8 +422,11 @@ impl Board {
         self.height = h;
     }
 
-    fn add_snake(&mut self, body: &[Coord], health: i32) {
-        self.snakes[self.num_snakes as usize].body[0..body.len()].copy_from_slice(&body[0..body.len()]);
+    fn add_snake(&mut self, body: &[ApiCoord], health: i32) {
+        for i in 0..body.len() {
+            self.snakes[self.num_snakes as usize].body[i] = body[i].to_internal();
+        }
+
         self.snakes[self.num_snakes as usize].len = body.len() as i32;
         self.snakes[self.num_snakes as usize].head_ptr = 0;
         self.snakes[self.num_snakes as usize].tail_ptr = max(0, body.len() as i32 - 1);
@@ -444,33 +447,35 @@ impl Board {
         }
 
         let mut prev_coord: Option<Coord> = None;
+        let body_len = self.snakes[snake_idx as usize].len as usize;
 
-        for (i, coord) in api_snake.body.iter().enumerate() {
+        for i in 0..body_len {
+            let coord = self.snakes[snake_idx as usize].body[i];
             if let Some(p) = prev_coord {
-                if *coord != p && !self.next_to(*coord, p, game.ruleset) {
+                if coord != p && !self.next_to(coord, p, game.ruleset) {
                     return Err(Error::BadBoard("Snake was not contiguous".to_owned()));
                 }
             }
 
-            match (self.at(*coord), i) {
+            match (self.at(coord), i) {
                 (BoardSquare::Empty, 0) => {
-                    self.set_at(*coord, BoardSquare::SnakeHead(snake_idx));
+                    self.set_at(coord, BoardSquare::SnakeHead(snake_idx));
                 }
                 (BoardSquare::Hazard, 0) => {
-                    self.set_at(*coord, BoardSquare::SnakeHeadHazard(snake_idx));
+                    self.set_at(coord, BoardSquare::SnakeHeadHazard(snake_idx));
                 }
                 (BoardSquare::Empty, x) => {
                     if x < api_snake.body.len() - 1 {
-                        self.set_at(*coord, BoardSquare::SnakeBody(snake_idx));
+                        self.set_at(coord, BoardSquare::SnakeBody(snake_idx));
                     } else {
-                        self.set_at(*coord, BoardSquare::SnakeTail(snake_idx));
+                        self.set_at(coord, BoardSquare::SnakeTail(snake_idx));
                     }
                 }
                 (BoardSquare::Hazard, x) => {
                     if x < api_snake.body.len() - 1 {
-                        self.set_at(*coord, BoardSquare::SnakeBodyHazard(snake_idx));
+                        self.set_at(coord, BoardSquare::SnakeBodyHazard(snake_idx));
                     } else {
-                        self.set_at(*coord, BoardSquare::SnakeTailHazard(snake_idx));
+                        self.set_at(coord, BoardSquare::SnakeTailHazard(snake_idx));
                     }
                 }
                 (BoardSquare::Food, _) | (BoardSquare::FoodHazard, _) => {
@@ -482,7 +487,7 @@ impl Board {
                             "Snake square conflicts with other SnakeBody".to_owned(),
                         ));
                     }
-                    self.set_at(*coord, BoardSquare::SnakeTail(snake_idx));
+                    self.set_at(coord, BoardSquare::SnakeTail(snake_idx));
                 }
                 (BoardSquare::SnakeBodyHazard(idx), _) => {
                     if idx != snake_idx {
@@ -490,7 +495,7 @@ impl Board {
                             "Snake square conflicts with other SnakeBodyHazard".to_owned(),
                         ));
                     }
-                    self.set_at(*coord, BoardSquare::SnakeTailHazard(snake_idx));
+                    self.set_at(coord, BoardSquare::SnakeTailHazard(snake_idx));
                 }
                 (BoardSquare::SnakeHead(idx), _)
                 | (BoardSquare::SnakeHeadHazard(idx), _)
@@ -503,7 +508,7 @@ impl Board {
                     }
                 }
             }
-            prev_coord = Some(*coord);
+            prev_coord = Some(coord);
         }
         Ok(())
     }
@@ -529,14 +534,11 @@ impl Board {
     }
 
     fn idx_from_coord(&self, loc: Coord) -> usize {
-        (loc.x as i32 + (loc.y as i32) * self.width) as usize
+        (loc.x() as i32 + (loc.y() as i32) * self.width) as usize
     }
 
     pub fn coord_from_idx(&self, idx: usize) -> Coord {
-        Coord {
-            x: (idx as i32 % self.width) as i8,
-            y: (idx as i32 / self.width) as i8,
-        }
+        Coord::new((idx as i32 % self.width) as i8, (idx as i32 / self.width) as i8)
     }
 
     pub fn set_at(&mut self, loc: Coord, val: BoardSquare) {
@@ -549,43 +551,43 @@ impl Board {
     }
 
     pub fn on_board(&self, square: Coord) -> bool {
-        !(square.x < 0 || square.x as i32 >= self.width || square.y < 0 || square.y as i32 >= self.height)
+        !(square.x() < 0 || square.x() as i32 >= self.width || square.y() < 0 || square.y() as i32 >= self.height)
     }
 
     pub fn move_to_coord(&self, head: Coord, mv: Move, rules: Rules) -> Coord {
-        let mut square = Coord { x: head.x, y: head.y };
-        match mv {
-            Move::Left => square.x = head.x - 1,
-            Move::Right => square.x = head.x + 1,
-            Move::Up => square.y = head.y + 1,
-            Move::Down => square.y = head.y - 1,
+        let (new_x, new_y) = match mv {
+            Move::Left => (head.x() - 1, head.y()),
+            Move::Right => (head.x() + 1, head.y()),
+            Move::Up => (head.x(), head.y() + 1),
+            Move::Down => (head.x(), head.y() - 1),
         };
 
+        let mut square = Coord::new(new_x, new_y);
         if let Rules::Wrapped = rules {
-            square.x = square.x.rem_euclid(self.width as i8);
-            square.y = square.y.rem_euclid(self.height as i8);
+            square.set_x(new_x.rem_euclid(self.width as i8));
+            square.set_y(new_y.rem_euclid(self.height as i8));
         }
 
         square
     }
 
     pub fn coord_to_move(&self, orig: Coord, dest: Coord, rules: Rules) -> (Option<Move>, Option<Move>) {
-        let mut diff_x = dest.x as i32 - orig.x as i32;
-        let mut diff_y = dest.y as i32 - orig.y as i32;
+        let mut diff_x = dest.x() as i32 - orig.x() as i32;
+        let mut diff_y = dest.y() as i32 - orig.y() as i32;
 
         if let Rules::Wrapped = rules {
             let diff_x_wrapped = if diff_x < 0 {
-                self.width - orig.x as i32 + dest.x as i32
+                self.width - orig.x() as i32 + dest.x() as i32
             } else {
-                -(orig.x as i32 + self.width - dest.x as i32)
+                -(orig.x() as i32 + self.width - dest.x() as i32)
             };
 
             diff_x = min_by(diff_x, diff_x_wrapped, |a, b| a.abs().cmp(&b.abs()));
 
             let diff_y_wrapped = if diff_y < 0 {
-                self.height - orig.y as i32 + dest.y as i32
+                self.height - orig.y() as i32 + dest.y() as i32
             } else {
-                -(orig.y as i32 + self.height - dest.y as i32)
+                -(orig.y() as i32 + self.height - dest.y() as i32)
             };
             diff_y = min_by(diff_y, diff_y_wrapped, |a, b| a.abs().cmp(&b.abs()));
         }
@@ -620,8 +622,8 @@ impl Board {
     }
 
     pub fn abs_dist(&self, square_1: Coord, square_2: Coord, rules: Rules) -> (i32, i32) {
-        let mut diff_x = (square_2.x as i32 - square_1.x as i32).abs();
-        let mut diff_y = (square_2.y as i32 - square_1.y as i32).abs();
+        let mut diff_x = (square_2.x() as i32 - square_1.x() as i32).abs();
+        let mut diff_y = (square_2.y() as i32 - square_1.y() as i32).abs();
 
         if let Rules::Wrapped = rules {
             diff_x = min(diff_x, self.width - diff_x);

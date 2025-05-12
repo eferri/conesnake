@@ -1,3 +1,4 @@
+use crate::api::ApiCoord;
 use crate::board::{Board, BoardSquare, HeadOnCol};
 use crate::config::MAX_BOARD_SIZE;
 use crate::rand::{FastRand, Rand};
@@ -19,7 +20,7 @@ pub fn basic_str_test() {
     let mut board = Board::new(7, 7);
     board.turn = 4;
 
-    let snake = test_snake(&[Coord::new(3, 4), Coord::new(4, 4), Coord::new(4, 3)], 87);
+    let snake = test_snake(&[ApiCoord::new(3, 4), ApiCoord::new(4, 4), ApiCoord::new(4, 3)], 87);
     board.add_api_snake(&game, &snake).unwrap();
 
     board.set_at(Coord::new(5, 6), BoardSquare::Food);
@@ -43,14 +44,14 @@ pub fn multiple_snake_str_test() {
     board.set_at(Coord::new(10, 7), BoardSquare::Food);
     board.num_food += 1;
 
-    let snake_0 = test_snake(&[Coord::new(3, 4), Coord::new(2, 4)], 87);
+    let snake_0 = test_snake(&[ApiCoord::new(3, 4), ApiCoord::new(2, 4)], 87);
     let snake_1 = test_snake(
         &[
-            Coord::new(5, 6),
-            Coord::new(5, 5),
-            Coord::new(6, 5),
-            Coord::new(7, 5),
-            Coord::new(7, 4),
+            ApiCoord::new(5, 6),
+            ApiCoord::new(5, 5),
+            ApiCoord::new(6, 5),
+            ApiCoord::new(7, 5),
+            ApiCoord::new(7, 4),
         ],
         76,
     );
@@ -70,7 +71,7 @@ pub fn stacked_str_test() {
 
     let mut board = Board::new(7, 7);
 
-    let snake = test_snake(&[Coord::new(3, 5), Coord::new(3, 5), Coord::new(3, 5)], 100);
+    let snake = test_snake(&[ApiCoord::new(3, 5), ApiCoord::new(3, 5), ApiCoord::new(3, 5)], 100);
     board.add_api_snake(&game, &snake).unwrap();
 
     let board_string = board.to_string();
@@ -86,7 +87,12 @@ pub fn hazard_str_test() {
     let mut board = Board::new(11, 11);
 
     let snake = test_snake(
-        &[Coord::new(3, 4), Coord::new(4, 4), Coord::new(4, 3), Coord::new(4, 2)],
+        &[
+            ApiCoord::new(3, 4),
+            ApiCoord::new(4, 4),
+            ApiCoord::new(4, 3),
+            ApiCoord::new(4, 2),
+        ],
         100,
     );
 
@@ -177,23 +183,23 @@ pub fn move_to_coord_test() {
     let game = test_game();
     let board_a = Board::from_str(BOARD_A, &game).unwrap();
 
-    let test_coord = Coord { x: 4, y: 3 };
+    let test_coord = Coord::new(4, 3);
 
     assert_eq!(
         board_a.move_to_coord(test_coord, Move::Left, game.ruleset),
-        Coord { x: 3, y: 3 }
+        Coord::new(3, 3)
     );
     assert_eq!(
         board_a.move_to_coord(test_coord, Move::Right, game.ruleset),
-        Coord { x: 5, y: 3 }
+        Coord::new(5, 3)
     );
     assert_eq!(
         board_a.move_to_coord(test_coord, Move::Up, game.ruleset),
-        Coord { x: 4, y: 4 }
+        Coord::new(4, 4)
     );
     assert_eq!(
         board_a.move_to_coord(test_coord, Move::Down, game.ruleset),
-        Coord { x: 4, y: 2 }
+        Coord::new(4, 2)
     );
 }
 
@@ -202,23 +208,23 @@ pub fn move_to_coord_wrapped_test() {
     let game = wrapped_game();
     let board_a = Board::from_str(BOARD_A, &game).unwrap();
 
-    let test_coord = Coord { x: 0, y: 5 };
+    let test_coord = Coord::new(0, 5);
 
     assert_eq!(
         board_a.move_to_coord(test_coord, Move::Left, game.ruleset),
-        Coord { x: 5, y: 5 }
+        Coord::new(5, 5)
     );
     assert_eq!(
         board_a.move_to_coord(test_coord, Move::Right, game.ruleset),
-        Coord { x: 1, y: 5 }
+        Coord::new(1, 5)
     );
     assert_eq!(
         board_a.move_to_coord(test_coord, Move::Up, game.ruleset),
-        Coord { x: 0, y: 0 }
+        Coord::new(0, 0)
     );
     assert_eq!(
         board_a.move_to_coord(test_coord, Move::Down, game.ruleset),
-        Coord { x: 0, y: 4 }
+        Coord::new(0, 4)
     );
 }
 
@@ -227,12 +233,12 @@ pub fn next_to_test() {
     let game = test_game();
     let board = Board::from_str(BOARD_A, &game).unwrap();
 
-    let a = Coord { x: 1, y: 1 };
-    let b = Coord { x: 2, y: 2 };
-    let c = Coord { x: 3, y: 3 };
-    let d = Coord { x: 3, y: 4 };
-    let e = Coord { x: 5, y: 2 };
-    let f = Coord { x: 4, y: 2 };
+    let a = Coord::new(1, 1);
+    let b = Coord::new(2, 2);
+    let c = Coord::new(3, 3);
+    let d = Coord::new(3, 4);
+    let e = Coord::new(5, 2);
+    let f = Coord::new(4, 2);
 
     assert!(board.next_to(e, f, game.ruleset));
     assert!(!board.next_to(a, b, game.ruleset));
@@ -246,16 +252,16 @@ pub fn next_to_wrapped_test() {
     let game = wrapped_game();
     let board = Board::from_str(BOARD_A, &game).unwrap();
 
-    let a = Coord { x: 0, y: 4 };
-    let b = Coord { x: 5, y: 4 };
-    let c = Coord { x: 3, y: 5 };
-    let d = Coord { x: 3, y: 0 };
-    let e = Coord { x: 0, y: 5 };
-    let f = Coord { x: 5, y: 0 };
+    let a = Coord::new(0, 4);
+    let b = Coord::new(5, 4);
+    let c = Coord::new(3, 5);
+    let d = Coord::new(3, 0);
+    let e = Coord::new(0, 5);
+    let f = Coord::new(5, 0);
 
-    let g = Coord { x: 1, y: 1 };
-    let h = Coord { x: 2, y: 2 };
-    let i = Coord { x: 3, y: 2 };
+    let g = Coord::new(1, 1);
+    let h = Coord::new(2, 2);
+    let i = Coord::new(3, 2);
 
     assert!(board.next_to(a, b, game.ruleset));
     assert!(board.next_to(b, a, game.ruleset));
@@ -274,10 +280,10 @@ pub fn coord_to_move_test() {
     let game = test_game();
     let board = Board::from_str(BOARD_A, &game).unwrap();
 
-    let a = Coord { x: 1, y: 1 };
-    let b = Coord { x: 1, y: 2 };
-    let c = Coord { x: 0, y: 0 };
-    let d = Coord { x: 1, y: 0 };
+    let a = Coord::new(1, 1);
+    let b = Coord::new(1, 2);
+    let c = Coord::new(0, 0);
+    let d = Coord::new(1, 0);
 
     assert_eq!(board.coord_to_move(a, b, game.ruleset), (Some(Move::Up), None));
     assert_eq!(board.coord_to_move(b, a, game.ruleset), (Some(Move::Down), None));
@@ -311,12 +317,12 @@ pub fn coord_to_move_wrapped_test() {
     let board = Board::from_str(BOARD_A, &game).unwrap();
 
     // Immediately next to
-    let a = Coord { x: 1, y: 1 };
-    let b = Coord { x: 1, y: 2 };
-    let c = Coord { x: 0, y: 0 };
-    let d = Coord { x: 1, y: 0 };
-    let e = Coord { x: 5, y: 0 };
-    let f = Coord { x: 0, y: 5 };
+    let a = Coord::new(1, 1);
+    let b = Coord::new(1, 2);
+    let c = Coord::new(0, 0);
+    let d = Coord::new(1, 0);
+    let e = Coord::new(5, 0);
+    let f = Coord::new(0, 5);
 
     assert_eq!(board.coord_to_move(a, b, game.ruleset), (Some(Move::Up), None));
     assert_eq!(board.coord_to_move(b, a, game.ruleset), (Some(Move::Down), None));
@@ -466,7 +472,7 @@ pub fn gen_board_food_test() {
     let mut board_food = Board::from_str(BOARD_D, &game).unwrap();
     let mut food_buff = [Default::default(); MAX_BOARD_SIZE];
 
-    board_food.gen_board(Move::Right as u32, &game, &mut food_buff, &mut rng);
+    board_food.gen_board(Move::Right as u16, &game, &mut food_buff, &mut rng);
 
     assert!(board_food.num_food() > 0);
 }

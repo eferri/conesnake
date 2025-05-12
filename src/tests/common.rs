@@ -1,9 +1,8 @@
-use crate::api::{Customizations, GameApi, RoyaleSettings, Ruleset, Settings, SnakeApi, SquadSettings};
+use crate::api::{ApiCoord, Customizations, GameApi, RoyaleSettings, Ruleset, Settings, SnakeApi, SquadSettings};
 use crate::config::Config;
 use crate::game::{Game, Map, Rules};
 use crate::rand::{FastRand, MaxRand};
 use crate::search::SearchContext;
-use crate::util::Coord;
 
 use clap::Parser;
 use log::info;
@@ -90,7 +89,7 @@ pub fn wrapped_game() -> Game {
     game
 }
 
-pub fn test_snake(coords: &[Coord], health: i32) -> SnakeApi {
+pub fn test_snake(coords: &[ApiCoord], health: i32) -> SnakeApi {
     SnakeApi {
         id: "0".to_owned(),
         name: "conesnake".to_owned(),

@@ -76,9 +76,6 @@ pub struct Config {
     #[clap(long, default_value_t = false)]
     pub strong_playout: bool,
 
-    #[clap(long, default_value_t = false)]
-    pub fixed_iter: bool,
-
-    #[clap(long, default_value_t = 1000)]
-    pub iter: i64,
+    #[clap(long, default_value_t = 0)]
+    pub fixed_iter: i64,
 }

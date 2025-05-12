@@ -177,7 +177,7 @@ impl Board {
     // Battlesnake rules implementation
     //
 
-    pub fn gen_board(&mut self, moves: u32, game: &Game, food_buff: &mut [Coord], rng: &mut impl Rand) {
+    pub fn gen_board(&mut self, moves: u16, game: &Game, food_buff: &mut [Coord], rng: &mut impl Rand) {
         // Note: this is not done till later in rules
         self.turn += 1;
 
@@ -211,7 +211,7 @@ impl Board {
     }
 
     #[inline(always)]
-    fn move_snakes(&mut self, moves: u32, game: &Game) {
+    fn move_snakes(&mut self, moves: u16, game: &Game) {
         // StageMovementStandard
         // Move snakes board_mat tails only, Compute location of move
         for idx in 0..(self.num_snakes() as usize) {
@@ -332,7 +332,7 @@ impl Board {
     // StageEliminationStandard
     // Move Head, Track Collisions
     #[inline(always)]
-    fn eliminate_snakes(&mut self, moves: u32, game: &Game) {
+    fn eliminate_snakes(&mut self, moves: u16, game: &Game) {
         for idx in 0..(self.num_snakes() as usize) {
             if !self.snakes[idx].alive() {
                 continue;

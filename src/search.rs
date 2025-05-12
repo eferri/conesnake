@@ -69,9 +69,8 @@ pub struct Node {
     cache: [[NodeScoreCache; 4]; MAX_SNAKES],
 
     num_children: u32,
-    num_move_perms: u32,
+    num_move_perms: u16,
     // This uses a LOT of memory
-    // each node has 4^max_snakes child nodes
     children: [NodePtr; max_possible_children(MAX_SNAKES as i32)],
 }
 
@@ -87,7 +86,7 @@ struct NodeScoreCache {
 // In Royale map, shrink direction is encoded in last 2 bits
 #[derive(Clone, Copy)]
 struct NodePtr {
-    moves: u32,
+    moves: u16,
     index: u32,
 }
 
@@ -175,7 +174,7 @@ impl Node {
         }
     }
 
-    pub fn child_moves(&self, idx: usize) -> u32 {
+    pub fn child_moves(&self, idx: usize) -> u16 {
         self.children[idx].moves
     }
 
@@ -208,7 +207,7 @@ impl Node {
     }
 
     #[cfg(feature = "simd")]
-    pub fn duct_scores_simd(&self, cfg: &Config, game: &Game, mvs: u32) -> f64x4 {
+    pub fn duct_scores_simd(&self, cfg: &Config, game: &Game, mvs: u16) -> f64x4 {
         let mut op_mask = mask64x4::splat(false);
 
         let mut results = f64x4::splat(0.0);
@@ -245,7 +244,7 @@ impl Node {
         op_mask.select((scores / games) + uct_score, results)
     }
 
-    pub fn duct_score_wrapper(&self, cfg: &Config, game: &Game, moves: u32) -> f64 {
+    pub fn duct_score_wrapper(&self, cfg: &Config, game: &Game, moves: u16) -> f64 {
         #[cfg(not(feature = "simd"))]
         {
             let mut score = 0.0;
@@ -351,7 +350,7 @@ pub fn mcts<R: Rand>(
         pool.execute(move || search_worker(ctx_cln, id));
     }
 
-    if !ctx.config.fixed_iter {
+    if ctx.config.fixed_iter == 0 {
         let startup_dur = Instant::now() - start_time;
         let search_us = (game.api.timeout - ctx.config.latency) as i64 * 1000;
         let search_dur = Duration::from_micros(search_us as u64).saturating_sub(startup_dur);
@@ -413,7 +412,7 @@ pub fn mcts<R: Rand>(
         scores,
     };
 
-    if !ctx.config.fixed_iter {
+    if ctx.config.fixed_iter == 0 {
         info!("search:\n{}", stats);
     }
 
@@ -428,7 +427,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
     'main_loop: loop {
         if ctx.search_timeout.load(Ordering::Acquire)
-            || (ctx.config.fixed_iter && ctx.num_searches.load(Ordering::Acquire) >= ctx.config.iter)
+            || (ctx.config.fixed_iter > 0 && ctx.num_searches.load(Ordering::Acquire) >= ctx.config.fixed_iter)
         {
             break 'main_loop;
         }
@@ -568,7 +567,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
 pub fn playout_game<R: Rand>(cfg: &Config, state: &mut ThreadContext<R>, game: &Game) -> (bool, i32) {
     let mut terminal = true;
-    let mut playout_moves: u32 = 0;
+    let mut playout_moves: u16 = 0;
     let mut num_moves = 0;
 
     while !game.over(&state.board) {

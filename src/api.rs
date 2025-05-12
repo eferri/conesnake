@@ -47,14 +47,30 @@ pub struct GameApi {
     pub ruleset: Ruleset,
 }
 
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+pub struct ApiCoord {
+    pub x: i8,
+    pub y: i8,
+}
+
+impl ApiCoord {
+    pub fn new(x: i8, y: i8) -> Self {
+        ApiCoord { x, y }
+    }
+
+    pub fn to_internal(&self) -> Coord {
+        Coord::new(self.x, self.y)
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SnakeApi {
     pub id: String,
     pub name: String,
     pub health: i32,
-    pub body: Vec<Coord>,
+    pub body: Vec<ApiCoord>,
     pub latency: String,
-    pub head: Coord,
+    pub head: ApiCoord,
     pub length: i32,
     pub shout: Option<String>,
     pub squad: String,
@@ -72,8 +88,8 @@ pub struct Customizations {
 pub struct BoardApi {
     pub height: i32,
     pub width: i32,
-    pub food: Vec<Coord>,
-    pub hazards: Vec<Coord>,
+    pub food: Vec<ApiCoord>,
+    pub hazards: Vec<ApiCoord>,
     pub snakes: Vec<SnakeApi>,
 }
 

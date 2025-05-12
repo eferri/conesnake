@@ -95,7 +95,7 @@ RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.11.4/terraform_1.11.4
     && mv terraform /tools/bin
 
 ENV PATH="/tools/go/bin:/app/.go/bin:/home/conesnake/.cargo/bin:/home/conesnake/.venv/bin:${PATH}"
-ENV PATH="/tools/bin:/usr/lib/linux-tools/6.8.0-55-generic/:${PATH}"
+ENV PATH="/tools/bin:/usr/lib/linux-tools/6.8.0-59-generic/:${PATH}"
 
 COPY requirements.txt .
 

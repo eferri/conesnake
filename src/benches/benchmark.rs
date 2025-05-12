@@ -11,6 +11,7 @@ use conesnake::search::{SearchContext, ThreadContext};
 use conesnake::tests::common::{release_config, test_game};
 
 use std::env;
+use std::mem;
 use std::str;
 use std::sync::Arc;
 use std::time::Instant;
@@ -50,6 +51,9 @@ fn playout_bench(b: &mut Bencher) {
         info!("compare is true!")
     }
 
+    let node_size = mem::size_of::<search::Node>();
+    info!("node size {} bytes", node_size);
+
     info!("running benchmark...");
 
     let game = test_game();
@@ -72,8 +76,7 @@ fn search_bench(b: &mut Bencher) {
     cfg.max_boards = 20000;
     cfg.num_threads = 8;
     cfg.latency = 0;
-    cfg.fixed_iter = true;
-    cfg.iter = 4000;
+    cfg.fixed_iter = 4000;
 
     let res = env::var("COMPARE").unwrap_or("0".to_string());
     cfg.compare = str::parse::<u32>(&res).unwrap() == 1;
@@ -84,6 +87,9 @@ fn search_bench(b: &mut Bencher) {
     if cfg.compare {
         info!("compare is true!")
     }
+
+    let node_size = mem::size_of::<search::Node>();
+    info!("node size {} bytes", node_size);
 
     info!("allocating...");
 

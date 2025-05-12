@@ -1,3 +1,4 @@
+use crate::api::ApiCoord;
 use crate::board::BoardSquare;
 use crate::rand::Rand;
 
@@ -10,19 +11,46 @@ use std::io;
 // API structs
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub struct Coord {
-    pub x: i8,
-    pub y: i8,
+    pub val: u8,
 }
 
 impl Coord {
     pub fn new(x: i8, y: i8) -> Self {
-        Coord { x, y }
+        let mut crd = Coord { val: 0 };
+        crd.set_x(x);
+        crd.set_y(y);
+        crd
+    }
+
+    pub fn x(&self) -> i8 {
+        (self.val & 0xf) as i8
+    }
+
+    pub fn y(&self) -> i8 {
+        ((self.val >> 4) & 0xf) as i8
+    }
+
+    pub fn set_x(&mut self, x_val: i8) {
+        self.val &= 0xf0;
+        self.val |= (x_val as u8) & 0xf;
+    }
+
+    pub fn set_y(&mut self, y_val: i8) {
+        self.val &= 0x0f;
+        self.val |= ((y_val as u8) & 0xf) << 4;
+    }
+
+    pub fn to_api(&self) -> ApiCoord {
+        ApiCoord {
+            x: self.x(),
+            y: self.y(),
+        }
     }
 }
 
 impl Display for Coord {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "({}, {})", self.x, self.y)?;
+        write!(f, "({}, {})", self.x(), self.y())?;
         Ok(())
     }
 }
@@ -43,26 +71,26 @@ impl Move {
         MOVES[idx]
     }
 
-    pub const fn num_perm(num_snakes: i32) -> u32 {
+    pub const fn num_perm(num_snakes: i32) -> u16 {
         // Equivalent to 4^(max_snakes)
-        1 << (2 * num_snakes as u32)
+        1 << (2 * num_snakes as u16)
     }
 
     // Extract the move index from snake at index snake_idx,
-    pub fn extract_idx(moves: u32, snake_idx: u32) -> u32 {
+    pub fn extract_idx(moves: u16, snake_idx: u32) -> u16 {
         (moves & (0x3 << (2 * snake_idx))) >> (2 * snake_idx)
     }
 
-    pub fn extract(moves: u32, snake_idx: u32) -> Self {
+    pub fn extract(moves: u16, snake_idx: u32) -> Self {
         Self::from_idx(Self::extract_idx(moves, snake_idx) as usize)
     }
 
-    pub fn set_move(moves: u32, snake_idx: u32, mv: Self) -> u32 {
-        ((mv as u32) << (2 * snake_idx)) | (!(0x3 << (2 * snake_idx)) & moves)
+    pub fn set_move(moves: u16, snake_idx: u32, mv: Self) -> u16 {
+        ((mv as u16) << (2 * snake_idx)) | (!(0x3 << (2 * snake_idx)) & moves)
     }
 
-    // Encode a list of snake-moves in a u32
-    pub fn encode(moves: &[Self]) -> u32 {
+    // Encode a list of snake-moves in a u16
+    pub fn encode(moves: &[Self]) -> u16 {
         let mut encoded_moves = 0;
         for (idx, mv) in moves.iter().enumerate() {
             encoded_moves = Self::set_move(encoded_moves, idx as u32, *mv);
@@ -70,7 +98,7 @@ impl Move {
         encoded_moves
     }
 
-    pub fn decode(moves: u32, num_snakes: i32) -> Vec<Self> {
+    pub fn decode(moves: u16, num_snakes: i32) -> Vec<Self> {
         let mut moves_vec = Vec::with_capacity(num_snakes as usize);
         for idx in 0..(num_snakes as u32) {
             moves_vec.push(Self::extract(moves, idx));
