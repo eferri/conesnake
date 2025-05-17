@@ -127,7 +127,6 @@ pub struct SearchStats {
     pub total_turns: i64,
     pub avg_playout_ns: f64,
     pub avg_turn_ns: f64,
-    pub max_depth: i32,
     pub num_snakes: i32,
     pub scores: [Scores; MAX_SNAKES],
 }
@@ -141,7 +140,6 @@ impl fmt::Display for SearchStats {
         write!(f, "total_turns: {}\n", self.total_turns)?;
         write!(f, "avg_playout_ns: {:.2}\n", self.avg_playout_ns)?;
         write!(f, "avg_turn_ns: {:.2}\n", self.avg_turn_ns)?;
-        write!(f, "max_depth: {}\n", self.max_depth)?;
         write!(f, "num_snakes: {}\n", self.num_snakes)?;
 
         for i in 0..self.num_snakes {

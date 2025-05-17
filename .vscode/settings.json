@@ -16,7 +16,6 @@
     "python.defaultInterpreterPath": "~/.venv/bin/python",
     "rust-analyzer.completion.autoimport.enable": true,
     "rust-analyzer.debug.engine": "vadimcn.vscode-lldb",
-    "rust-analyzer.debug.openDebugPane": true,
     "rust-analyzer.lens.implementations.enable": false,
     "rust-analyzer.lens.debug.enable": false,
     "rust-analyzer.lens.run.enable": false,

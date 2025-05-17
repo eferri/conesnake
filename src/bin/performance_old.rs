@@ -477,7 +477,6 @@ fn main() -> Result<(), Error> {
                     }
                 }
 
-                total_depth_sum += search_result.max_depth as f64;
                 total_node_sum += search_result.total_nodes;
                 total_playouts_sum += search_result.total_playouts as f64;
                 total_searches_sum += search_result.num_searches as f64;

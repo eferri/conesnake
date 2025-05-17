@@ -185,7 +185,7 @@ fn expand_node_test() {
     ];
 
     let mut state = ctx.thread_state[0].lock().unwrap();
-    let mut root_state_guard = ctx.node_space[0].write().unwrap();
+    let mut root_state_guard = ctx.root_node.write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str(start_board, &game).unwrap();
@@ -222,7 +222,7 @@ fn expand_node_test() {
 
             // Ignore status of snakes that are dead, not encoded in string
             {
-                let mut state_guard = ctx.node_space[idx + 1].write().unwrap();
+                let mut state_guard = ctx.node_space[idx].write().unwrap();
                 for snake_idx in 0..state_guard.board.num_snakes() as usize {
                     let snake = &mut state_guard.board.snakes[snake_idx];
                     if !snake.alive() {
@@ -232,7 +232,7 @@ fn expand_node_test() {
             }
 
             let mut compare_board = Board::new(0, 0);
-            compare_board.set_from(&ctx.node_space[idx + 1].read().unwrap().board);
+            compare_board.set_from(&ctx.node_space[idx].read().unwrap().board);
 
             assert_eq!(compare_board, Board::from_str(board, &game).unwrap());
         }
@@ -311,7 +311,6 @@ fn small_search_test() {
     let best_move = search::best_move(&ctx.config, 0, &search_result.scores, true);
 
     assert_eq!(best_move, Move::Right);
-    assert_eq!(search_result.max_depth, 2);
     assert_eq!(search_result.total_nodes, 3);
 }
 

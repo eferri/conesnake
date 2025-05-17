@@ -3,6 +3,7 @@
 extern crate test;
 
 use conesnake::board::Board;
+use conesnake::config::MAX_SNAKES;
 use conesnake::log::log_test_init;
 use conesnake::pool::ThreadPool;
 use conesnake::rand::FastRand;
@@ -51,7 +52,7 @@ fn playout_bench(b: &mut Bencher) {
         info!("compare is true!")
     }
 
-    let node_size = mem::size_of::<search::Node>();
+    let node_size = mem::size_of::<search::Node<{ search::max_node_children(MAX_SNAKES as i32) }>>();
     info!("node size {} bytes", node_size);
 
     info!("running benchmark...");
@@ -88,7 +89,7 @@ fn search_bench(b: &mut Bencher) {
         info!("compare is true!")
     }
 
-    let node_size = mem::size_of::<search::Node>();
+    let node_size = mem::size_of::<search::Node<{ search::max_node_children(MAX_SNAKES as i32) }>>();
     info!("node size {} bytes", node_size);
 
     info!("allocating...");

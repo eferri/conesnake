@@ -5,7 +5,7 @@ use crate::game::Game;
 use crate::pool::ThreadPool;
 use crate::rand::FastRand;
 use crate::search;
-use crate::search::{Node, SearchContext};
+use crate::search::{max_node_children, Node, SearchContext};
 use crate::util::{Error, Move};
 
 use axum::{
@@ -72,7 +72,7 @@ impl Server {
         }
 
         if config.mode != Mode::Relay && config.max_boards > 0 {
-            let node_size = mem::size_of::<Node>();
+            let node_size = mem::size_of::<Node<{ max_node_children(MAX_SNAKES as i32) }>>();
             let num_boards = config.max_boards;
             let space_size = node_size as i64 * num_boards as i64;
 
