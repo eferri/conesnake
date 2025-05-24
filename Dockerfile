@@ -1,4 +1,4 @@
-FROM ubuntu:noble-20250404 AS base
+FROM ubuntu:noble-20250415.1 AS base
 
 ARG UID=1000
 ARG GID=1000
@@ -73,23 +73,23 @@ USER conesnake
 WORKDIR /app/install
 
 # Install golang
-RUN curl -sSfL "https://go.dev/dl/go1.24.2.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
+RUN curl -sSfL "https://go.dev/dl/go1.24.3.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
     && tar -C /tools -xf go.tar.gz
 
 # Install helm
-RUN curl -sSfL "https://get.helm.sh/helm-v3.17.3-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
+RUN curl -sSfL "https://get.helm.sh/helm-v3.18.0-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
     && tar -xf helm.tar.gz \
     && cp ./linux-${DOCKER_ARCH}/helm . \
     && chmod +x helm \
     && mv helm /tools/bin
 
 # Install kubectl
-RUN curl -sSfL "https://dl.k8s.io/release/v1.32.4/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
+RUN curl -sSfL "https://dl.k8s.io/release/v1.33.1/bin/linux/${DOCKER_ARCH}/kubectl" -o kubectl \
     && chmod +x ./kubectl \
     && mv kubectl /tools/bin
 
 # Install terraform
-RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.11.4/terraform_1.11.4_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
+RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.12.1/terraform_1.12.1_linux_${DOCKER_ARCH}.zip" -o terraform.zip \
     && unzip -q terraform.zip \
     && chmod +x ./terraform \
     && mv terraform /tools/bin
@@ -106,7 +106,7 @@ RUN python3 -m venv /home/conesnake/.venv \
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-05-04
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-05-22
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \
