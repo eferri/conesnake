@@ -195,15 +195,13 @@ fn expand_node_test() {
         root_state_guard.board = start_board;
         ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
-        while !root_state_guard.is_fully_expanded() {
-            search::expand_node(&ctx, &test_game(), &mut state, &mut root_state_guard, 0);
-        }
+        search::expand_node(&ctx, &test_game(), &mut state, &mut root_state_guard, 0).unwrap();
 
         assert_eq!(root_state_guard.num_children as usize, expected_results.len());
 
         for (idx, (board, exp_moves)) in expected_results.iter().enumerate() {
             // Ignore moves of snakes that were dead before expanding
-            let mut act_moves = Move::decode(root_state_guard.child_moves(idx), root_state_guard.board.num_snakes());
+            let mut act_moves = Move::decode(root_state_guard.child_moves[idx], root_state_guard.board.num_snakes());
 
             #[allow(clippy::needless_range_loop)]
             for snake_idx in 0..root_state_guard.board.num_snakes() as usize {
@@ -217,8 +215,6 @@ fn expand_node_test() {
                 "Expected moves: {:?}, actual moves: {:?}",
                 *exp_moves, act_moves
             );
-
-            assert_eq!(root_state_guard.children[idx].index, idx as u32 + 1);
 
             // Ignore status of snakes that are dead, not encoded in string
             {
@@ -350,19 +346,19 @@ fn arcade_maze_search_test() {
         {
             let root_guard = ctx.node_space[0].read().unwrap();
 
-            for child_ptr in root_guard.children[0..root_guard.num_children as usize].iter() {
+            for child_moves in root_guard.child_moves[0..root_guard.num_children as usize].iter() {
                 let mut duct_sum = 0.0;
 
                 for snake_idx in 0..root_guard.board.num_snakes() as usize {
                     if !root_guard.board.snakes[snake_idx].alive() {
                         continue;
                     }
-                    let mv = Move::extract(child_ptr.moves, snake_idx as u32);
+                    let mv = Move::extract(*child_moves, snake_idx as u32);
                     duct_sum += root_guard.duct_score(&ctx.config, &game, snake_idx, mv)
                 }
 
                 let duct_sum_simd = root_guard
-                    .duct_scores_simd(&ctx.config, &game, child_ptr.moves)
+                    .duct_scores_simd(&ctx.config, &game, *child_moves)
                     .reduce_sum();
 
                 assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-5);

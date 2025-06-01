@@ -133,6 +133,7 @@ pub enum Error {
     BadBoardStr(String),
     LockHeld(String),
     WorkerError(String),
+    ResourceError(String),
 }
 
 impl From<serde_json::Error> for Error {
@@ -164,6 +165,7 @@ impl Display for Error {
             Error::BadBoardStr(s) => write!(f, "BadBoardStr: {s}"),
             Error::LockHeld(s) => write!(f, "LockHeld: {s}"),
             Error::WorkerError(s) => write!(f, "WorkerError: {s}"),
+            Error::ResourceError(s) => write!(f, "ResourceError: {s}"),
         }
     }
 }
