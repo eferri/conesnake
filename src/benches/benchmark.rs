@@ -73,7 +73,7 @@ fn search_bench(b: &mut Bencher) {
 
     log_test_init();
 
-    cfg.max_boards = 20000;
+    cfg.max_boards = 100000;
     cfg.num_threads = 8;
     cfg.latency = 0;
     cfg.fixed_iter = 4000;
