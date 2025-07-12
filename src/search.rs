@@ -68,12 +68,12 @@ pub struct Node {
 
     cache: [[NodeScoreCache; 4]; MAX_SNAKES],
 
-    num_children: u32,
-    num_visited: u32,
+    num_children: i32,
+    num_move_perms: i32,
     child_idx: u32,
 
     // This uses a LOT of memory
-    child_moves: [u16; max_possible_children(MAX_SNAKES as i32)],
+    child_moves: [u16; Move::num_perm(MAX_SNAKES as i32) as usize],
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -143,9 +143,9 @@ impl Node {
             score: [0.0; MAX_SNAKES],
             cache: [[Default::default(); 4]; MAX_SNAKES],
             num_children: 0,
-            num_visited: 0,
+            num_move_perms: 0,
             child_idx: 0,
-            child_moves: [0; max_possible_children(MAX_SNAKES as i32)],
+            child_moves: [0; Move::num_perm(MAX_SNAKES as i32) as usize],
         }
     }
 
@@ -157,7 +157,7 @@ impl Node {
 
         self.games = 0;
         self.num_children = 0;
-        self.num_visited = 0;
+        self.num_move_perms = 0;
         self.child_idx = 0;
 
         for snake_score in self.score.iter_mut() {
@@ -175,7 +175,7 @@ impl Node {
     }
 
     pub fn is_fully_expanded(&self) -> bool {
-        self.num_visited != 0 && self.num_visited >= self.num_children
+        self.num_move_perms as i32 >= self.max_children()
     }
 
     pub fn temperature(&self, cfg: &Config, game: &Game) -> f64 {
@@ -466,27 +466,25 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         if !game.over(&scratch_guard.board) {
             let mut node_guard = ctx.node_space[curr_idx].write().unwrap();
 
-            // If the nodes haven't actually been expanded yet, do that
-            if node_guard.num_children == 0 {
-                let expand_opt = expand_node(&ctx, game, &mut scratch_guard, &mut node_guard, curr_idx);
-                match expand_opt {
-                    Err(msg) => {
-                        error!("{}", msg);
-                        ctx.out_of_space.store(true, Ordering::Release);
-                        break 'main_loop;
+            let expand_res = expand_node(&ctx, game, &mut scratch_guard, &mut node_guard, curr_idx);
+            match expand_res {
+                Ok(expanded) => {
+                    // The parent node is write-locked, meaning no other thread can be reading this node
+                    // This means no other thread could have access to this node for playout
+                    if expanded {
+                        // If a new node was created, play a game from that one
+                        curr_idx = (node_guard.child_idx as i32 + node_guard.num_children) as usize;
+                    } else {
+                        // otherwise the node is now fully expanded. Go back to choose one of its children
+                        // Go back to choose one of its children
+                        continue 'main_loop;
                     }
-                    Ok(_) => {}
                 }
-            }
-
-            if node_guard.num_visited < node_guard.num_children {
-                // If a new node was created, play a game from that one
-                curr_idx = (node_guard.child_idx + node_guard.num_visited) as usize;
-                node_guard.num_visited += 1;
-            } else {
-                // otherwise the node has been fully expanded since we checked.
-                // Go back to choose one of its children
-                continue 'main_loop;
+                Err(e) => {
+                    error!("Error expanding node: {}", e);
+                    ctx.out_of_space.store(true, Ordering::Release);
+                    break 'main_loop;
+                }
             }
         }
 
@@ -607,17 +605,15 @@ fn expand_node<R: Rand>(
     state: &mut ThreadContext<R>,
     node: &mut Node,
     parent_index: usize,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     let num_snakes = node.board.num_snakes() as usize;
 
     // Shouldn't try and expand an end of game board
     debug_assert!(!game.over(&node.board));
 
-    let mut num_move_perms = 0;
+    let mut expanded = false;
 
-    // First figure out which child nodes we will expand
-    // Iterate over permutations of moves for all alive snakes
-    'expand_loop: while num_move_perms < node.max_children() {
+    'expand_loop: while node.num_move_perms < node.max_children() {
         let mut alive_index = 0;
 
         for s in 0..num_snakes {
@@ -625,7 +621,7 @@ fn expand_node<R: Rand>(
                 continue;
             }
 
-            let snake_mv_idx = Move::extract_idx(num_move_perms as u16, alive_index) as usize;
+            let snake_mv_idx = Move::extract_idx(node.num_move_perms as u16, alive_index) as usize;
             let snake_move = Move::from_idx(snake_mv_idx);
 
             // If this node is pruned, continue
@@ -634,13 +630,13 @@ fn expand_node<R: Rand>(
             //  Expand a single node (left move) for the snake's death
             // Else expand the node
             if node.cache[s][snake_mv_idx].pruned {
-                num_move_perms += 1;
+                node.num_move_perms += 1;
                 continue 'expand_loop;
             } else if (!node.board.valid_move(game, s, snake_move) && !node.board.is_trapped(game, s))
                 || (node.board.is_trapped(game, s) && snake_move != Move::Left)
             {
                 node.cache[s][snake_mv_idx].pruned = true;
-                num_move_perms += 1;
+                node.num_move_perms += 1;
                 continue 'expand_loop;
             } else {
                 let moves = node.child_moves[node.num_children as usize];
@@ -650,20 +646,23 @@ fn expand_node<R: Rand>(
             alive_index += 1;
         }
 
+        if node.num_children == 0 {
+            node.child_idx = ctx.total_nodes.fetch_add(node.max_children() as i64, Ordering::AcqRel) as u32;
+            if node.child_idx as usize >= ctx.node_space.len() {
+                return Err(Error::ResourceError("No more boards in search space".to_owned()));
+            }
+        }
+
+        expanded = true;
         node.num_children += 1;
-        num_move_perms += 1;
-    }
+        node.num_move_perms += 1;
 
-    // Expand the nodes
-    node.child_idx = ctx.total_nodes.fetch_add(node.num_children as i64, Ordering::AcqRel) as u32;
-    if node.child_idx as usize >= ctx.node_space.len() {
-        return Err(Error::ResourceError("No more boards in search space".to_owned()));
-    }
+        // Expand the nodes
+        let child_moves = node.child_moves[node.num_children as usize];
 
-    for idx in 0..node.num_children {
-        let child_moves = node.child_moves[idx as usize];
-
-        let mut child_node_guard = ctx.node_space[(node.child_idx + idx) as usize].write().unwrap();
+        let mut child_node_guard = ctx.node_space[(node.child_idx as i32 + node.num_children) as usize]
+            .write()
+            .unwrap();
 
         child_node_guard.reset();
 
@@ -675,14 +674,10 @@ fn expand_node<R: Rand>(
         child_node_guard.depth = node.depth + 1;
         child_node_guard.max_depth = child_node_guard.depth;
         child_node_guard.parent_node_idx = parent_index as u32;
-        child_node_guard.parent_move_idx = idx;
+        child_node_guard.parent_move_idx = node.num_children as u32;
     }
 
-    Ok(())
-}
-
-pub const fn max_possible_children(max_snakes: i32) -> usize {
-    Move::num_perm(max_snakes) as usize
+    Ok(expanded)
 }
 
 #[cfg(test)]

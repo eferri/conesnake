@@ -195,7 +195,9 @@ fn expand_node_test() {
         root_state_guard.board = start_board;
         ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
-        search::expand_node(&ctx, &test_game(), &mut state, &mut root_state_guard, 0).unwrap();
+        while !root_state_guard.is_fully_expanded() {
+            search::expand_node(&ctx, &test_game(), &mut state, &mut root_state_guard, 0).unwrap();
+        }
 
         assert_eq!(root_state_guard.num_children as usize, expected_results.len());
 
