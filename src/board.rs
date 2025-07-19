@@ -166,8 +166,8 @@ impl PartialEq for Board {
             && self.snakes == other.snakes;
 
         for idx in 0..MAX_BOARD_SIZE {
-            let sqr = BoardSquare::from(self.at_idx(idx as usize));
-            let other_sqr = BoardSquare::from(other.at_idx(idx as usize));
+            let sqr = self.at_idx(idx);
+            let other_sqr = other.at_idx(idx);
             result = result && (sqr == other_sqr);
         }
         result
@@ -423,8 +423,8 @@ impl Board {
     }
 
     fn add_snake(&mut self, body: &[ApiCoord], health: i32) {
-        for i in 0..body.len() {
-            self.snakes[self.num_snakes as usize].body[i] = body[i].to_internal();
+        for (i, crd) in body.iter().enumerate() {
+            self.snakes[self.num_snakes as usize].body[i] = crd.to_internal();
         }
 
         self.snakes[self.num_snakes as usize].len = body.len() as i32;

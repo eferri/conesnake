@@ -76,7 +76,7 @@ impl Server {
             let num_boards = config.max_boards;
             let space_size = node_size as i64 * num_boards as i64;
 
-            info!("Size of Node: {}B", node_size);
+            info!("Size of Node: {node_size}B");
 
             info!("Approx. size of search space: {}MiB", space_size >> 20);
             info!("Approx. size of search space: {}GiB", space_size >> 30);
@@ -90,7 +90,7 @@ impl Server {
         let pod_name = match env::var("POD_NAME") {
             Ok(str) => str,
             Err(e) => {
-                info!("Error retrieving POD_NAME: {}", e);
+                info!("Error retrieving POD_NAME: {e}");
                 "test-0".to_owned()
             }
         };
@@ -98,7 +98,7 @@ impl Server {
         let index = match pod_name.split('-').next_back().unwrap().parse() {
             Ok(idx) => idx,
             Err(e) => {
-                error!("Error parsing pod index: {}", e);
+                error!("Error parsing pod index: {e}");
                 0
             }
         };
@@ -225,11 +225,11 @@ async fn ping(State(state): State<Arc<ServerState>>) -> Response {
 
             match res {
                 Err(e) => {
-                    warn!("Error pinging worker: {}", e);
+                    warn!("Error pinging worker: {e}");
                     false
                 }
                 Ok(_) => {
-                    info!("Worker {} ping latency ms: {}", worker, latency_ms);
+                    info!("Worker {worker} ping latency ms: {latency_ms}");
                     true
                 }
             }
@@ -269,11 +269,11 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
     let game_height = game_state.board.height;
     let game_snakes = game_state.board.snakes.len() as i32;
 
-    info!("Server reported latency: {} - timeout: {}", api_latency, timeout);
+    info!("Server reported latency: {api_latency} - timeout: {timeout}");
 
     if let Ok(l) = str::parse::<i32>(&api_latency) {
         if l >= timeout {
-            error!("Excessive reported latency: {}", l);
+            error!("Excessive reported latency: {l}");
         }
     }
 
@@ -283,20 +283,14 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
     let game = match Game::new(game_state.game.clone(), is_solo) {
         Ok(game) => game,
         Err(e) => {
-            error!("Error parsing game {} {}", game_id, e);
+            error!("Error parsing game {game_id} {e}");
             return StatusCode::BAD_REQUEST.into_response();
         }
     };
 
     if (MAX_WIDTH as i32) < game_width || (MAX_HEIGHT as i32) < game_height || (MAX_SNAKES as i32) < game_snakes {
-        error!(
-            "Server not configured for w: {} h: {} max_snakes: {}",
-            game_width, game_height, game_snakes
-        );
-        error!(
-            "Current settings are max_width: {} max_height: {} max_snakes: {}",
-            MAX_WIDTH, MAX_HEIGHT, MAX_SNAKES
-        );
+        error!("Server not configured for w: {game_width} h: {game_height} max_snakes: {game_snakes}");
+        error!("Current settings are max_width: {MAX_WIDTH} max_height: {MAX_HEIGHT} max_snakes: {MAX_SNAKES}");
         return StatusCode::CONFLICT.into_response();
     }
 
@@ -306,7 +300,7 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
 
     let board = match Board::from_req(&game, &game_state) {
         Err(e) => {
-            error!("Error parsing board - {}", e);
+            error!("Error parsing board - {e}");
             return StatusCode::BAD_REQUEST.into_response();
         }
         Ok(board) => board,
@@ -320,7 +314,7 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
                 Ok(stats) => {
                     state.max_nodes.fetch_max(stats.total_nodes, Ordering::AcqRel);
                     let max = state.max_nodes.load(Ordering::Acquire);
-                    info!("max nodes expanded: {}", max);
+                    info!("max nodes expanded: {max}");
                     let mv = search::best_move(&state.config, 0, &stats.scores, false);
                     (
                         StatusCode::OK,
@@ -331,7 +325,7 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
                     )
                 }
                 Err(e) => {
-                    error!("Error from mcts: {}", e);
+                    error!("Error from mcts: {e}");
                     (
                         StatusCode::CONFLICT,
                         Json(MoveResp {
@@ -348,11 +342,11 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
             match worker_res {
                 Ok(scores) => {
                     let mv = search::best_move(&state.config, 0, &[scores], true);
-                    info!("board:\n{}", board);
+                    info!("board:\n{board}");
                     (StatusCode::OK, Json(MoveResp { mv, scores: None }))
                 }
                 Err(e) => {
-                    error!("Error from run_workers: {}", e);
+                    error!("Error from run_workers: {e}");
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(MoveResp {
@@ -417,7 +411,7 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
                         s.games
                     ));
                 }
-                info!("{}\n", run_str);
+                info!("{run_str}\n");
 
                 Ok(scores)
             });
@@ -436,7 +430,7 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
 
     for res in worker_res.iter() {
         if let Err(e) = res {
-            error!("Error from worker: {}", e);
+            error!("Error from worker: {e}");
         }
     }
 

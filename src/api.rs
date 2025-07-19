@@ -134,18 +134,18 @@ pub struct SearchStats {
 
 impl fmt::Display for SearchStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "total_nodes: {}\n", self.total_nodes)?;
-        write!(f, "num_searches: {}\n", self.num_searches)?;
-        write!(f, "num_terminal: {}\n", self.num_terminal)?;
-        write!(f, "total_playouts: {}\n", self.total_playouts)?;
-        write!(f, "total_turns: {}\n", self.total_turns)?;
-        write!(f, "avg_playout_ns: {:.2}\n", self.avg_playout_ns)?;
-        write!(f, "avg_turn_ns: {:.2}\n", self.avg_turn_ns)?;
-        write!(f, "max_depth: {}\n", self.max_depth)?;
-        write!(f, "num_snakes: {}\n", self.num_snakes)?;
+        writeln!(f, "total_nodes: {}", self.total_nodes)?;
+        writeln!(f, "num_searches: {}", self.num_searches)?;
+        writeln!(f, "num_terminal: {}", self.num_terminal)?;
+        writeln!(f, "total_playouts: {}", self.total_playouts)?;
+        writeln!(f, "total_turns: {}", self.total_turns)?;
+        writeln!(f, "avg_playout_ns: {:.2}", self.avg_playout_ns)?;
+        writeln!(f, "avg_turn_ns: {:.2}", self.avg_turn_ns)?;
+        writeln!(f, "max_depth: {}", self.max_depth)?;
+        writeln!(f, "num_snakes: {}", self.num_snakes)?;
 
         for i in 0..self.num_snakes {
-            write!(f, "snake {}:\n", i)?;
+            writeln!(f, "snake {i}:")?;
             for j in 0..4 {
                 let mv_str = match j {
                     0 => "left",
@@ -157,10 +157,9 @@ impl fmt::Display for SearchStats {
                 let games = self.scores[i as usize][j].games;
                 let avg = if games > 0 { score / games as f64 } else { 0.0 };
 
-                write!(
+                writeln!(
                     f,
-                    "    {} score: {:.1} games: {} avg: {:.5}\n",
-                    mv_str, score, games, avg
+                    "    {mv_str} score: {score:.1} games: {games} avg: {avg:.5}",
                 )?;
             }
         }

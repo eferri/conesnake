@@ -11,7 +11,7 @@ async fn main() {
 
     let args = Config::parse();
 
-    info!("Args:\n{:#?}", args);
+    info!("Args:\n{args:#?}");
 
     #[cfg(feature = "simd")]
     info!("using simd");

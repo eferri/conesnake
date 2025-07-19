@@ -86,7 +86,7 @@ async fn server_test() {
 
     // Wait for server to be ready
     loop {
-        let res = client.get(format!("http://localhost:{}/ping", base_port)).send().await;
+        let res = client.get(format!("http://localhost:{base_port}/ping")).send().await;
 
         if res.is_err() || res.as_ref().unwrap().status() != 200 {
             time::sleep(Duration::from_millis(500)).await;
@@ -105,7 +105,7 @@ async fn server_test() {
         game.ruleset = *rules;
         game.api.map = *map;
 
-        let mut board = Board::from_str(&board_str, &game).unwrap().to_req(&game).unwrap();
+        let mut board = Board::from_str(board_str, &game).unwrap().to_req(&game).unwrap();
 
         board.you.latency = "0".to_owned();
         board.board.snakes[0].latency = "0".to_owned();

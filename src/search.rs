@@ -184,7 +184,7 @@ impl Node {
     }
 
     pub fn is_fully_expanded(&self) -> bool {
-        self.num_move_perms as i32 >= self.max_children()
+        self.num_move_perms >= self.max_children()
     }
 
     pub fn temperature(&self, cfg: &Config, game: &Game) -> f64 {
@@ -311,7 +311,7 @@ pub fn best_move(cfg: &Config, snake_idx: usize, scores: &[Scores], print_summar
         search_str.push_str(&format!("\nSearch best move score: {best_move_score}"));
         search_str.push_str(&format!("\nSearch best move games: {best_move_games}"));
 
-        info!("{}", search_str);
+        info!("{search_str}");
     }
     best_move
 }
@@ -413,7 +413,7 @@ pub fn mcts<R: Rand>(
     };
 
     if ctx.config.fixed_iter == 0 {
-        info!("search:\n{}", stats);
+        info!("search:\n{stats}");
     }
 
     Ok(stats)
@@ -490,7 +490,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                     }
                 }
                 Err(e) => {
-                    error!("Error expanding node: {}", e);
+                    error!("Error expanding node: {e}");
                     ctx.out_of_space.store(true, Ordering::Release);
                     break 'main_loop;
                 }
