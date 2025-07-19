@@ -468,12 +468,12 @@ fn main() -> Result<(), Error> {
                     results.max_nodes = search_result.total_nodes;
                 }
 
-                for snake_idx in 0..board.num_snakes() as usize {
+                for (snake_idx, score_sum) in summed_scores.iter_mut().enumerate() {
                     let mv_scores = search_result.scores[snake_idx];
 
                     for (mv_idx, scores) in mv_scores.iter().enumerate() {
-                        summed_scores[snake_idx][mv_idx].games += scores.games;
-                        summed_scores[snake_idx][mv_idx].score += scores.score;
+                        score_sum[mv_idx].games += scores.games;
+                        score_sum[mv_idx].score += scores.score;
                     }
                 }
 

@@ -33,7 +33,7 @@ fn main() {
     let mut cfg = Config::parse();
     cfg.max_boards = 800000;
 
-    info!("Args:\n{:#?}", cfg);
+    info!("Args:\n{cfg:#?}");
 
     #[cfg(feature = "simd")]
     info!("using simd");

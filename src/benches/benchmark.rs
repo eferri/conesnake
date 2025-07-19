@@ -52,7 +52,7 @@ fn playout_bench(b: &mut Bencher) {
     }
 
     let node_size = mem::size_of::<search::Node>();
-    info!("node size {} bytes", node_size);
+    info!("node size {node_size} bytes");
 
     info!("running benchmark...");
 
@@ -89,7 +89,7 @@ fn search_bench(b: &mut Bencher) {
     }
 
     let node_size = mem::size_of::<search::Node>();
-    info!("node size {} bytes", node_size);
+    info!("node size {node_size} bytes");
 
     info!("allocating...");
 
