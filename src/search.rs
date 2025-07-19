@@ -12,7 +12,7 @@ use log::{error, info, warn};
 #[cfg(feature = "simd")]
 use std::simd::{f64x4, mask64x4, num::SimdFloat, StdFloat};
 
-use std::sync::{atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering, Arc, Barrier};
+use std::sync::{atomic::AtomicBool, atomic::AtomicI64, atomic::AtomicU16, atomic::Ordering, Arc, Barrier};
 use std::sync::{Mutex, RwLock};
 use std::{thread::sleep, time::Duration, time::Instant};
 
@@ -22,7 +22,7 @@ pub struct SearchContext<R: Rand> {
     pub game: RwLock<Option<Game>>,
 
     search_lock: Mutex<()>,
-    node_space: Vec<RwLock<Node>>,
+    node_space: Vec<NodeWrap>,
     thread_state: Vec<Mutex<ThreadContext<R>>>,
 
     // Search state
@@ -52,13 +52,19 @@ impl<R: Rand> Default for ThreadContext<R> {
     }
 }
 
+// Wrapper around Node with values that don't need a lock
+pub struct NodeWrap {
+    moves: AtomicU16,
+    node: RwLock<Node>,
+}
+
 // Node in search tree
 #[derive(Clone)]
 pub struct Node {
     board: Board,
 
     parent_node_idx: u32,
-    parent_move_idx: u32,
+    relative_node_idx: u32,
 
     depth: i32,
     max_depth: i32,
@@ -70,10 +76,7 @@ pub struct Node {
 
     num_children: i32,
     num_move_perms: i32,
-    child_idx: u32,
-
-    // This uses a LOT of memory
-    child_moves: [u16; Move::num_perm(MAX_SNAKES as i32) as usize],
+    first_child_idx: u32,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -98,7 +101,7 @@ impl<R: Rand> ThreadContext<R> {
 impl<R: Rand> SearchContext<R> {
     pub fn new(config: &Config) -> Self {
         let mut node_space = Vec::with_capacity(config.max_boards);
-        node_space.resize_with(config.max_boards, || RwLock::new(Node::new(Board::new(0, 0))));
+        node_space.resize_with(config.max_boards, || NodeWrap::new(Board::new(0, 0)));
 
         let mut thread_state = Vec::with_capacity(config.num_threads);
         thread_state.resize_with(config.num_threads, || Mutex::new(ThreadContext::new()));
@@ -138,7 +141,7 @@ impl Node {
         Node {
             board,
             parent_node_idx: 0,
-            parent_move_idx: 0,
+            relative_node_idx: 0,
             depth: 0,
             max_depth: 0,
             games: 0,
@@ -146,13 +149,12 @@ impl Node {
             cache: [[Default::default(); 4]; MAX_SNAKES],
             num_children: 0,
             num_move_perms: 0,
-            child_idx: 0,
-            child_moves: [0; Move::num_perm(MAX_SNAKES as i32) as usize],
+            first_child_idx: 0,
         }
     }
 
     pub fn reset(&mut self) {
-        self.parent_move_idx = 0;
+        self.relative_node_idx = 0;
         self.parent_node_idx = 0;
         self.depth = 0;
         self.max_depth = 0;
@@ -160,7 +162,7 @@ impl Node {
         self.games = 0;
         self.num_children = 0;
         self.num_move_perms = 0;
-        self.child_idx = 0;
+        self.first_child_idx = 0;
 
         for snake_score in self.score.iter_mut() {
             *snake_score = 0.0;
@@ -273,6 +275,19 @@ impl Node {
     }
 }
 
+impl NodeWrap {
+    pub fn new(board: Board) -> Self {
+        NodeWrap {
+            moves: AtomicU16::new(0),
+            node: RwLock::new(Node::new(board)),
+        }
+    }
+
+    pub fn reset(&self) {
+        self.moves.store(0, Ordering::Release)
+    }
+}
+
 pub fn best_move(cfg: &Config, snake_idx: usize, scores: &[Scores], print_summary: bool) -> Move {
     let mut best_move_score = Move::Left;
     let mut best_move_games = Move::Left;
@@ -339,8 +354,10 @@ pub fn mcts<R: Rand>(
 
     // Set the root node
     {
-        let mut root_node_guard = ctx.node_space[0].write().unwrap();
+        let root_node_wrap = &ctx.node_space[0];
+        let mut root_node_guard = root_node_wrap.node.write().unwrap();
 
+        root_node_wrap.reset();
         root_node_guard.reset();
         root_node_guard.board.set_from(board);
     }
@@ -373,7 +390,7 @@ pub fn mcts<R: Rand>(
 
     ctx.done_barrier.wait();
 
-    let root_guard = ctx.node_space[0].read().unwrap();
+    let root_guard = ctx.node_space[0].node.read().unwrap();
 
     let mut scores = [Default::default(); MAX_SNAKES];
     let num_snakes = root_guard.board.num_alive_snakes();
@@ -442,7 +459,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                 break 'main_loop;
             }
 
-            let node_guard = ctx.node_space[curr_idx].read().unwrap();
+            let node_guard = ctx.node_space[curr_idx].node.read().unwrap();
 
             // Leaf node: we have reached a node that is end of the game
             // OR reached node with a child that hasn't been played out yet.
@@ -456,15 +473,15 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             let mut max_score = f64::MIN;
             let mut max_idx_opt = None;
 
-            for (idx, child_moves) in node_guard.child_moves[0..node_guard.num_children as usize]
-                .iter()
-                .enumerate()
-            {
-                let duct_score = node_guard.duct_score_wrapper(&ctx.config, game, *child_moves);
+            for idx in 0..node_guard.num_children as usize {
+                let child = &ctx.node_space[node_guard.first_child_idx as usize + idx];
+                let child_moves = child.moves.load(Ordering::Acquire);
+
+                let duct_score = node_guard.duct_score_wrapper(&ctx.config, game, child_moves);
 
                 if duct_score > max_score || max_idx_opt.is_none() {
                     max_score = duct_score;
-                    max_idx_opt = Some(node_guard.child_idx + idx as u32)
+                    max_idx_opt = Some(node_guard.first_child_idx + idx as u32)
                 }
             }
 
@@ -475,7 +492,8 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
         // Expand the node
         if !game.over(&scratch_guard.board) {
-            let mut node_guard = ctx.node_space[curr_idx].write().unwrap();
+            let node_wrap = &ctx.node_space[curr_idx];
+            let mut node_guard = node_wrap.node.write().unwrap();
 
             let expand_res = expand_node(&ctx, game, &mut scratch_guard, &mut node_guard, curr_idx);
             match expand_res {
@@ -484,7 +502,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                     // This means no other thread could have access to this node for playout
                     if expanded {
                         // If a new node was created, play a game from that one
-                        curr_idx = (node_guard.child_idx as i32 + node_guard.num_children - 1) as usize;
+                        curr_idx = (node_guard.first_child_idx as i32 + node_guard.num_children - 1) as usize;
                     } else {
                         // otherwise the node is now fully expanded. Go back to choose one of its children
                         // Go back to choose one of its children
@@ -520,11 +538,11 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         ctx.num_searches.fetch_add(1, Ordering::AcqRel);
 
         // Update rollout node score, get parent node for backpropagation
-        let mut curr_move_idx;
+        let mut curr_relative_idx;
         let new_depth;
 
-        (curr_idx, curr_move_idx, new_depth) = {
-            let mut node_guard = ctx.node_space[curr_idx].write().unwrap();
+        (curr_idx, curr_relative_idx, new_depth) = {
+            let mut node_guard = ctx.node_space[curr_idx].node.write().unwrap();
 
             for snake_idx in 0..node_guard.board.num_snakes() as usize {
                 node_guard.score[snake_idx] += scratch_guard.play_scores[snake_idx];
@@ -534,14 +552,14 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
 
             (
                 node_guard.parent_node_idx as usize,
-                node_guard.parent_move_idx,
+                node_guard.relative_node_idx,
                 node_guard.max_depth,
             )
         };
 
         // Backpropagate results from playout
         loop {
-            let mut node_guard = ctx.node_space[curr_idx].write().unwrap();
+            let mut node_guard = ctx.node_space[curr_idx].node.write().unwrap();
 
             node_guard.games += 1;
 
@@ -549,7 +567,8 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                 node_guard.max_depth = new_depth;
             }
 
-            let moves = node_guard.child_moves[curr_move_idx as usize];
+            let child = &ctx.node_space[(node_guard.first_child_idx + curr_relative_idx) as usize];
+            let moves = child.moves.load(Ordering::Acquire);
 
             for snake_idx in 0..node_guard.board.num_snakes() as usize {
                 let snake_score = scratch_guard.play_scores[snake_idx];
@@ -567,7 +586,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                 break;
             } else {
                 curr_idx = node_guard.parent_node_idx as usize;
-                curr_move_idx = node_guard.parent_move_idx;
+                curr_relative_idx = node_guard.relative_node_idx;
             }
         }
     }
@@ -627,6 +646,8 @@ fn expand_node<R: Rand>(
     'expand_loop: while !expanded && node.num_move_perms < node.max_children() {
         let mut alive_index = 0;
 
+        let mut moves = 0;
+
         for s in 0..num_snakes {
             if !node.board.snakes[s].alive() {
                 continue;
@@ -650,8 +671,7 @@ fn expand_node<R: Rand>(
                 node.num_move_perms += 1;
                 continue 'expand_loop;
             } else {
-                let moves = node.child_moves[node.num_children as usize];
-                node.child_moves[node.num_children as usize] = Move::set_move(moves, s as u32, snake_move);
+                moves = Move::set_move(moves, s as u32, snake_move);
             }
 
             alive_index += 1;
@@ -675,30 +695,31 @@ fn expand_node<R: Rand>(
                 nodes *= valid;
             }
 
-            node.child_idx = ctx.total_nodes.fetch_add(nodes as i64, Ordering::AcqRel) as u32;
-            if node.child_idx as usize >= ctx.node_space.len() {
+            node.first_child_idx = ctx.total_nodes.fetch_add(nodes as i64, Ordering::AcqRel) as u32;
+            if node.first_child_idx as usize >= ctx.node_space.len() {
                 return Err(Error::ResourceError("No more boards in search space".to_owned()));
             }
         }
 
         // Expand the nodes
-        let child_moves = node.child_moves[node.num_children as usize];
+        let child_node_wrap = &ctx.node_space[(node.first_child_idx as i32 + node.num_children) as usize];
+        let mut child_node_guard = child_node_wrap.node.write().unwrap();
 
-        let mut child_node_guard = ctx.node_space[(node.child_idx as i32 + node.num_children) as usize]
-            .write()
-            .unwrap();
-
+        child_node_wrap.reset();
         child_node_guard.reset();
+
+        // Parent node is write-locked, should not be any other threads accessing child wrap
+        child_node_wrap.moves.store(moves, Ordering::Release);
 
         child_node_guard.board.set_from(&node.board);
         child_node_guard
             .board
-            .gen_board(child_moves, game, &mut state.food_buff, &mut state.rng);
+            .gen_board(moves, game, &mut state.food_buff, &mut state.rng);
 
         child_node_guard.depth = node.depth + 1;
         child_node_guard.max_depth = child_node_guard.depth;
         child_node_guard.parent_node_idx = parent_index as u32;
-        child_node_guard.parent_move_idx = node.num_children as u32;
+        child_node_guard.relative_node_idx = node.num_children as u32;
 
         expanded = true;
         node.num_children += 1;

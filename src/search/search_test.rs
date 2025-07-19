@@ -185,7 +185,7 @@ fn expand_node_test() {
     ];
 
     let mut state = ctx.thread_state[0].lock().unwrap();
-    let mut root_state_guard = ctx.node_space[0].write().unwrap();
+    let mut root_state_guard = ctx.node_space[0].node.write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str(start_board, &game).unwrap();
@@ -203,7 +203,9 @@ fn expand_node_test() {
 
         for (idx, (board, exp_moves)) in expected_results.iter().enumerate() {
             // Ignore moves of snakes that were dead before expanding
-            let mut act_moves = Move::decode(root_state_guard.child_moves[idx], root_state_guard.board.num_snakes());
+            let child_wrap = &ctx.node_space[root_state_guard.first_child_idx as usize + idx];
+            let moves = child_wrap.moves.load(Ordering::Acquire);
+            let mut act_moves = Move::decode(moves, root_state_guard.board.num_snakes());
 
             #[allow(clippy::needless_range_loop)]
             for snake_idx in 0..root_state_guard.board.num_snakes() as usize {
@@ -220,7 +222,7 @@ fn expand_node_test() {
 
             // Ignore status of snakes that are dead, not encoded in string
             {
-                let mut state_guard = ctx.node_space[idx + 1].write().unwrap();
+                let mut state_guard = ctx.node_space[idx + 1].node.write().unwrap();
                 for snake_idx in 0..state_guard.board.num_snakes() as usize {
                     let snake = &mut state_guard.board.snakes[snake_idx];
                     if !snake.alive() {
@@ -230,7 +232,7 @@ fn expand_node_test() {
             }
 
             let mut compare_board = Board::new(0, 0);
-            compare_board.set_from(&ctx.node_space[idx + 1].read().unwrap().board);
+            compare_board.set_from(&ctx.node_space[idx + 1].node.read().unwrap().board);
 
             assert_eq!(compare_board, Board::from_str(board, &game).unwrap());
         }
@@ -346,21 +348,24 @@ fn arcade_maze_search_test() {
         // Ensure simd duct score produces same result as non-simd version
         #[cfg(feature = "simd")]
         {
-            let root_guard = ctx.node_space[0].read().unwrap();
+            let root_guard = ctx.node_space[0].node.read().unwrap();
 
-            for child_moves in root_guard.child_moves[0..root_guard.num_children as usize].iter() {
+            for idx in 0..root_guard.num_children as usize {
                 let mut duct_sum = 0.0;
+
+                let child_wrap = &ctx.node_space[root_guard.first_child_idx as usize + idx];
+                let child_moves = child_wrap.moves.load(Ordering::Acquire);
 
                 for snake_idx in 0..root_guard.board.num_snakes() as usize {
                     if !root_guard.board.snakes[snake_idx].alive() {
                         continue;
                     }
-                    let mv = Move::extract(*child_moves, snake_idx as u32);
+                    let mv = Move::extract(child_moves, snake_idx as u32);
                     duct_sum += root_guard.duct_score(&ctx.config, &game, snake_idx, mv)
                 }
 
                 let duct_sum_simd = root_guard
-                    .duct_scores_simd(&ctx.config, &game, *child_moves)
+                    .duct_scores_simd(&ctx.config, &game, child_moves)
                     .reduce_sum();
 
                 assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-5);

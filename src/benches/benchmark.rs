@@ -51,7 +51,7 @@ fn playout_bench(b: &mut Bencher) {
         info!("compare is true!")
     }
 
-    let node_size = mem::size_of::<search::Node>();
+    let node_size = mem::size_of::<search::NodeWrap>();
     info!("node size {node_size} bytes");
 
     info!("running benchmark...");
@@ -88,7 +88,7 @@ fn search_bench(b: &mut Bencher) {
         info!("compare is true!")
     }
 
-    let node_size = mem::size_of::<search::Node>();
+    let node_size = mem::size_of::<search::NodeWrap>();
     info!("node size {node_size} bytes");
 
     info!("allocating...");
