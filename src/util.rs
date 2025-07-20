@@ -27,7 +27,7 @@ impl Coord {
     }
 
     pub fn y(&self) -> i8 {
-        ((self.val >> 4) & 0xf) as i8
+        (self.val >> 4) as i8
     }
 
     pub fn set_x(&mut self, x_val: i8) {
