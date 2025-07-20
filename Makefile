@@ -36,7 +36,7 @@ PROFILE_ARGS := -Z build-std --profile=release-with-debug --target x86_64-unknow
 .PHONY: profile-build
 profile-build:
 	docker compose run --rm snake bash -c ' \
-		RUSTFLAGS="-C force-frame-pointers=yes" cargo build --all-targets $(PROFILE_ARGS)'
+		RUSTFLAGS="-C force-frame-pointers" cargo build --all-targets $(PROFILE_ARGS)'
 
 .PHONY: lint
 lint:
@@ -70,7 +70,7 @@ profile: profile-build record report
 profile-mem: profile-build record-mem report
 
 PROFILE_EXE := \
-	RUSTFLAGS="-C force-frame-pointers=yes" cargo test $(PROFILE_ARGS) \
+	RUSTFLAGS="-C force-frame-pointers" cargo test $(PROFILE_ARGS) \
 		--no-run --bench=benchmark 2>&1 | grep -Eo "target[^\(\)]+"
 
 PROFILE_BENCH ?= playout_bench
@@ -80,7 +80,7 @@ record:
 	docker compose run --rm snake bash -c '\
 		PROFILE_PATH="$$($(PROFILE_EXE))" \
 		&& perf record \
-			--call-graph fp \
+			--call-graph dwarf \
 			-e cycles \
 			-F 1000 \
 			"$$PROFILE_PATH" --bench $(PROFILE_BENCH)'
@@ -90,7 +90,7 @@ record-mem:
 	docker compose run --rm snake bash -c '\
 		PROFILE_PATH="$$($(PROFILE_EXE))" \
 		&& perf record \
-			--call-graph fp \
+			--call-graph dwarf \
 			-e cache-misses \
 			-F 1000 \
 			"$$PROFILE_PATH" --bench $(PROFILE_BENCH)'
@@ -101,10 +101,10 @@ report:
 		perf report \
 			--stdio \
 			--stdio-color \
-			--percent-limit 3 \
+			--percent-limit 0.5 \
 			--show-nr-samples \
 			--show-cpu-utilization \
-			--call-graph fractal,srcline
+			--call-graph none
 
 .PHONY: stat
 stat:
@@ -143,7 +143,7 @@ optimize:
 		cargo build --release \
 		&& python3 -u ./scripts/play_games.py --mode optimize 2>&1 | tee optimize.log'
 
-ASM_FUNC ?= "conesnake::search::NodeState::duct_scores_simd"
+ASM_FUNC ?= "conesnake::search::Node::duct_scores_simd"
 
 .PHONY: asm
 asm:
