@@ -128,7 +128,7 @@ resource "google_compute_instance" "conesnake_relay" {
 
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-minimal-2404-noble-amd64-v20250313"
+      image = "ubuntu-os-cloud/ubuntu-minimal-2404-noble-amd64-v20250710"
 
       type = "pd-balanced"
 

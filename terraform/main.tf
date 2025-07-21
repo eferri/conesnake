@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 1.11.0"
+  required_version = "~> 1.12.2"
 
   backend "gcs" {
     bucket = "conesnake-tf-state"

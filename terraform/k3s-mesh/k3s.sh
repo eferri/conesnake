@@ -5,8 +5,8 @@ SERVER_INSTALL_FILES=" \
   ./traefik-config.yaml \
 "
 
-K3S_SHASUM="9ca7930c31179d83bc13de20078fd8ad3e1ee00875b31f39a7e524ca4ef7d9de"
-INSTALL_K3S_VERSION="v1.32.4+k3s1"
+K3S_SHASUM="48fe6ec10517263cc69e1c924cf6b283c59a2b942b9b46186fc7c8d29e6f243a"
+INSTALL_K3S_VERSION="v1.33.2+k3s1"
 
 CLOUD_SSH_ARGS="-q -o StrictHostKeyChecking=no -i ~/.ssh/conesnake_ed25519"
 LOCAL_SSH_ARGS="-q -o StrictHostKeyChecking=no"
@@ -53,14 +53,19 @@ sudo cp $TEMP_DIR/*.yaml /var/lib/rancher/k3s/server/manifests/
 
 export INSTALL_K3S_VERSION=$INSTALL_K3S_VERSION
 
-curl -sfL https://get.k3s.io > k3s.sh \\
-  && sha256sum k3s.sh | grep $K3S_SHASUM \\
-  && sh k3s.sh server \\
-    --cluster-init \\
-    --node-label mode=server \\
-    --node-name $HOST \\
-    --node-ip $INTERNAL_IP \\
-    --flannel-iface conesnake
+curl -sfL https://get.k3s.io > k3s.sh
+
+if ! sha256sum k3s.sh | grep $K3S_SHASUM ; then
+  echo "Error: get.k3s.io script checksum validation failed"
+  exit 1
+fi
+
+sh k3s.sh server \\
+  --cluster-init \\
+  --node-label mode=server \\
+  --node-name $HOST \\
+  --node-ip $INTERNAL_IP \\
+  --flannel-iface conesnake
 
 rm -r $TEMP_DIR
 EOF
