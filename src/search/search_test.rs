@@ -310,7 +310,7 @@ fn small_search_test() {
 
     assert_eq!(best_move, Move::Right);
     assert_eq!(search_result.max_depth, 2);
-    assert_eq!(search_result.total_nodes, 7);
+    assert_eq!(search_result.total_nodes, 3);
 }
 
 const MAZE_BOARD: &str = "

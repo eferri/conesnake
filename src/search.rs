@@ -658,9 +658,24 @@ fn expand_node<R: Rand>(
         }
 
         if node.num_children == 0 {
-            node.child_idx = ctx
-                .total_nodes
-                .fetch_add(node.max_children_turn() as i64, Ordering::AcqRel) as u32;
+            let mut nodes = 1;
+            for s in 0..num_snakes {
+                if !node.board.snakes[s].alive() {
+                    continue;
+                }
+                let mut valid = 0;
+                for mv in 0..4 {
+                    if node.board.valid_move(game, s, Move::from_idx(mv)) {
+                        valid += 1;
+                    }
+                }
+                if valid == 0 {
+                    valid = 1;
+                }
+                nodes *= valid;
+            }
+
+            node.child_idx = ctx.total_nodes.fetch_add(nodes as i64, Ordering::AcqRel) as u32;
             if node.child_idx as usize >= ctx.node_space.len() {
                 return Err(Error::ResourceError("No more boards in search space".to_owned()));
             }
