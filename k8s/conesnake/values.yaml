@@ -8,6 +8,6 @@ relay:
 
 worker:
   mem: "5000Mi"
-  boards: "1500000"
+  boards: "2300000"
   latency: 40
   num_threads: 8

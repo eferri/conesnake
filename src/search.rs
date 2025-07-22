@@ -123,10 +123,12 @@ impl<R: Rand> SearchContext<R> {
     }
 
     pub fn reset(&self) {
+        self.search_timeout.store(false, Ordering::Release);
+        self.out_of_space.store(false, Ordering::Release);
         self.total_nodes.store(0, Ordering::Release);
         self.num_searches.store(0, Ordering::Release);
         self.total_playouts.store(0, Ordering::Release);
-        self.search_timeout.store(false, Ordering::Release);
+        self.total_turns.store(0, Ordering::Release);
         self.playout_ns.store(0, Ordering::Release);
     }
 }
