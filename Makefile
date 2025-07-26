@@ -35,8 +35,7 @@ PROFILE_ARGS := -Z build-std --profile=release-with-debug --target x86_64-unknow
 
 .PHONY: profile-build
 profile-build:
-	docker compose run --rm snake bash -c ' \
-		RUSTFLAGS="-C force-frame-pointers" cargo build --all-targets $(PROFILE_ARGS)'
+	docker compose run --rm snake bash -c 'cargo build --all-targets $(PROFILE_ARGS)'
 
 .PHONY: lint
 lint:
@@ -70,8 +69,7 @@ profile: profile-build record report
 profile-mem: profile-build record-mem report
 
 PROFILE_EXE := \
-	RUSTFLAGS="-C force-frame-pointers" cargo test $(PROFILE_ARGS) \
-		--no-run --bench=benchmark 2>&1 | grep -Eo "target[^\(\)]+"
+	cargo test $(PROFILE_ARGS) --no-run --bench=benchmark 2>&1 | grep -Eo "target[^\(\)]+"
 
 PROFILE_BENCH ?= playout_bench
 
@@ -168,7 +166,8 @@ veryclean: clean
 	( chmod 700 -R .go || true ) \
 	&& rm -rf target* build* \
 		.go \
-		.cargo \
+		.cargo/registry \
+		.cargo/.*cache* \
 		terraform/.terraform
 
 # -------------------- production --------------------
