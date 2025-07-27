@@ -184,30 +184,31 @@ fn expand_node_test() {
         ),
     ];
 
-    let mut state = ctx.thread_state[0].lock().unwrap();
-    let mut root_state_guard = ctx.node_space[0].write().unwrap();
+    let mut thread_state_guard = ctx.thread_state[0].lock().unwrap();
+    let mut root_node_guard = ctx.node_space[0].write().unwrap();
 
     for (start_board, expected_results) in &test_cases {
         let start_board = Board::from_str(start_board, &game).unwrap();
 
         ctx.reset();
-        root_state_guard.reset();
-        root_state_guard.board = start_board;
+        root_node_guard.reset();
+        root_node_guard.board = start_board;
+
         ctx.total_nodes.fetch_add(1, Ordering::AcqRel);
 
-        while !root_state_guard.is_fully_expanded() {
-            search::expand_node(&ctx, &test_game(), &mut state, &mut root_state_guard, 0).unwrap();
+        while !root_node_guard.is_fully_expanded() {
+            search::expand_node(&ctx, &test_game(), &mut thread_state_guard, &mut root_node_guard, 0).unwrap();
         }
 
-        assert_eq!(root_state_guard.num_children as usize, expected_results.len());
+        assert_eq!(root_node_guard.num_children as usize, expected_results.len());
 
         for (idx, (board, exp_moves)) in expected_results.iter().enumerate() {
             // Ignore moves of snakes that were dead before expanding
-            let mut act_moves = Move::decode(root_state_guard.child_moves[idx], root_state_guard.board.num_snakes());
+            let mut act_moves = Move::decode(root_node_guard.child_moves[idx], root_node_guard.board.num_snakes());
 
             #[allow(clippy::needless_range_loop)]
-            for snake_idx in 0..root_state_guard.board.num_snakes() as usize {
-                if !root_state_guard.board.snakes[snake_idx].alive() {
+            for snake_idx in 0..root_node_guard.board.num_snakes() as usize {
+                if !root_node_guard.board.snakes[snake_idx].alive() {
                     act_moves[snake_idx] = Move::Left;
                 }
             }
@@ -265,26 +266,25 @@ fn playout_test() {
     let ctx = get_deterministic_context();
     let game = test_game();
 
-    let mut scratch_guard = ctx.thread_state[0].lock().unwrap();
-
+    let mut thread_state_guard = ctx.thread_state[0].lock().unwrap();
     let start_board = Board::from_str(PLAYOUT_TRAPPED, &game).unwrap();
 
-    scratch_guard.board = start_board;
+    thread_state_guard.board = start_board;
 
-    search::playout_game(&ctx.config, &mut scratch_guard, &game);
+    search::playout_game(&ctx.config, &mut thread_state_guard, &game);
 
     check_scores(
-        &scratch_guard.play_scores[0..2],
+        &thread_state_guard.play_scores[0..2],
         &[ctx.config.win_val, ctx.config.loss_val],
     );
 
     let start_board = Board::from_str(PLAYOUT_WIN, &game).unwrap();
-    scratch_guard.board = start_board;
+    thread_state_guard.board = start_board;
 
-    search::playout_game(&ctx.config, &mut scratch_guard, &game);
+    search::playout_game(&ctx.config, &mut thread_state_guard, &game);
 
     check_scores(
-        &scratch_guard.play_scores[0..2],
+        &thread_state_guard.play_scores[0..2],
         &[ctx.config.win_val, ctx.config.loss_val],
     );
 }

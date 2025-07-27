@@ -7,7 +7,7 @@ relay:
   parallel_reqs: 3
 
 worker:
-  mem: "5000Mi"
-  boards: "2000000"
+  mem: "4000Mi"
+  boards: "2300000"
   latency: 40
   num_threads: 8

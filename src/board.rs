@@ -134,7 +134,7 @@ pub enum HeadOnCol {
     PossibleElimination,
 }
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Clone, Eq)]
 pub struct Board {
     pub width: i32,
     pub height: i32,
@@ -404,10 +404,6 @@ impl Board {
             }
         }
         alive
-    }
-
-    pub fn num_food(&self) -> i32 {
-        self.num_food
     }
 
     #[allow(clippy::len_without_is_empty)]

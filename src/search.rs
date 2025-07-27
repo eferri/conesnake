@@ -422,7 +422,7 @@ pub fn mcts<R: Rand>(
 }
 
 fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
-    let mut scratch_guard = ctx.thread_state[id].lock().unwrap();
+    let mut thread_state_guard = ctx.thread_state[id].lock().unwrap();
 
     let game_guard = ctx.game.read().unwrap();
     let game = game_guard.as_ref().unwrap();
@@ -448,7 +448,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             // OR reached node with a child that hasn't been played out yet.
             if game.over(&node_guard.board) || !node_guard.is_fully_expanded() {
                 // Still set the board for playout (evaluation) if we lost
-                scratch_guard.board.set_from(&node_guard.board);
+                thread_state_guard.board.set_from(&node_guard.board);
                 break;
             }
 
@@ -474,10 +474,10 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         }
 
         // Expand the node
-        if !game.over(&scratch_guard.board) {
+        if !game.over(&thread_state_guard.board) {
             let mut node_guard = ctx.node_space[curr_idx].write().unwrap();
 
-            let expand_res = expand_node(&ctx, game, &mut scratch_guard, &mut node_guard, curr_idx);
+            let expand_res = expand_node(&ctx, game, &mut thread_state_guard, &mut node_guard, curr_idx);
             match expand_res {
                 Ok(expanded) => {
                     // The parent node is write-locked, meaning no other thread can be reading this node
@@ -506,7 +506,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
         let num_playouts = 1;
 
         for _ in 0..num_playouts {
-            let (is_curr_terminal, num_turns) = playout_game(&ctx.config, &mut scratch_guard, game);
+            let (is_curr_terminal, num_turns) = playout_game(&ctx.config, &mut thread_state_guard, game);
             is_terminal |= is_curr_terminal;
             num_total_turns += num_turns;
         }
@@ -527,7 +527,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             let mut node_guard = ctx.node_space[curr_idx].write().unwrap();
 
             for snake_idx in 0..node_guard.board.num_snakes() as usize {
-                node_guard.score[snake_idx] += scratch_guard.play_scores[snake_idx];
+                node_guard.score[snake_idx] += thread_state_guard.play_scores[snake_idx];
             }
 
             node_guard.games += 1;
@@ -552,7 +552,7 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
             let moves = node_guard.child_moves[curr_move_idx as usize];
 
             for snake_idx in 0..node_guard.board.num_snakes() as usize {
-                let snake_score = scratch_guard.play_scores[snake_idx];
+                let snake_score = thread_state_guard.play_scores[snake_idx];
 
                 // Update cached score and game count of each snake-move for this node
                 let snake_mv = Move::extract(moves, snake_idx as u32);

@@ -86,6 +86,7 @@ impl Board {
         best_move.unwrap_or(Move::Left)
     }
 
+    #[inline(always)]
     pub fn valid_move(&self, game: &Game, snake_idx: usize, mv: Move) -> bool {
         let head = self.snake_head(snake_idx);
         let square = self.move_to_coord(head, mv, game.ruleset);
@@ -114,6 +115,7 @@ impl Board {
         }
     }
 
+    #[inline(always)]
     pub fn is_trapped(&self, game: &Game, snake_idx: usize) -> bool {
         !self.valid_move(game, snake_idx, Move::Left)
             && !self.valid_move(game, snake_idx, Move::Right)
@@ -122,6 +124,7 @@ impl Board {
     }
 
     // Assumption: move is valid
+    #[inline(always)]
     pub fn head_on_col(&self, game: &Game, snake_idx: usize, mv: Move) -> HeadOnCol {
         let snake_head = self.snake_head(snake_idx);
         let dest_square = self.move_to_coord(snake_head, mv, game.ruleset);
@@ -176,7 +179,7 @@ impl Board {
 
     // Battlesnake rules implementation
     //
-
+    #[inline(always)]
     pub fn gen_board(&mut self, moves: u16, game: &Game, food_buff: &mut [Coord], rng: &mut impl Rand) {
         // Note: this is not done till later in rules
         self.turn += 1;
@@ -489,8 +492,8 @@ impl Board {
         let mut num_spawn = 0;
 
         let rand_val = 100 - rng.int_n(100);
-        if self.num_food() < min_food {
-            num_spawn = (min_food - self.num_food()) as usize;
+        if self.num_food < min_food {
+            num_spawn = (min_food - self.num_food) as usize;
         } else if rand_val < chance {
             num_spawn = 1;
         }

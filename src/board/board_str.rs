@@ -262,3 +262,27 @@ impl fmt::Display for Board {
         Ok(())
     }
 }
+
+impl fmt::Debug for Board {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "width: {}", self.width)?;
+        writeln!(f, "height: {}", self.height)?;
+        writeln!(f, "turn: {}", self.turn)?;
+        writeln!(f, "num_snakes: {}", self.num_snakes)?;
+        writeln!(f, "num_food: {}", self.num_food)?;
+        writeln!(f, "royale_min_x: {}", self.royale_min_x)?;
+        writeln!(f, "royale_max_x: {}", self.royale_max_x)?;
+        writeln!(f, "royale_min_y: {}", self.royale_min_y)?;
+        writeln!(f, "royale_max_y: {}", self.royale_max_y)?;
+        for i in 0..self.num_snakes {
+            let snake = &self.snakes[i as usize];
+            writeln!(
+                f,
+                "snake {i} health: {}, eliminated: {}, len: {}, tail_ptr: {}, head_ptr: {}",
+                snake.health, snake.eliminated, snake.len, snake.tail_ptr, snake.head_ptr
+            )?;
+            writeln!(f, "snake {i} body: {:?}", &snake.body[..(snake.len as usize)])?;
+        }
+        fmt::Display::fmt(&self, f)
+    }
+}

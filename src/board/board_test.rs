@@ -474,5 +474,5 @@ pub fn gen_board_food_test() {
 
     board_food.gen_board(Move::Right as u16, &game, &mut food_buff, &mut rng);
 
-    assert!(board_food.num_food() > 0);
+    assert!(board_food.num_food > 0);
 }

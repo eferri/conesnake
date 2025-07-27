@@ -5,11 +5,11 @@ use crate::rand::Rand;
 use serde::{Deserialize, Serialize};
 
 use std::cmp::{Ord, PartialOrd};
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Debug, Display, Formatter, Result};
 use std::io;
 
 // API structs
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub struct Coord {
     pub val: u8,
 }
@@ -52,6 +52,12 @@ impl Display for Coord {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "({}, {})", self.x(), self.y())?;
         Ok(())
+    }
+}
+
+impl Debug for Coord {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        Display::fmt(self, f)
     }
 }
 
