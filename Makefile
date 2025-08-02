@@ -1,7 +1,7 @@
 # -------------------- local development --------------------
 
 .PHONY: build-all
-build-all: debug-build release-build profile-build rules
+build-all: debug-build release-build relay-build profile-build rules
 
 # Docker
 
@@ -30,6 +30,10 @@ build debug-build:
 .PHONY: release-build
 release-build:
 	docker compose run --rm snake cargo build --all-targets --release
+
+.PHONY: relay-build
+relay-build:
+	docker compose run --rm snake cargo build --all-targets --profile=release-relay
 
 PROFILE_ARGS := -Z build-std --profile=release-with-debug --target x86_64-unknown-linux-gnu
 
@@ -174,10 +178,12 @@ veryclean: clean
 
 # docker
 
+PROJECT = $(shell gcloud config get-value project)
+
 .PHONY: prod-shell
 prod-shell:
 	docker run --rm -it --entrypoint bash \
-		us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app
+		us-west1-docker.pkg.dev/$(PROJECT)/conesnake/conesnake:latest-app
 
 .PHONY: gcloud-config-docker
 gcloud-config-docker:
@@ -199,12 +205,15 @@ regcred-secret:
 	'
 
 .PHONY: prod-build
-prod-build: release-build
+prod-build: release-build relay-build
 	DOCKER_BUILDKIT=1 docker build \
-		--target prod \
-		--tag us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app .
-
-	docker push us-west1-docker.pkg.dev/$(shell gcloud config get-value project)/conesnake/conesnake:latest-app
+		--target prod-worker \
+		--tag us-west1-docker.pkg.dev/$(PROJECT)/conesnake/conesnake:latest-worker-app .
+	DOCKER_BUILDKIT=1 docker build \
+		--target prod-relay \
+		--tag us-west1-docker.pkg.dev/$(PROJECT)/conesnake/conesnake:latest-relay-app .
+	docker push us-west1-docker.pkg.dev/$(PROJECT)/conesnake/conesnake:latest-worker-app
+	docker push us-west1-docker.pkg.dev/$(PROJECT)/conesnake/conesnake:latest-relay-app
 
 # helm
 

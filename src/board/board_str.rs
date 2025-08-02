@@ -183,12 +183,12 @@ impl Board {
             let w_line = line_vec.len();
             lines_vec.push(line_vec);
 
-            if let Some(w_prev) = w_opt {
-                if w_prev != w_line {
-                    return Err(Error::BadBoardStr(
-                        "Invalid board str, board width not consistent".to_owned(),
-                    ));
-                }
+            if let Some(w_prev) = w_opt
+                && w_prev != w_line
+            {
+                return Err(Error::BadBoardStr(
+                    "Invalid board str, board width not consistent".to_owned(),
+                ));
             }
             w_opt = Some(w_line);
         }

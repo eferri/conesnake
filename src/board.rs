@@ -4,7 +4,7 @@ use crate::game::{Game, Map, Rules};
 use crate::util::{self};
 use crate::util::{Coord, Error, Move};
 
-use std::cmp::{max, min, min_by, Ordering};
+use std::cmp::{Ordering, max, min, min_by};
 use std::{fmt::Write, str};
 
 use serde::{Deserialize, Serialize};
@@ -447,10 +447,11 @@ impl Board {
 
         for i in 0..body_len {
             let coord = self.snakes[snake_idx as usize].body[i];
-            if let Some(p) = prev_coord {
-                if coord != p && !self.next_to(coord, p, game.ruleset) {
-                    return Err(Error::BadBoard("Snake was not contiguous".to_owned()));
-                }
+            if let Some(p) = prev_coord
+                && coord != p
+                && !self.next_to(coord, p, game.ruleset)
+            {
+                return Err(Error::BadBoard("Snake was not contiguous".to_owned()));
             }
 
             match (self.at(coord), i) {
@@ -475,7 +476,7 @@ impl Board {
                     }
                 }
                 (BoardSquare::Food, _) | (BoardSquare::FoodHazard, _) => {
-                    return Err(Error::BadBoard("Snake square conflicts with Food".to_owned()))
+                    return Err(Error::BadBoard("Snake square conflicts with Food".to_owned()));
                 }
                 (BoardSquare::SnakeBody(idx), _) => {
                     if idx != snake_idx {

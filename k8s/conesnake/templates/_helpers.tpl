@@ -10,6 +10,10 @@ app.kubernetes.io/version: {{ .Chart.Version }}
 helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
 {{- end -}}
 
-{{- define "amd64_image" -}}
-"{{ .Values.gcp_region }}-docker.pkg.dev/{{ .Values.gcp_project }}/conesnake/conesnake:latest-app"
+{{- define "amd64_worker_image" -}}
+"{{ .Values.gcp_region }}-docker.pkg.dev/{{ .Values.gcp_project }}/conesnake/conesnake:latest-worker-app"
+{{- end -}}
+
+{{- define "amd64_relay_image" -}}
+"{{ .Values.gcp_region }}-docker.pkg.dev/{{ .Values.gcp_project }}/conesnake/conesnake:latest-relay-app"
 {{- end -}}

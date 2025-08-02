@@ -126,8 +126,16 @@ ENV CARGO_HOME=.cargo
 
 FROM base AS prod
 
-COPY --chown=conesnake target-snake/release/conesnake .
-
 USER conesnake
 
 ENTRYPOINT [ "/app/conesnake" ]
+
+
+FROM prod AS prod-worker
+
+COPY --chown=conesnake target-snake/release/conesnake .
+
+
+FROM prod AS prod-relay
+
+COPY --chown=conesnake target-snake/release-relay/conesnake .

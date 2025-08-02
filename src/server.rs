@@ -1,6 +1,6 @@
 use crate::api::{BattleState, IndexResp, MoveResp, Scores};
 use crate::board::Board;
-use crate::config::{Config, Mode, MAX_HEIGHT, MAX_SNAKES, MAX_WIDTH};
+use crate::config::{Config, MAX_HEIGHT, MAX_SNAKES, MAX_WIDTH, Mode};
 use crate::game::Game;
 use crate::pool::ThreadPool;
 use crate::rand::FastRand;
@@ -9,11 +9,12 @@ use crate::search::{Node, SearchContext};
 use crate::util::{Error, Move};
 
 use axum::{
+    Json, Router,
     extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
-    serve, Json, Router,
+    serve,
 };
 use futures::future;
 use log::{debug, error, info, warn};
@@ -26,8 +27,8 @@ use std::{
     collections::HashMap,
     env, mem,
     net::SocketAddr,
-    sync::atomic::{AtomicI64, Ordering},
     sync::Arc,
+    sync::atomic::{AtomicI64, Ordering},
     time::{Duration, Instant},
 };
 
@@ -271,10 +272,10 @@ async fn move_req(State(state): State<Arc<ServerState>>, Json(game_state): Json<
 
     info!("Server reported latency: {api_latency} - timeout: {timeout}");
 
-    if let Ok(l) = str::parse::<i32>(&api_latency) {
-        if l >= timeout {
-            error!("Excessive reported latency: {l}");
-        }
+    if let Ok(l) = str::parse::<i32>(&api_latency)
+        && l >= timeout
+    {
+        error!("Excessive reported latency: {l}");
     }
 
     let is_solo = game_state.board.snakes.len() == 1;

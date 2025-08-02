@@ -1,7 +1,9 @@
+cargo-features = ["profile-rustflags"]
+
 [package]
 name = "conesnake"
 version = "0.3.0"
-edition = "2021"
+edition = "2024"
 autobins = false
 
 [[bin]]
@@ -54,6 +56,11 @@ opt-level = 3
 strip = "none"
 panic = "abort"
 codegen-units = 16
+rustflags = ["-C", "target-cpu=znver3"]
+
+[profile.release-relay]
+inherits = "release"
+rustflags = ["-C", "target-cpu=x86-64"]
 
 [profile.release-with-debug]
 inherits = "release"
