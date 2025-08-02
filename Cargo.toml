@@ -2,18 +2,13 @@
 name = "conesnake"
 version = "0.3.0"
 edition = "2021"
+autobins = false
 
 [[bin]]
 name = "conesnake"
 path = "./src/bin/conesnake.rs"
-
-[[bin]]
-name = "performance"
-path = "./src/bin/performance.rs"
-
-[[bin]]
-name = "performance_old"
-path = "./src/bin/performance_old.rs"
+test = false
+bench = false
 
 [[bench]]
 name = "benchmark"
