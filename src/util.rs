@@ -71,6 +71,7 @@ pub enum Move {
     Down,
 }
 pub const MOVES: [Move; 4] = [Move::Left, Move::Right, Move::Up, Move::Down];
+pub const MOVE_INCR: [u16; 4] = [0xff, 0x1, 0x100, 0xff00];
 
 impl Move {
     pub fn from_idx(idx: usize) -> Self {

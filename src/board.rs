@@ -1,7 +1,7 @@
 use crate::api::{ApiCoord, BattleState, BoardApi, SnakeApi};
 use crate::config::{MAX_BOARD_SIZE, MAX_SNAKES};
 use crate::game::{Game, Map, Rules};
-use crate::util::{self};
+use crate::util::{self, MOVE_INCR};
 use crate::util::{Coord, Error, Move};
 
 use std::cmp::{Ordering, max, min, min_by};
@@ -166,8 +166,8 @@ impl PartialEq for Board {
             && self.snakes == other.snakes;
 
         for idx in 0..MAX_BOARD_SIZE {
-            let sqr = self.at_idx(idx);
-            let other_sqr = other.at_idx(idx);
+            let sqr = self.idx_at(idx);
+            let other_sqr = other.idx_at(idx);
             result = result && (sqr == other_sqr);
         }
         result
@@ -526,7 +526,7 @@ impl Board {
         BoardSquare::from_raw(self.board_mat[self.idx_from_coord(loc)])
     }
 
-    pub fn at_idx(&self, idx: usize) -> BoardSquare {
+    pub fn idx_at(&self, idx: usize) -> BoardSquare {
         BoardSquare::from_raw(self.board_mat[idx])
     }
 
@@ -543,7 +543,7 @@ impl Board {
         self.board_mat[idx] = val.to_raw();
     }
 
-    pub fn set_at_idx(&mut self, idx: usize, val: BoardSquare) {
+    pub fn idx_set_at(&mut self, idx: usize, val: BoardSquare) {
         self.board_mat[idx] = val.to_raw();
     }
 
@@ -552,12 +552,10 @@ impl Board {
     }
 
     pub fn move_to_coord(&self, head: Coord, mv: Move, rules: Rules) -> Coord {
-        let (new_x, new_y) = match mv {
-            Move::Left => (head.x() - 1, head.y()),
-            Move::Right => (head.x() + 1, head.y()),
-            Move::Up => (head.x(), head.y() + 1),
-            Move::Down => (head.x(), head.y() - 1),
-        };
+        let mv_incr = MOVE_INCR[mv.idx()];
+
+        let new_x = head.x() + mv_incr as i8;
+        let new_y = head.y() + (mv_incr >> 8) as i8;
 
         let mut square = Coord::new(new_x, new_y);
         if let Rules::Wrapped = rules {
@@ -634,6 +632,7 @@ impl Board {
 pub mod board_rules;
 pub mod board_str;
 
+#[cfg(false)]
 #[cfg(feature = "simd")]
 pub mod board_simd;
 

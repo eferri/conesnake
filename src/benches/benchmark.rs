@@ -60,11 +60,20 @@ fn playout_bench(b: &mut Bencher) {
     let start_board = Board::from_str(BOARD, &game).unwrap();
 
     let mut ctx = ThreadContext::<FastRand>::new();
+    let mut total_turns = 0;
+
+    let start_time = Instant::now();
 
     b.iter(|| {
         ctx.board = start_board.clone();
-        let _ = search::playout_game(&cfg, &mut ctx, &game);
+        let (_, turns) = search::playout_game(&cfg, &mut ctx, &game);
+        total_turns += turns;
     });
+
+    let duration_ns = (Instant::now() - start_time).as_nanos();
+    let ns_turn = duration_ns as f64 / total_turns as f64;
+
+    info!("avg ns per turn {ns_turn:.3}")
 }
 
 #[bench]
