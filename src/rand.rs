@@ -1,4 +1,4 @@
-use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng, seq::SliceRandom};
 
 #[cfg(feature = "simd")]
 use std::simd::i32x4;
@@ -10,6 +10,7 @@ pub trait Rand: Send + Sync + 'static {
     #[cfg(feature = "simd")]
     fn range_simd(&mut self, min: i32, max: i32) -> i32x4;
     fn shuffle<A>(&mut self, arr: &mut [A], n: usize);
+    fn sample_n(&mut self, arr: &mut [u32], length: u32, amount: u32);
 }
 
 pub struct FastRand {
@@ -35,8 +36,20 @@ impl Rand for FastRand {
         self.rng.random_range(i32x4::splat(min)..(i32x4::splat(max + 1)))
     }
 
-    fn shuffle<A>(&mut self, arr: &mut [A], n: usize) {
+    fn shuffle<T>(&mut self, arr: &mut [T], n: usize) {
         arr.partial_shuffle(&mut self.rng, n);
+    }
+
+    fn sample_n(&mut self, arr: &mut [u32], length: u32, amount: u32) {
+        debug_assert!(amount <= length);
+        debug_assert!(arr.len() >= amount as usize);
+        for (index, j) in (length - amount..length).enumerate() {
+            let t = self.rng.random_range(..=j);
+            if let Some(pos) = arr.iter().position(|&x| x == t) {
+                arr[pos] = j;
+            }
+            arr[index] = t;
+        }
     }
 }
 
@@ -61,7 +74,13 @@ impl Rand for MaxRand {
         i32x4::splat(max)
     }
 
-    fn shuffle<A>(&mut self, arr: &mut [A], _n: usize) {
+    fn shuffle<T>(&mut self, arr: &mut [T], _n: usize) {
         arr.rotate_left(1);
+    }
+
+    fn sample_n(&mut self, arr: &mut [u32], length: u32, amount: u32) {
+        for i in 0..amount {
+            arr[i as usize] = length - i - 1;
+        }
     }
 }

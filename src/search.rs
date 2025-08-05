@@ -10,9 +10,9 @@ use crate::util::{Coord, Error, Move};
 use log::{error, info, warn};
 
 #[cfg(feature = "simd")]
-use std::simd::{f64x4, mask64x4, num::SimdFloat, StdFloat};
+use std::simd::{StdFloat, f64x4, mask64x4, num::SimdFloat};
 
-use std::sync::{atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering, Arc, Barrier};
+use std::sync::{Arc, Barrier, atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering};
 use std::sync::{Mutex, RwLock};
 use std::{thread::sleep, time::Duration, time::Instant};
 

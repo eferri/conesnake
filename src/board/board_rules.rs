@@ -1,7 +1,7 @@
 use super::*;
 
 use crate::game::{Game, Map};
-use crate::rand::Rand;
+use crate::rand::{FastRand, Rand};
 
 use std::cmp::max;
 
@@ -211,6 +211,11 @@ impl Board {
         // Apply map logic
         // Does not correspond to a rules stage
         self.update_board(game, food_buff, rng);
+    }
+
+    #[inline(never)]
+    pub fn move_snakes_asm(&mut self, moves: u16, game: &Game) {
+        self.move_snakes(moves, game);
     }
 
     #[inline(always)]
@@ -475,6 +480,11 @@ impl Board {
                 }
             }
         }
+    }
+
+    #[inline(never)]
+    pub fn update_board_asm(&mut self, game: &Game, food_buff: &mut [Coord], rng: &mut FastRand) {
+        self.update_board(game, food_buff, rng);
     }
 
     #[inline(always)]

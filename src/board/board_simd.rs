@@ -1,16 +1,15 @@
 use super::*;
 
-use crate::rand::Rand;
-
 use core::arch::x86_64::{_mm256_castps_si256, _mm256_castsi256_ps, _mm256_permutevar_ps};
 use std::simd::{
-    cmp::SimdPartialOrd, i16x8, mask16x8, mask32x4, num::SimdInt, num::SimdUint, simd_swizzle, u8x16, u16x4, u16x8,
-    u32x8, usizex4,
+    cmp::SimdPartialOrd, i16x8, mask16x8, mask32x4, num::SimdInt, num::SimdUint, simd_swizzle, u16x4, u16x8, u32x8,
+    usizex4,
 };
 
-type CoordVec = u16x8;
+pub type CoordVec = u16x8;
 type IndexVec = usizex4;
 type BoardSquareVec = u16x4;
+#[cfg(false)]
 type MoveVec = u16x4;
 
 type SnakeMask = mask32x4;
@@ -28,6 +27,7 @@ impl Board {
         unsafe { _mm256_castps_si256(_mm256_permutevar_ps(_mm256_castsi256_ps(vec.into()), idx.into())) }.into()
     }
 
+    #[cfg(false)]
     pub fn gen_move_simd(&self, game: &Game, rng: &mut impl Rand) -> MoveVec {
         let valid_moves = u8x16::splat(0);
 

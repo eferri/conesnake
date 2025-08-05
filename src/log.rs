@@ -1,4 +1,4 @@
-use tracing_subscriber::{filter::LevelFilter, EnvFilter};
+use tracing_subscriber::{EnvFilter, filter::LevelFilter};
 
 pub fn log_init() {
     tracing_subscriber::fmt()

@@ -43,7 +43,9 @@ profile-build:
 
 .PHONY: lint
 lint:
-	docker compose run --rm snake cargo clippy -- -D warnings
+	docker compose run --rm snake bash -c ' \
+		cargo clippy -- -D warnings \
+		&& cargo fmt --check'
 
 .PHONY: test
 test: rules
@@ -150,7 +152,7 @@ ASM_FUNC ?= "conesnake::search::Node::duct_scores_simd"
 .PHONY: asm
 asm:
 	docker compose run --rm snake bash -ic '\
-		cargo asm --lib --rust --color $(ASM_FUNC) | less -R'
+		cargo asm --lib --rust --color "$(ASM_FUNC)" | less -R'
 
 # Misc
 

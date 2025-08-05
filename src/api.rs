@@ -157,10 +157,7 @@ impl fmt::Display for SearchStats {
                 let games = self.scores[i as usize][j].games;
                 let avg = if games > 0 { score / games as f64 } else { 0.0 };
 
-                writeln!(
-                    f,
-                    "    {mv_str} score: {score:.1} games: {games} avg: {avg:.5}",
-                )?;
+                writeln!(f, "    {mv_str} score: {score:.1} games: {games} avg: {avg:.5}",)?;
             }
         }
 

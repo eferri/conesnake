@@ -177,6 +177,32 @@ fn gen_board_ref_test() {
             Map::Standard,
         ),
         (
+            // Simultaneous body low health
+            "turn: 1 health: 2 health: 1 health: 3
+            b > v - - - -
+            - 1 v - - - -
+            - ^ 0 d - - -
+            - ^ < < 2 - -
+            - - - - ^ - -
+            - + - - ^ a -
+            - - - - - - -",
+            Rules::Standard,
+            Map::Standard,
+        ),
+        (
+            // Head-to-Head low health
+            "turn: 1 health: 1 health: 2
+            b > v - - - -
+            - - v - - - -
+            - - 0 1 < - -
+            - - - - ^ - -
+            - - - - ^ - -
+            - + - - ^ a -
+            - - - - - - -",
+            Rules::Standard,
+            Map::Standard,
+        ),
+        (
             "turn: 3 health: 97 health: 97 health: 97 health: 97
             - - - - - - - - - - -
             - > > 1 b v - - - - -
@@ -332,6 +358,7 @@ fn gen_board_ref_test() {
             let mut gen_board = board.clone();
             gen_board.gen_board(Move::encode(&moves), &game, &mut food_buff, &mut rng);
 
+            // Copy generated board into new board to reset snake ring buffers for comparison
             let mut compare_board = Board::new(0, 0);
             compare_board.set_from(&gen_board);
 

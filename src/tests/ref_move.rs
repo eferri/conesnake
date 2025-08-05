@@ -9,7 +9,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use serde_json::{de::IoRead, Deserializer, StreamDeserializer};
+use serde_json::{Deserializer, StreamDeserializer, de::IoRead};
 
 #[derive(Serialize, Deserialize)]
 struct MoveState {

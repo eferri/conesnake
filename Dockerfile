@@ -1,4 +1,4 @@
-FROM ubuntu:noble-20250529 AS base
+FROM ubuntu:noble-20250714 AS base
 
 ARG UID=1000
 ARG GID=1000
@@ -73,11 +73,11 @@ USER conesnake
 WORKDIR /app/install
 
 # Install golang
-RUN curl -sSfL "https://go.dev/dl/go1.24.4.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
+RUN curl -sSfL "https://go.dev/dl/go1.24.6.linux-${DOCKER_ARCH}.tar.gz" > go.tar.gz \
     && tar -C /tools -xf go.tar.gz
 
 # Install helm
-RUN curl -sSfL "https://get.helm.sh/helm-v3.18.3-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
+RUN curl -sSfL "https://get.helm.sh/helm-v3.18.4-linux-${DOCKER_ARCH}.tar.gz" -o helm.tar.gz \
     && tar -xf helm.tar.gz \
     && cp ./linux-${DOCKER_ARCH}/helm . \
     && chmod +x helm \
@@ -95,7 +95,7 @@ RUN curl -sSfL "https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2
     && mv terraform /tools/bin
 
 ENV PATH="/tools/go/bin:/app/.go/bin:/home/conesnake/.cargo/bin:/home/conesnake/.venv/bin:${PATH}"
-ENV PATH="/tools/bin:/usr/lib/linux-tools/6.8.0-64-generic/:${PATH}"
+ENV PATH="/tools/bin:/usr/lib/linux-tools/6.8.0-71-generic/:${PATH}"
 
 COPY requirements.txt .
 
@@ -106,7 +106,7 @@ RUN python3 -m venv /home/conesnake/.venv \
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-07-18
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-08-09
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \

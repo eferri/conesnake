@@ -12,7 +12,7 @@ use pretty_assertions::assert_eq;
 #[cfg(feature = "simd")]
 use std::simd::num::SimdFloat;
 
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::{Arc, atomic::Ordering};
 use std::time::Instant;
 
 #[test]
@@ -230,6 +230,7 @@ fn expand_node_test() {
                 }
             }
 
+            // Copy generated board into new board to reset snake ring buffers for comparison
             let mut compare_board = Board::new(0, 0);
             compare_board.set_from(&ctx.node_space[idx + 1].read().unwrap().board);
 

@@ -3,6 +3,7 @@
 extern crate test;
 
 use conesnake::board::Board;
+use conesnake::config::{Config, MAX_BOARD_SIZE};
 use conesnake::log::log_test_init;
 use conesnake::pool::ThreadPool;
 use conesnake::rand::FastRand;
@@ -33,6 +34,23 @@ const BOARD: &str = "
     - - - - - - - - - - -
     - - - - - - - - - - -";
 
+fn print_info(cfg: &Config) {
+    #[cfg(feature = "simd")]
+    info!("using simd");
+
+    if cfg.compare {
+        info!("compare is true!")
+    }
+
+    let node_size = mem::size_of::<search::Node>();
+    let board_size = mem::size_of::<Board>();
+    let board_mat_size = mem::size_of::<[u16; MAX_BOARD_SIZE]>();
+
+    info!("node size {node_size} bytes");
+    info!("board size {board_size} bytes");
+    info!("board_mat size {board_mat_size} bytes");
+}
+
 #[bench]
 fn playout_bench(b: &mut Bencher) {
     let mut cfg = release_config();
@@ -44,15 +62,7 @@ fn playout_bench(b: &mut Bencher) {
     let res = env::var("COMPARE").unwrap_or("0".to_string());
     cfg.compare = str::parse::<u32>(&res).unwrap() == 1;
 
-    #[cfg(feature = "simd")]
-    info!("using simd");
-
-    if cfg.compare {
-        info!("compare is true!")
-    }
-
-    let node_size = mem::size_of::<search::Node>();
-    info!("node size {node_size} bytes");
+    print_info(&cfg);
 
     info!("running benchmark...");
 
@@ -90,15 +100,7 @@ fn search_bench(b: &mut Bencher) {
     let res = env::var("COMPARE").unwrap_or("0".to_string());
     cfg.compare = str::parse::<u32>(&res).unwrap() == 1;
 
-    #[cfg(feature = "simd")]
-    info!("using simd");
-
-    if cfg.compare {
-        info!("compare is true!")
-    }
-
-    let node_size = mem::size_of::<search::Node>();
-    info!("node size {node_size} bytes");
+    print_info(&cfg);
 
     info!("allocating...");
 
