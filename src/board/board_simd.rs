@@ -107,7 +107,7 @@ impl Board {
 
     pub fn at_simd(&self, coords: CoordVec) -> BoardSquareVec {
         let idxs_simd = self.idx_from_coord_simd(coords);
-        BoardSquareVec::gather_or_default(&self.board_mat, idxs_simd)
+        BoardSquareVec::gather_or_default(&self.board_arr, idxs_simd)
     }
 
     pub fn idx_from_coord_simd(&self, coords: CoordVec) -> IndexVec {

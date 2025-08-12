@@ -86,45 +86,17 @@ impl Snake {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(u8, align(2))]
-pub enum BoardSquare {
-    Empty,
-    SnakeHead(u8),       // index of snake
-    SnakeHeadHazard(u8), // index of snake
-    SnakeBody(u8),       // index of snake
-    SnakeBodyHazard(u8), // index of snake
-    SnakeTail(u8),       // index of snake
-    SnakeTailHazard(u8), // index of snake
-    Food,
-    FoodHazard,
-    Hazard,
+pub enum BoardBit {
+    Food = 0,
+    Hazard = 1,
+    SnakeHead = 2,
+    SnakeBody = 3,
+    SnakeTail = 4,
+    SnakeIdx = 5,
 }
 
-impl BoardSquare {
-    pub fn tag_val(&self) -> u8 {
-        // https://rust-lang.github.io/unsafe-code-guidelines/layout/enums.html#explicit-repr-annotation-without-c-compatibility
-        let sqr_ptr = self as *const BoardSquare as *const u8;
-        unsafe { *sqr_ptr }
-    }
-
-    pub fn idx_val(&self) -> u8 {
-        let sqr_ptr = self as *const BoardSquare as *const u8;
-        unsafe { *(sqr_ptr.offset(1)) }
-    }
-
-    pub fn from_raw(val: u16) -> Self {
-        let mut sqr = BoardSquare::Empty;
-        let sqr_ptr = &mut sqr as *mut BoardSquare as *mut u16;
-        unsafe {
-            *sqr_ptr = val;
-        }
-        sqr
-    }
-
-    pub fn to_raw(&self) -> u16 {
-        let sqr_ptr = self as *const BoardSquare as *const u16;
-        unsafe { *sqr_ptr }
-    }
+pub fn is_bit_set(sqr: u8, bit: BoardBit) -> bool {
+    ((sqr >> bit as u8) & 0x1) != 0
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,7 +121,7 @@ pub struct Board {
 
     pub snakes: [Snake; MAX_SNAKES],
 
-    board_mat: [u16; MAX_BOARD_SIZE],
+    board_arr: [u8; MAX_BOARD_SIZE],
 }
 
 impl PartialEq for Board {
@@ -166,8 +138,8 @@ impl PartialEq for Board {
             && self.snakes == other.snakes;
 
         for idx in 0..MAX_BOARD_SIZE {
-            let sqr = self.idx_at(idx);
-            let other_sqr = other.idx_at(idx);
+            let sqr = self.at_idx_raw(idx, BoardBit::Food);
+            let other_sqr = other.at_idx_raw(idx, BoardBit::Food);
             result = result && (sqr == other_sqr);
         }
         result
@@ -187,7 +159,7 @@ impl Board {
             royale_min_y: 0,
             royale_max_y: 0,
             snakes: [Snake::new(); MAX_SNAKES],
-            board_mat: [0; MAX_BOARD_SIZE],
+            board_arr: [0; MAX_BOARD_SIZE],
         }
     }
 
@@ -198,16 +170,12 @@ impl Board {
 
         let mut board = Board::new(req.board.width, req.board.height);
         for coord in req.board.food.iter() {
-            board.set_at(coord.to_internal(), BoardSquare::Food);
+            board.set_at(coord.to_internal(), 1, BoardBit::Food);
             board.num_food += 1;
         }
 
         for coord in req.board.hazards.iter() {
-            match board.at(coord.to_internal()) {
-                BoardSquare::Empty => board.set_at(coord.to_internal(), BoardSquare::Hazard),
-                BoardSquare::Food => board.set_at(coord.to_internal(), BoardSquare::FoodHazard),
-                _ => (),
-            };
+            board.set_at(coord.to_internal(), 1, BoardBit::Hazard);
         }
 
         board.turn = req.turn;
@@ -236,17 +204,11 @@ impl Board {
 
         for i in 0..self.len() {
             let coord = self.coord_from_idx(i as usize);
-            match self.at(coord) {
-                BoardSquare::Food => food.push(coord.to_api()),
-                BoardSquare::Hazard
-                | BoardSquare::SnakeHeadHazard(_)
-                | BoardSquare::SnakeBodyHazard(_)
-                | BoardSquare::SnakeTailHazard(_) => hazards.push(coord.to_api()),
-                BoardSquare::FoodHazard => {
-                    food.push(coord.to_api());
-                    hazards.push(coord.to_api());
-                }
-                _ => (),
+            if self.at(coord, BoardBit::Food) == 1 {
+                food.push(coord.to_api());
+            }
+            if self.at(coord, BoardBit::Hazard) == 1 {
+                hazards.push(coord.to_api());
             }
         }
 
@@ -339,7 +301,7 @@ impl Board {
             }
         }
 
-        self.board_mat[..board_len].copy_from_slice(&other.board_mat[..board_len]);
+        self.board_arr[..board_len].copy_from_slice(&other.board_arr[..board_len]);
     }
 
     pub fn set_royale(&mut self) {
@@ -370,15 +332,8 @@ impl Board {
                         Coord::new(z as i8, side_val as i8)
                     };
 
-                    match self.at(coord) {
-                        BoardSquare::Empty
-                        | BoardSquare::Food
-                        | BoardSquare::SnakeHead(_)
-                        | BoardSquare::SnakeBody(_)
-                        | BoardSquare::SnakeTail(_) => {
-                            continue 'side_loop;
-                        }
-                        _ => (),
+                    if self.at(coord, BoardBit::Hazard) != 1 {
+                        continue 'side_loop;
                     }
                 }
 
@@ -412,7 +367,7 @@ impl Board {
     }
 
     fn set_size(&mut self, w: i32, h: i32) {
-        debug_assert!(w * h <= self.board_mat.len() as i32);
+        debug_assert!(w * h <= self.board_arr.len() as i32);
 
         self.width = w;
         self.height = h;
@@ -454,57 +409,34 @@ impl Board {
                 return Err(Error::BadBoard("Snake was not contiguous".to_owned()));
             }
 
-            match (self.at(coord), i) {
-                (BoardSquare::Empty, 0) => {
-                    self.set_at(coord, BoardSquare::SnakeHead(snake_idx));
-                }
-                (BoardSquare::Hazard, 0) => {
-                    self.set_at(coord, BoardSquare::SnakeHeadHazard(snake_idx));
-                }
-                (BoardSquare::Empty, x) => {
-                    if x < api_snake.body.len() - 1 {
-                        self.set_at(coord, BoardSquare::SnakeBody(snake_idx));
-                    } else {
-                        self.set_at(coord, BoardSquare::SnakeTail(snake_idx));
-                    }
-                }
-                (BoardSquare::Hazard, x) => {
-                    if x < api_snake.body.len() - 1 {
-                        self.set_at(coord, BoardSquare::SnakeBodyHazard(snake_idx));
-                    } else {
-                        self.set_at(coord, BoardSquare::SnakeTailHazard(snake_idx));
-                    }
-                }
-                (BoardSquare::Food, _) | (BoardSquare::FoodHazard, _) => {
-                    return Err(Error::BadBoard("Snake square conflicts with Food".to_owned()));
-                }
-                (BoardSquare::SnakeBody(idx), _) => {
-                    if idx != snake_idx {
-                        return Err(Error::BadBoard(
-                            "Snake square conflicts with other SnakeBody".to_owned(),
-                        ));
-                    }
-                    self.set_at(coord, BoardSquare::SnakeTail(snake_idx));
-                }
-                (BoardSquare::SnakeBodyHazard(idx), _) => {
-                    if idx != snake_idx {
-                        return Err(Error::BadBoard(
-                            "Snake square conflicts with other SnakeBodyHazard".to_owned(),
-                        ));
-                    }
-                    self.set_at(coord, BoardSquare::SnakeTailHazard(snake_idx));
-                }
-                (BoardSquare::SnakeHead(idx), _)
-                | (BoardSquare::SnakeHeadHazard(idx), _)
-                | (BoardSquare::SnakeTail(idx), _)
-                | (BoardSquare::SnakeTailHazard(idx), _) => {
-                    if idx != snake_idx {
-                        return Err(Error::BadBoard(
-                            "Snake square conflicts with other SnakeHead/SnakeTail".to_owned(),
-                        ));
-                    }
+            self.set_at_raw(coord, snake_idx, BoardBit::SnakeIdx);
+
+            // Error checking
+            let sqr = self.at_raw(coord, BoardBit::Food);
+
+            if is_bit_set(sqr, BoardBit::Food) {
+                return Err(Error::BadBoard("Snake square conflicts with Food".to_owned()));
+            }
+
+            if self.at_raw(coord, BoardBit::SnakeHead) > 0 && self.at_raw(coord, BoardBit::SnakeIdx) != snake_idx {
+                return Err(Error::BadBoard("Snake square conflicts with Snake".to_owned()));
+            }
+
+            // If stacking, set square to tail
+            if is_bit_set(sqr, BoardBit::SnakeBody) {
+                self.set_at(coord, 1, BoardBit::SnakeTail);
+                self.set_at(coord, 0, BoardBit::SnakeBody);
+            // In a heads-only scenario, don't overwrite head/tail
+            } else if !is_bit_set(sqr, BoardBit::SnakeHead) && !is_bit_set(sqr, BoardBit::SnakeTail) {
+                if i == 0 {
+                    self.set_at(coord, 1, BoardBit::SnakeHead);
+                } else if i < api_snake.body.len() - 1 {
+                    self.set_at(coord, 1, BoardBit::SnakeBody);
+                } else {
+                    self.set_at(coord, 1, BoardBit::SnakeTail);
                 }
             }
+
             prev_coord = Some(coord);
         }
         Ok(())
@@ -522,12 +454,20 @@ impl Board {
         self.snakes[snake_idx].len
     }
 
-    pub fn at(&self, loc: Coord) -> BoardSquare {
-        BoardSquare::from_raw(self.board_mat[self.idx_from_coord(loc)])
+    pub fn at(&self, loc: Coord, bit: BoardBit) -> u8 {
+        self.at_idx(self.idx_from_coord(loc), bit)
     }
 
-    pub fn idx_at(&self, idx: usize) -> BoardSquare {
-        BoardSquare::from_raw(self.board_mat[idx])
+    pub fn at_raw(&self, loc: Coord, bit: BoardBit) -> u8 {
+        self.at_idx_raw(self.idx_from_coord(loc), bit)
+    }
+
+    pub fn at_idx(&self, idx: usize, bit: BoardBit) -> u8 {
+        (self.board_arr[idx] >> bit as u8) & 0x1
+    }
+
+    pub fn at_idx_raw(&self, idx: usize, bit: BoardBit) -> u8 {
+        self.board_arr[idx] >> bit as u8
     }
 
     fn idx_from_coord(&self, loc: Coord) -> usize {
@@ -538,13 +478,22 @@ impl Board {
         Coord::new((idx as i32 % self.width) as i8, (idx as i32 / self.width) as i8)
     }
 
-    pub fn set_at(&mut self, loc: Coord, val: BoardSquare) {
+    pub fn set_at(&mut self, loc: Coord, val: u8, bit: BoardBit) {
         let idx = self.idx_from_coord(loc);
-        self.board_mat[idx] = val.to_raw();
+        self.set_at_idx(idx, val, bit);
     }
 
-    pub fn idx_set_at(&mut self, idx: usize, val: BoardSquare) {
-        self.board_mat[idx] = val.to_raw();
+    pub fn set_at_raw(&mut self, loc: Coord, val: u8, bit: BoardBit) {
+        let idx = self.idx_from_coord(loc);
+        self.set_at_idx_raw(idx, val, bit);
+    }
+
+    pub fn set_at_idx(&mut self, idx: usize, val: u8, bit: BoardBit) {
+        self.board_arr[idx] = self.board_arr[idx] & !(1 << bit as u8) | (val << bit as u8);
+    }
+
+    pub fn set_at_idx_raw(&mut self, idx: usize, val: u8, bit: BoardBit) {
+        self.board_arr[idx] = self.board_arr[idx] & ((1 << bit as u8) - 1) | (val << bit as u8);
     }
 
     pub fn on_board(&self, square: Coord) -> bool {

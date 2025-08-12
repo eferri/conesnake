@@ -89,29 +89,25 @@ impl Board {
     #[inline(always)]
     pub fn valid_move(&self, game: &Game, snake_idx: usize, mv: Move) -> bool {
         let head = self.snake_head(snake_idx);
-        let square = self.move_to_coord(head, mv, game.ruleset);
-        if !self.on_board(square) {
+        let coord = self.move_to_coord(head, mv, game.ruleset);
+        if !self.on_board(coord) {
             return false;
         }
-        match self.at(square) {
-            BoardSquare::Empty | BoardSquare::Food | BoardSquare::FoodHazard => true,
-            BoardSquare::Hazard => {
-                (self.snakes[snake_idx].health - game.api.ruleset.settings.hazard_damage_per_turn) > 0
-            }
-            BoardSquare::SnakeHead(_)
-            | BoardSquare::SnakeHeadHazard(_)
-            | BoardSquare::SnakeBody(_)
-            | BoardSquare::SnakeBodyHazard(_) => false,
-            BoardSquare::SnakeTail(i) => {
-                let idx = i as usize;
-                self.snake_tail(idx) != self.snakes[idx].at_tail_offset(-1)
-            }
-            BoardSquare::SnakeTailHazard(i) => {
-                let idx = i as usize;
 
-                (self.snakes[snake_idx].health - game.api.ruleset.settings.hazard_damage_per_turn) > 0
-                    && self.snake_tail(idx) != self.snakes[idx].at_tail_offset(-1)
+        let sqr = self.at_raw(coord, BoardBit::Food);
+
+        if is_bit_set(sqr, BoardBit::SnakeHead) || is_bit_set(sqr, BoardBit::SnakeBody) {
+            false
+        } else if is_bit_set(sqr, BoardBit::SnakeTail) {
+            let idx = self.at_raw(coord, BoardBit::SnakeIdx);
+            let stacked = self.snake_tail(idx as usize) == self.snakes[idx as usize].at_tail_offset(-1);
+            if !is_bit_set(sqr, BoardBit::Hazard) {
+                !stacked
+            } else {
+                (self.snakes[snake_idx].health - game.api.ruleset.settings.hazard_damage_per_turn) > 0 && !stacked
             }
+        } else {
+            true
         }
     }
 
@@ -135,20 +131,18 @@ impl Board {
                 continue;
             }
 
-            match self.at(adj_coord) {
-                BoardSquare::SnakeHead(idx) | BoardSquare::SnakeHeadHazard(idx) => {
-                    if idx as usize != snake_idx {
-                        let len_us = self.snake_len(snake_idx);
-                        let len_other = self.snake_len(idx as usize);
-                        if len_us > len_other {
-                            return HeadOnCol::PossibleElimination;
-                        } else {
-                            return HeadOnCol::PossibleCollision;
-                        }
+            if self.at(adj_coord, BoardBit::SnakeHead) == 1 {
+                let idx = self.at_raw(adj_coord, BoardBit::SnakeIdx);
+                if idx as usize != snake_idx {
+                    let len_us = self.snake_len(snake_idx);
+                    let len_other = self.snake_len(idx as usize);
+                    if len_us > len_other {
+                        return HeadOnCol::PossibleElimination;
+                    } else {
+                        return HeadOnCol::PossibleCollision;
                     }
                 }
-                _ => (),
-            };
+            }
         }
         HeadOnCol::None
     }
@@ -221,7 +215,7 @@ impl Board {
     #[inline(always)]
     fn move_snakes(&mut self, moves: u16, game: &Game) {
         // StageMovementStandard
-        // Move snakes board_mat tails only, Compute location of move
+        // Move snakes board_arr tails only, Compute location of move
         for idx in 0..(self.num_snakes() as usize) {
             let snake = &self.snakes[idx];
             if !snake.alive() {
@@ -237,55 +231,29 @@ impl Board {
 
             self.snakes[idx].push_front(new_head);
 
-            match (self.at(old_tail), self.at(new_tail)) {
-                (BoardSquare::SnakeTail(old_idx), BoardSquare::SnakeTail(new_idx))
-                | (BoardSquare::SnakeTailHazard(old_idx), BoardSquare::SnakeTailHazard(new_idx)) => {
-                    debug_assert_eq!(old_idx, idx as u8);
-                    debug_assert_eq!(new_idx, idx as u8);
-                }
-                (BoardSquare::SnakeTail(old_idx), BoardSquare::SnakeBody(new_idx)) => {
-                    debug_assert_eq!(old_idx, idx as u8);
-                    debug_assert_eq!(new_idx, idx as u8);
+            let old_sqr = self.at_raw(old_tail, BoardBit::Food);
+            let new_sqr = self.at_raw(new_tail, BoardBit::Food);
 
-                    self.set_at(old_tail, BoardSquare::Empty);
-                    self.set_at(new_tail, BoardSquare::SnakeTail(new_idx));
-                }
-                (BoardSquare::SnakeTail(old_idx), BoardSquare::SnakeBodyHazard(new_idx)) => {
-                    debug_assert_eq!(old_idx, idx as u8);
-                    debug_assert_eq!(new_idx, idx as u8);
-
-                    self.set_at(old_tail, BoardSquare::Empty);
-                    self.set_at(new_tail, BoardSquare::SnakeTailHazard(new_idx));
-                }
-                (BoardSquare::SnakeTailHazard(old_idx), BoardSquare::SnakeBody(new_idx)) => {
-                    debug_assert_eq!(old_idx, idx as u8);
-                    debug_assert_eq!(new_idx, idx as u8);
-
-                    self.set_at(old_tail, BoardSquare::Hazard);
-                    self.set_at(new_tail, BoardSquare::SnakeTail(new_idx));
-                }
-                (BoardSquare::SnakeTailHazard(old_idx), BoardSquare::SnakeBodyHazard(new_idx)) => {
-                    debug_assert_eq!(old_idx, idx as u8);
-                    debug_assert_eq!(new_idx, idx as u8);
-
-                    self.set_at(old_tail, BoardSquare::Hazard);
-                    self.set_at(new_tail, BoardSquare::SnakeTailHazard(new_idx));
-                }
+            if is_bit_set(old_sqr, BoardBit::SnakeTail) && is_bit_set(new_sqr, BoardBit::SnakeBody) {
+                self.set_at(old_tail, 0, BoardBit::SnakeTail);
+                self.set_at_raw(old_tail, 0, BoardBit::SnakeIdx);
+                self.set_at(new_tail, 1, BoardBit::SnakeTail);
+                self.set_at(new_tail, 0, BoardBit::SnakeBody);
+            } else if is_bit_set(old_sqr, BoardBit::SnakeHead) {
                 // Special cases: Snake was head only. This should only happen on first move
-                (BoardSquare::SnakeHead(old_idx), _) => {
-                    debug_assert_eq!(old_idx, idx as u8);
-
-                    self.set_at(old_tail, BoardSquare::SnakeTail(old_idx));
-                }
-                (BoardSquare::SnakeHeadHazard(old_idx), _) => {
-                    debug_assert_eq!(old_idx, idx as u8);
-                    self.set_at(old_tail, BoardSquare::SnakeTailHazard(old_idx));
-                }
-                (old_val, new_val) => panic!(
-                    "LOGIC ERROR: snake {idx} tails set to invalid BoardSquare:\nold: {old_val:?}, new: {new_val:?}\n{self}"
-                ),
+                self.set_at(old_tail, 1, BoardBit::SnakeTail);
+                self.set_at(old_tail, 0, BoardBit::SnakeHead);
+            } else if is_bit_set(old_sqr, BoardBit::SnakeTail) && is_bit_set(new_sqr, BoardBit::SnakeTail) {
+                // Special case: Stacked tails. no-op
+            } else {
+                panic!("snake {idx} tails set with invalid bits! old: {old_sqr}, new: {new_sqr}\n{self}");
             }
         }
+    }
+
+    #[inline(never)]
+    pub fn update_health_asm(&mut self, game: &Game) {
+        self.update_health(game);
     }
 
     #[inline(always)]
@@ -311,22 +279,15 @@ impl Board {
             // StageHazardDamageStandard
             // StageFeedSnakesStandard
             //  - Except for removal of food coords, which are only tracked on board
-            let dest_square = self.at(dest);
-            match dest_square {
-                BoardSquare::Food | BoardSquare::FoodHazard => {
-                    let tail = self.snake_tail(idx);
+            let dest_square = self.at_raw(dest, BoardBit::Food);
+            if is_bit_set(dest_square, BoardBit::Food) {
+                let tail = self.snake_tail(idx);
 
-                    self.snakes[idx].health = 100;
-                    self.snakes[idx].push_back(tail);
-                }
-                BoardSquare::Hazard
-                | BoardSquare::SnakeHeadHazard(_)
-                | BoardSquare::SnakeBodyHazard(_)
-                | BoardSquare::SnakeTailHazard(_) => {
-                    let damage = game.api.ruleset.settings.hazard_damage_per_turn;
-                    self.snakes[idx].health = max(self.snakes[idx].health - damage, 0);
-                }
-                _ => (),
+                self.snakes[idx].health = 100;
+                self.snakes[idx].push_back(tail);
+            } else if is_bit_set(dest_square, BoardBit::Hazard) {
+                let damage = game.api.ruleset.settings.hazard_damage_per_turn;
+                self.snakes[idx].health = max(self.snakes[idx].health - damage, 0);
             }
 
             // StageEliminationStandard: out-of-health
@@ -346,85 +307,46 @@ impl Board {
                 continue;
             }
 
-            let idx_byte = idx as u8;
             let mv = Move::extract(moves, idx as u32);
 
             // Update old head, even for eliminated snakes
             let old_head = self.snakes[idx].at_head_offset(1);
             if old_head != self.snake_tail(idx) {
-                match self.at(old_head) {
-                    BoardSquare::SnakeHead(snake_idx) => {
-                        debug_assert_eq!(snake_idx, idx_byte);
-
-                        self.set_at(old_head, BoardSquare::SnakeBody(snake_idx));
-                    }
-                    BoardSquare::SnakeHeadHazard(snake_idx) => {
-                        debug_assert_eq!(snake_idx, idx_byte);
-
-                        self.set_at(old_head, BoardSquare::SnakeBodyHazard(snake_idx));
-                    }
-                    _ => panic!("LOGIC ERROR: snake {idx} head set to invalid BoardSquare:\n{self}"),
-                }
+                self.set_at(old_head, 0, BoardBit::SnakeHead);
+                self.set_at(old_head, 1, BoardBit::SnakeBody);
             }
 
             let new_head = self.move_to_coord(old_head, mv, game.ruleset);
 
             // Track collisions by only setting new head if snake is alive
-            match self.at(new_head) {
-                BoardSquare::Empty => {
-                    self.set_at(new_head, BoardSquare::SnakeHead(idx_byte));
+            let new_sqr = self.at_raw(new_head, BoardBit::Food);
+            let new_snake_idx = self.at_raw(new_head, BoardBit::SnakeIdx) as usize;
+
+            if is_bit_set(new_sqr, BoardBit::SnakeHead) {
+                if self.snakes[new_snake_idx].eliminated
+                    || (new_snake_idx < idx && self.snake_len(idx) > self.snake_len(new_snake_idx))
+                {
+                    self.set_at_raw(new_head, idx as u8, BoardBit::SnakeIdx);
+                // Edge case: Equal length means we need to indicate the other snake is dead too
+                } else if new_snake_idx < idx && self.snake_len(idx) == self.snake_len(new_snake_idx) {
+                    self.set_at(new_head, 0, BoardBit::SnakeHead);
+                    self.set_at_raw(new_head, 0, BoardBit::SnakeIdx);
                 }
-                BoardSquare::Food => {
-                    self.set_at(new_head, BoardSquare::SnakeHead(idx_byte));
+            } else if is_bit_set(new_sqr, BoardBit::SnakeBody) || is_bit_set(new_sqr, BoardBit::SnakeTail) {
+                if self.snakes[new_snake_idx].eliminated {
+                    self.set_at(new_head, 1, BoardBit::SnakeHead);
+                    self.set_at(new_head, 0, BoardBit::SnakeBody);
+                    self.set_at(new_head, 0, BoardBit::SnakeTail);
+                    self.set_at_raw(new_head, idx as u8, BoardBit::SnakeIdx);
+                }
+            } else {
+                if is_bit_set(new_sqr, BoardBit::Food) {
                     self.num_food -= 1;
+                    self.set_at(new_head, 0, BoardBit::Food);
                 }
-                BoardSquare::Hazard => {
-                    self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
-                }
-                BoardSquare::FoodHazard => {
-                    self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
-                    self.num_food -= 1;
-                }
-                BoardSquare::SnakeHead(s) => {
-                    if self.snakes[s as usize].eliminated
-                        || (s < idx_byte && self.snake_len(idx) > self.snake_len(s as usize))
-                    {
-                        self.set_at(new_head, BoardSquare::SnakeHead(idx_byte));
-                    // Edge case: Equal length means we need to indicate the other snake is dead too
-                    } else if s < idx_byte && self.snake_len(idx) == self.snake_len(s as usize) {
-                        self.set_at(new_head, BoardSquare::Empty);
-                    }
-                }
-                BoardSquare::SnakeHeadHazard(s) => {
-                    if self.snakes[s as usize].eliminated
-                        || (s < idx_byte && self.snake_len(idx) > self.snake_len(s as usize))
-                    {
-                        self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
-                    // Edge case: Equal length means we need to indicate the other snake is dead too
-                    } else if s < idx_byte && self.snake_len(idx) == self.snake_len(s as usize) {
-                        self.set_at(new_head, BoardSquare::Empty);
-                    }
-                }
-                BoardSquare::SnakeTail(s) => {
-                    if self.snakes[s as usize].eliminated {
-                        self.set_at(new_head, BoardSquare::SnakeHead(idx_byte));
-                    }
-                }
-                BoardSquare::SnakeTailHazard(s) => {
-                    if self.snakes[s as usize].eliminated {
-                        self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
-                    }
-                }
-                BoardSquare::SnakeBody(s) => {
-                    if self.snakes[s as usize].eliminated {
-                        self.set_at(new_head, BoardSquare::SnakeHead(idx_byte));
-                    }
-                }
-                BoardSquare::SnakeBodyHazard(s) => {
-                    if self.snakes[s as usize].eliminated {
-                        self.set_at(new_head, BoardSquare::SnakeHeadHazard(idx_byte));
-                    }
-                }
+
+                self.set_at(new_head, 1, BoardBit::SnakeHead);
+                self.set_at_raw(new_head, idx as u8, BoardBit::SnakeIdx);
             }
         }
 
@@ -435,20 +357,17 @@ impl Board {
             }
 
             if !self.snakes[idx].eliminated {
-                let head = self.at(self.snake_head(idx));
-                match head {
-                    // If snake head is not set properly and snake has not yet been eliminated for other reasons
-                    // then snake was eliminated by a collision
-                    BoardSquare::SnakeHead(s) | BoardSquare::SnakeHeadHazard(s) => {
-                        if s as usize != idx {
-                            self.snakes[idx].health = 0;
-                            self.snakes[idx].eliminated = true;
-                        }
-                    }
-                    _ => {
+                // If snake head is not set properly and snake has not yet been eliminated for other reasons
+                // then snake was eliminated by a collision
+                if self.at(self.snake_head(idx), BoardBit::SnakeHead) == 1 {
+                    let other_idx = self.at_raw(self.snake_head(idx), BoardBit::SnakeIdx);
+                    if other_idx as usize != idx {
                         self.snakes[idx].health = 0;
                         self.snakes[idx].eliminated = true;
                     }
+                } else {
+                    self.snakes[idx].health = 0;
+                    self.snakes[idx].eliminated = true;
                 }
             }
 
@@ -463,20 +382,12 @@ impl Board {
                     continue;
                 }
 
-                match self.at(coord) {
-                    BoardSquare::SnakeHead(s) | BoardSquare::SnakeBody(s) | BoardSquare::SnakeTail(s) => {
-                        if s as usize == idx {
-                            self.set_at(coord, BoardSquare::Empty)
-                        }
-                    }
-                    BoardSquare::SnakeHeadHazard(s)
-                    | BoardSquare::SnakeBodyHazard(s)
-                    | BoardSquare::SnakeTailHazard(s) => {
-                        if s as usize == idx {
-                            self.set_at(coord, BoardSquare::Hazard)
-                        }
-                    }
-                    _ => (),
+                let snake_idx = self.at_raw(coord, BoardBit::SnakeIdx) as usize;
+                if snake_idx == idx {
+                    self.set_at(coord, 0, BoardBit::SnakeHead);
+                    self.set_at(coord, 0, BoardBit::SnakeBody);
+                    self.set_at(coord, 0, BoardBit::SnakeTail);
+                    self.set_at_raw(coord, 0, BoardBit::SnakeIdx);
                 }
             }
         }
@@ -515,9 +426,9 @@ impl Board {
                 'coord_loop: for y in 0..self.height {
                     let coord = Coord::new(x as i8, y as i8);
 
-                    let square = self.at(coord);
+                    let square = self.at_raw(coord, BoardBit::Food);
 
-                    if square != BoardSquare::Empty && square != BoardSquare::Hazard {
+                    if square != 0 && square != (1 << BoardBit::Hazard as u8) {
                         continue;
                     };
 
@@ -546,11 +457,7 @@ impl Board {
                 self.num_food += num_spawn as i32;
 
                 for coord in food_buff.iter().take(num_spawn) {
-                    match self.at(*coord) {
-                        BoardSquare::Empty => self.set_at(*coord, BoardSquare::Food),
-                        BoardSquare::Hazard => self.set_at(*coord, BoardSquare::FoodHazard),
-                        _ => panic!("Invalid square in food_buff"),
-                    }
+                    self.set_at(*coord, 1, BoardBit::Food);
                 }
             }
         }
@@ -600,17 +507,7 @@ impl Board {
                 Coord::new(index as i8, z as i8)
             };
 
-            let curr_val = self.at(curr_coord);
-            let set_val = match curr_val {
-                BoardSquare::Empty => BoardSquare::Hazard,
-                BoardSquare::Food => BoardSquare::FoodHazard,
-                BoardSquare::SnakeHead(x) => BoardSquare::SnakeHeadHazard(x),
-                BoardSquare::SnakeBody(x) => BoardSquare::SnakeBodyHazard(x),
-                BoardSquare::SnakeTail(x) => BoardSquare::SnakeTailHazard(x),
-                _ => curr_val,
-            };
-
-            self.set_at(curr_coord, set_val)
+            self.set_at(curr_coord, 1, BoardBit::Hazard);
         }
     }
 

@@ -1,5 +1,9 @@
 use crate::api::ApiCoord;
-use crate::board::BoardSquare;
+use crate::board::BoardBit;
+use crate::board::board_str::{
+    EMPTY, FOOD, FOOD_HAZARD, HAZARD, SNAKE_BODY, SNAKE_BODY_HAZARD, SNAKE_HEAD, SNAKE_HEAD_HAZARD, SNAKE_TAIL,
+    SNAKE_TAIL_HAZARD,
+};
 use crate::rand::Rand;
 
 use serde::{Deserialize, Serialize};
@@ -177,87 +181,93 @@ impl Display for Error {
     }
 }
 
-pub fn square_to_char(sqr: BoardSquare, num_stacked: i32, mv: Option<Move>) -> char {
-    match (sqr, num_stacked, mv) {
-        (BoardSquare::Empty, ..) => '-',
-        (BoardSquare::Food, ..) => '+',
-        (BoardSquare::FoodHazard, ..) => '@',
-        (BoardSquare::Hazard, ..) => '*',
-        (BoardSquare::SnakeHead(idx), _, None) => (idx + 48) as char,
-        (BoardSquare::SnakeHeadHazard(idx), _, None) => (idx + 83) as char,
-        (BoardSquare::SnakeBody(_), 0, Some(Move::Left) | None) => '<',
-        (BoardSquare::SnakeBody(_), 0, Some(Move::Right)) => '>',
-        (BoardSquare::SnakeBody(_), 0, Some(Move::Up)) => '^',
-        (BoardSquare::SnakeBody(_), 0, Some(Move::Down)) => 'v',
-        (BoardSquare::SnakeBodyHazard(_), 0, Some(Move::Left) | None) => '{',
-        (BoardSquare::SnakeBodyHazard(_), 0, Some(Move::Right)) => '}',
-        (BoardSquare::SnakeBodyHazard(_), 0, Some(Move::Up)) => 'u',
-        (BoardSquare::SnakeBodyHazard(_), 0, Some(Move::Down)) => 'n',
-        (BoardSquare::SnakeTail(_), 0, Some(Move::Left) | None) => 'a',
-        (BoardSquare::SnakeTail(_), 0, Some(Move::Right)) => 'b',
-        (BoardSquare::SnakeTail(_), 0, Some(Move::Up)) => 'c',
-        (BoardSquare::SnakeTail(_), 0, Some(Move::Down)) => 'd',
-        (BoardSquare::SnakeTail(_), _, Some(Move::Left) | None) => 'e',
-        (BoardSquare::SnakeTail(_), _, Some(Move::Right)) => 'f',
-        (BoardSquare::SnakeTail(_), _, Some(Move::Up)) => 'g',
-        (BoardSquare::SnakeTail(_), _, Some(Move::Down)) => 'h',
-        (BoardSquare::SnakeTailHazard(_), 0, Some(Move::Left) | None) => 'A',
-        (BoardSquare::SnakeTailHazard(_), 0, Some(Move::Right)) => 'B',
-        (BoardSquare::SnakeTailHazard(_), 0, Some(Move::Up)) => 'C',
-        (BoardSquare::SnakeTailHazard(_), 0, Some(Move::Down)) => 'D',
-        (BoardSquare::SnakeTailHazard(_), _, Some(Move::Left) | None) => 'E',
-        (BoardSquare::SnakeTailHazard(_), _, Some(Move::Right)) => 'F',
-        (BoardSquare::SnakeTailHazard(_), _, Some(Move::Up)) => 'G',
-        (BoardSquare::SnakeTailHazard(_), _, Some(Move::Down)) => 'H',
+pub fn square_to_char(sqr: u8, idx: u8, num_stacked: i32, mv: Option<Move>) -> char {
+    let sqr_mod = sqr & ((1 << BoardBit::SnakeIdx as u8) - 1);
 
-        (BoardSquare::SnakeBody(_), _, None) | (BoardSquare::SnakeBodyHazard(_), _, None) => {
-            panic!("Body must have move")
+    match (sqr_mod, num_stacked, mv) {
+        (EMPTY, ..) => '-',
+        (FOOD, ..) => '+',
+        (FOOD_HAZARD, ..) => '@',
+        (HAZARD, ..) => '*',
+        (SNAKE_HEAD, _, None) => (idx + 48) as char,
+        (SNAKE_HEAD_HAZARD, _, None) => (idx + 83) as char,
+        (SNAKE_BODY, 0, Some(Move::Left) | None) => '<',
+        (SNAKE_BODY, 0, Some(Move::Right)) => '>',
+        (SNAKE_BODY, 0, Some(Move::Up)) => '^',
+        (SNAKE_BODY, 0, Some(Move::Down)) => 'v',
+        (SNAKE_BODY_HAZARD, 0, Some(Move::Left) | None) => '{',
+        (SNAKE_BODY_HAZARD, 0, Some(Move::Right)) => '}',
+        (SNAKE_BODY_HAZARD, 0, Some(Move::Up)) => 'u',
+        (SNAKE_BODY_HAZARD, 0, Some(Move::Down)) => 'n',
+        (SNAKE_TAIL, 0, Some(Move::Left) | None) => 'a',
+        (SNAKE_TAIL, 0, Some(Move::Right)) => 'b',
+        (SNAKE_TAIL, 0, Some(Move::Up)) => 'c',
+        (SNAKE_TAIL, 0, Some(Move::Down)) => 'd',
+        (SNAKE_TAIL, _, Some(Move::Left) | None) => 'e',
+        (SNAKE_TAIL, _, Some(Move::Right)) => 'f',
+        (SNAKE_TAIL, _, Some(Move::Up)) => 'g',
+        (SNAKE_TAIL, _, Some(Move::Down)) => 'h',
+        (SNAKE_TAIL_HAZARD, 0, Some(Move::Left) | None) => 'A',
+        (SNAKE_TAIL_HAZARD, 0, Some(Move::Right)) => 'B',
+        (SNAKE_TAIL_HAZARD, 0, Some(Move::Up)) => 'C',
+        (SNAKE_TAIL_HAZARD, 0, Some(Move::Down)) => 'D',
+        (SNAKE_TAIL_HAZARD, _, Some(Move::Left) | None) => 'E',
+        (SNAKE_TAIL_HAZARD, _, Some(Move::Right)) => 'F',
+        (SNAKE_TAIL_HAZARD, _, Some(Move::Up)) => 'G',
+        (SNAKE_TAIL_HAZARD, _, Some(Move::Down)) => 'H',
+
+        (SNAKE_BODY, _, None) | (SNAKE_BODY_HAZARD, _, None) => {
+            println!("ERROR: Body must have move");
+            '!'
         }
-        _ => panic!("Invalid args {sqr:?} {num_stacked:?} {mv:?}"),
+        _ => {
+            println!("ERROR: Invalid args sqr: {sqr} num_stacked: {num_stacked} mv: {mv:?}");
+            '!'
+        }
     }
 }
 
-pub fn char_to_square(chr: char) -> (BoardSquare, i32, Option<Move>) {
+pub fn char_to_square(chr: char) -> (u8, u8, i32, Option<Move>) {
     let (basic_parse_result, num_stacked, mv) = match chr {
-        '-' => (Some(BoardSquare::Empty), 0, None),
-        '+' => (Some(BoardSquare::Food), 0, None),
-        '@' => (Some(BoardSquare::FoodHazard), 0, None),
-        '*' => (Some(BoardSquare::Hazard), 0, None),
-        '<' => (Some(BoardSquare::SnakeBody(0)), 0, Some(Move::Left)),
-        '>' => (Some(BoardSquare::SnakeBody(0)), 0, Some(Move::Right)),
-        '^' => (Some(BoardSquare::SnakeBody(0)), 0, Some(Move::Up)),
-        'v' => (Some(BoardSquare::SnakeBody(0)), 0, Some(Move::Down)),
-        '{' => (Some(BoardSquare::SnakeBodyHazard(0)), 0, Some(Move::Left)),
-        '}' => (Some(BoardSquare::SnakeBodyHazard(0)), 0, Some(Move::Right)),
-        'n' => (Some(BoardSquare::SnakeBodyHazard(0)), 0, Some(Move::Up)),
-        'u' => (Some(BoardSquare::SnakeBodyHazard(0)), 0, Some(Move::Down)),
-        'a' => (Some(BoardSquare::SnakeTail(0)), 0, Some(Move::Left)),
-        'b' => (Some(BoardSquare::SnakeTail(0)), 0, Some(Move::Right)),
-        'c' => (Some(BoardSquare::SnakeTail(0)), 0, Some(Move::Up)),
-        'd' => (Some(BoardSquare::SnakeTail(0)), 0, Some(Move::Down)),
-        'e' => (Some(BoardSquare::SnakeTail(0)), 1, Some(Move::Left)),
-        'f' => (Some(BoardSquare::SnakeTail(0)), 1, Some(Move::Right)),
-        'g' => (Some(BoardSquare::SnakeTail(0)), 1, Some(Move::Up)),
-        'h' => (Some(BoardSquare::SnakeTail(0)), 1, Some(Move::Down)),
-        'A' => (Some(BoardSquare::SnakeTailHazard(0)), 0, Some(Move::Left)),
-        'B' => (Some(BoardSquare::SnakeTailHazard(0)), 0, Some(Move::Right)),
-        'C' => (Some(BoardSquare::SnakeTailHazard(0)), 0, Some(Move::Up)),
-        'D' => (Some(BoardSquare::SnakeTailHazard(0)), 0, Some(Move::Down)),
-        'E' => (Some(BoardSquare::SnakeTailHazard(0)), 1, Some(Move::Left)),
-        'F' => (Some(BoardSquare::SnakeTailHazard(0)), 1, Some(Move::Right)),
-        'G' => (Some(BoardSquare::SnakeTailHazard(0)), 1, Some(Move::Up)),
-        'H' => (Some(BoardSquare::SnakeTailHazard(0)), 1, Some(Move::Down)),
+        '-' => (Some(EMPTY), 0, None),
+        '+' => (Some(FOOD), 0, None),
+        '@' => (Some(FOOD_HAZARD), 0, None),
+        '*' => (Some(HAZARD), 0, None),
+        '<' => (Some(SNAKE_BODY), 0, Some(Move::Left)),
+        '>' => (Some(SNAKE_BODY), 0, Some(Move::Right)),
+        '^' => (Some(SNAKE_BODY), 0, Some(Move::Up)),
+        'v' => (Some(SNAKE_BODY), 0, Some(Move::Down)),
+        '{' => (Some(SNAKE_BODY_HAZARD), 0, Some(Move::Left)),
+        '}' => (Some(SNAKE_BODY_HAZARD), 0, Some(Move::Right)),
+        'n' => (Some(SNAKE_BODY_HAZARD), 0, Some(Move::Up)),
+        'u' => (Some(SNAKE_BODY_HAZARD), 0, Some(Move::Down)),
+        'a' => (Some(SNAKE_TAIL), 0, Some(Move::Left)),
+        'b' => (Some(SNAKE_TAIL), 0, Some(Move::Right)),
+        'c' => (Some(SNAKE_TAIL), 0, Some(Move::Up)),
+        'd' => (Some(SNAKE_TAIL), 0, Some(Move::Down)),
+        'e' => (Some(SNAKE_TAIL), 1, Some(Move::Left)),
+        'f' => (Some(SNAKE_TAIL), 1, Some(Move::Right)),
+        'g' => (Some(SNAKE_TAIL), 1, Some(Move::Up)),
+        'h' => (Some(SNAKE_TAIL), 1, Some(Move::Down)),
+        'A' => (Some(SNAKE_TAIL_HAZARD), 0, Some(Move::Left)),
+        'B' => (Some(SNAKE_TAIL_HAZARD), 0, Some(Move::Right)),
+        'C' => (Some(SNAKE_TAIL_HAZARD), 0, Some(Move::Up)),
+        'D' => (Some(SNAKE_TAIL_HAZARD), 0, Some(Move::Down)),
+        'E' => (Some(SNAKE_TAIL_HAZARD), 1, Some(Move::Left)),
+        'F' => (Some(SNAKE_TAIL_HAZARD), 1, Some(Move::Right)),
+        'G' => (Some(SNAKE_TAIL_HAZARD), 1, Some(Move::Up)),
+        'H' => (Some(SNAKE_TAIL_HAZARD), 1, Some(Move::Down)),
         _ => (None, 0, None),
     };
 
     let chr_byte = chr as u8;
 
     if let Some(parse_result) = basic_parse_result {
-        (parse_result, num_stacked, mv)
+        (parse_result, 0, num_stacked, mv)
     } else if (48..56).contains(&chr_byte) {
-        (BoardSquare::SnakeHead(chr as u8 - 48), 0, None)
+        (SNAKE_HEAD, chr as u8 - 48, 0, None)
     } else if (83..91).contains(&chr_byte) {
-        (BoardSquare::SnakeHeadHazard(chr as u8 - 83), 0, None)
+        (SNAKE_HEAD_HAZARD, chr as u8 - 83, 0, None)
     } else {
         panic!("Invalid board character {chr}")
     }

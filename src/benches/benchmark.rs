@@ -44,11 +44,11 @@ fn print_info(cfg: &Config) {
 
     let node_size = mem::size_of::<search::Node>();
     let board_size = mem::size_of::<Board>();
-    let board_mat_size = mem::size_of::<[u16; MAX_BOARD_SIZE]>();
+    let board_arr_size = mem::size_of::<[u8; MAX_BOARD_SIZE]>();
 
     info!("node size {node_size} bytes");
     info!("board size {board_size} bytes");
-    info!("board_mat size {board_mat_size} bytes");
+    info!("board_arrs size {board_arr_size} bytes");
 }
 
 #[bench]

@@ -16,9 +16,11 @@ pub const MAX_WIDTH: usize = 11;
 pub const MAX_BOARD_SIZE: usize = MAX_HEIGHT * MAX_WIDTH;
 pub const MAX_SNAKES: usize = 4;
 
+// Sizing assumptions made throughout implementation
 const _: () = {
-    assert!(MAX_HEIGHT < 16);
-    assert!(MAX_WIDTH < 16);
+    assert!(MAX_HEIGHT <= 16);
+    assert!(MAX_WIDTH <= 16);
+    assert!(MAX_SNAKES <= 8);
 };
 
 #[derive(ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]

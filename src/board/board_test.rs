@@ -1,17 +1,11 @@
 use crate::api::ApiCoord;
-use crate::board::{Board, BoardSquare, HeadOnCol};
+use crate::board::{Board, BoardBit, HeadOnCol};
 use crate::config::MAX_BOARD_SIZE;
 use crate::rand::{FastRand, Rand};
 use crate::tests::common::{solo_game, test_game, test_snake, wrapped_game};
 use crate::util::{Coord, Move};
 
 use pretty_assertions::assert_eq;
-
-#[test]
-pub fn boardsquare_sizing_test() {
-    assert_eq!(size_of::<BoardSquare>(), 2);
-    assert_eq!(align_of::<BoardSquare>(), 2);
-}
 
 #[test]
 pub fn basic_str_test() {
@@ -23,10 +17,10 @@ pub fn basic_str_test() {
     let snake = test_snake(&[ApiCoord::new(3, 4), ApiCoord::new(4, 4), ApiCoord::new(4, 3)], 87);
     board.add_api_snake(&game, &snake).unwrap();
 
-    board.set_at(Coord::new(5, 6), BoardSquare::Food);
+    board.set_at(Coord::new(5, 6), 1, BoardBit::Food);
     board.num_food += 1;
 
-    board.set_at(Coord::new(1, 3), BoardSquare::Hazard);
+    board.set_at(Coord::new(1, 3), 1, BoardBit::Hazard);
 
     let board_string = board.to_string();
     let parsed_board = Board::from_str(board_string.as_str(), &game).unwrap();
@@ -41,7 +35,7 @@ pub fn multiple_snake_str_test() {
     let mut board = Board::new(11, 11);
     board.turn = 4;
 
-    board.set_at(Coord::new(10, 7), BoardSquare::Food);
+    board.set_at(Coord::new(10, 7), 1, BoardBit::Food);
     board.num_food += 1;
 
     let snake_0 = test_snake(&[ApiCoord::new(3, 4), ApiCoord::new(2, 4)], 87);
@@ -96,9 +90,9 @@ pub fn hazard_str_test() {
         100,
     );
 
-    board.set_at(Coord::new(3, 4), BoardSquare::Hazard);
-    board.set_at(Coord::new(4, 4), BoardSquare::Hazard);
-    board.set_at(Coord::new(4, 2), BoardSquare::Hazard);
+    board.set_at(Coord::new(3, 4), 1, BoardBit::Hazard);
+    board.set_at(Coord::new(4, 4), 1, BoardBit::Hazard);
+    board.set_at(Coord::new(4, 2), 1, BoardBit::Hazard);
 
     board.add_api_snake(&game, &snake).unwrap();
 
