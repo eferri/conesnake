@@ -400,6 +400,10 @@ async fn run_workers(state: Arc<ServerState>, game_state: &BattleState, start_ti
                 let server_latency = req_dur.as_millis() as i64;
                 let mut run_str = format!("\nWorker {worker} move latency ms {server_latency}\n");
 
+                if move_resp.scores.is_none() {
+                    return Err(Error::WorkerError("no score from worker".to_owned()));
+                }
+
                 let scores = move_resp.scores.unwrap();
 
                 for (i, s) in scores.iter().enumerate() {
