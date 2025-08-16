@@ -42,6 +42,7 @@ RUN apt-get update \
     less \
     cmake \
     lldb-19 \
+    gdb \
     g++ \
     unzip \
     jq \
@@ -62,7 +63,8 @@ RUN apt-get update \
     && update-alternatives --install /usr/bin/clangd clangd /usr/bin/clangd-19 100 \
     && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-19 100 \
     && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100 \
-    && update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-19 100
+    && update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-19 100 \
+    && update-alternatives --install /usr/bin/lldb-dap lldb-dap /usr/bin/lldb-dap-19 100
 
 RUN mkdir -p /tools/bin \
     && chown -R conesnake:conesnake /tools
@@ -111,6 +113,14 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \
     && cargo install cargo-show-asm
+
+RUN python <<EOF > ~/.gdbinit
+import os
+toolchain_hash = os.popen("rustc --version --verbose").read().split("commit-hash: ")[1].split("\n")[0].strip()
+rustc_path = os.popen("rustc --print sysroot").readline().strip()
+settings_str = "set substitute-path /rustc/{} {}/lib/rustlib/src/rust".format(toolchain_hash, rustc_path)
+print(settings_str)
+EOF
 
 WORKDIR /app
 

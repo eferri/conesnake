@@ -18,7 +18,9 @@
                 "ms-kubernetes-tools.vscode-kubernetes-tools",
                 "shardulm94.trailing-spaces",
                 "tamasfe.even-better-toml",
+                "llvm-vs-code-extensions.lldb-dap",
                 "vadimcn.vscode-lldb",
+                "ms-vscode.cpptools",
                 "streetsidesoftware.code-spell-checker",
                 "twxs.cmake"
             ]

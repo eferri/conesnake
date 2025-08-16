@@ -21,10 +21,17 @@
         "warnings"
     ],
     "rust-analyzer.completion.autoimport.enable": true,
-    "rust-analyzer.debug.engine": "vadimcn.vscode-lldb",
+    "rust-analyzer.debug.engine": "ms-vscode.cpptools",
     "rust-analyzer.lens.implementations.enable": false,
     "rust-analyzer.lens.debug.enable": false,
     "rust-analyzer.lens.run.enable": false,
+    "lldb-dap.disableASLR": false,
+    "lldb-dap.initCommands": [
+        "settings set target.disable-aslr false"
+    ],
+    "lldb-dap.preRunCommands": [
+        "script lldb.debugger.HandleCommand('settings set target.source-map /rustc/{} \"{}/lib/rustlib/src/rust\"'.format(os.popen('rustc --version --verbose').read().split('commit-hash: ')[1].split('\\n')[0].strip(), os.popen('rustc --print sysroot').readline().strip()))"
+    ],
     "lldb.launch.initCommands": [
         "settings set target.disable-aslr false"
     ],
