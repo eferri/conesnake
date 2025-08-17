@@ -94,12 +94,12 @@ impl Board {
             return false;
         }
 
-        let sqr = self.at_raw(coord, BoardBit::Food);
+        let sqr = self.at(coord);
 
-        if is_bit_set(sqr, BoardBit::SnakeHead) || is_bit_set(sqr, BoardBit::SnakeBody) {
+        if any_bits_set(sqr, BoardBit::SnakeHead as u8 | BoardBit::SnakeBody as u8) {
             false
         } else if is_bit_set(sqr, BoardBit::SnakeTail) {
-            let idx = self.at_raw(coord, BoardBit::SnakeIdx);
+            let idx = self.snake_num(coord);
             let stacked = self.snake_tail(idx as usize) == self.snakes[idx as usize].at_tail_offset(-1);
             if !is_bit_set(sqr, BoardBit::Hazard) {
                 !stacked
@@ -131,8 +131,8 @@ impl Board {
                 continue;
             }
 
-            if self.at(adj_coord, BoardBit::SnakeHead) == 1 {
-                let idx = self.at_raw(adj_coord, BoardBit::SnakeIdx);
+            if is_bit_set(self.at(adj_coord), BoardBit::SnakeHead) {
+                let idx = self.snake_num(adj_coord);
                 if idx as usize != snake_idx {
                     let len_us = self.snake_len(snake_idx);
                     let len_other = self.snake_len(idx as usize);
@@ -231,18 +231,17 @@ impl Board {
 
             self.snakes[idx].push_front(new_head);
 
-            let old_sqr = self.at_raw(old_tail, BoardBit::Food);
-            let new_sqr = self.at_raw(new_tail, BoardBit::Food);
+            let old_sqr = self.at(old_tail);
+            let new_sqr = self.at(new_tail);
 
             if is_bit_set(old_sqr, BoardBit::SnakeTail) && is_bit_set(new_sqr, BoardBit::SnakeBody) {
-                self.set_at(old_tail, 0, BoardBit::SnakeTail);
-                self.set_at_raw(old_tail, 0, BoardBit::SnakeIdx);
-                self.set_at(new_tail, 1, BoardBit::SnakeTail);
-                self.set_at(new_tail, 0, BoardBit::SnakeBody);
+                self.clear_bits_at(old_tail, BoardBit::SnakeTail as u8 | BoardBit::SnakeIdx as u8);
+                self.set_at(new_tail, BoardBit::SnakeTail);
+                self.clear_at(new_tail, BoardBit::SnakeBody);
             } else if is_bit_set(old_sqr, BoardBit::SnakeHead) {
                 // Special cases: Snake was head only. This should only happen on first move
-                self.set_at(old_tail, 1, BoardBit::SnakeTail);
-                self.set_at(old_tail, 0, BoardBit::SnakeHead);
+                self.set_at(old_tail, BoardBit::SnakeTail);
+                self.clear_at(old_tail, BoardBit::SnakeHead);
             } else if is_bit_set(old_sqr, BoardBit::SnakeTail) && is_bit_set(new_sqr, BoardBit::SnakeTail) {
                 // Special case: Stacked tails. no-op
             } else {
@@ -279,7 +278,7 @@ impl Board {
             // StageHazardDamageStandard
             // StageFeedSnakesStandard
             //  - Except for removal of food coords, which are only tracked on board
-            let dest_square = self.at_raw(dest, BoardBit::Food);
+            let dest_square = self.at(dest);
             if is_bit_set(dest_square, BoardBit::Food) {
                 let tail = self.snake_tail(idx);
 
@@ -312,41 +311,39 @@ impl Board {
             // Update old head, even for eliminated snakes
             let old_head = self.snakes[idx].at_head_offset(1);
             if old_head != self.snake_tail(idx) {
-                self.set_at(old_head, 0, BoardBit::SnakeHead);
-                self.set_at(old_head, 1, BoardBit::SnakeBody);
+                self.clear_at(old_head, BoardBit::SnakeHead);
+                self.set_at(old_head, BoardBit::SnakeBody);
             }
 
             let new_head = self.move_to_coord(old_head, mv, game.ruleset);
 
             // Track collisions by only setting new head if snake is alive
-            let new_sqr = self.at_raw(new_head, BoardBit::Food);
-            let new_snake_idx = self.at_raw(new_head, BoardBit::SnakeIdx) as usize;
+            let new_sqr = self.at(new_head);
+            let new_snake_idx = self.snake_num(new_head) as usize;
 
             if is_bit_set(new_sqr, BoardBit::SnakeHead) {
                 if self.snakes[new_snake_idx].eliminated
                     || (new_snake_idx < idx && self.snake_len(idx) > self.snake_len(new_snake_idx))
                 {
-                    self.set_at_raw(new_head, idx as u8, BoardBit::SnakeIdx);
+                    self.set_snake_num(new_head, idx as u8);
                 // Edge case: Equal length means we need to indicate the other snake is dead too
                 } else if new_snake_idx < idx && self.snake_len(idx) == self.snake_len(new_snake_idx) {
-                    self.set_at(new_head, 0, BoardBit::SnakeHead);
-                    self.set_at_raw(new_head, 0, BoardBit::SnakeIdx);
+                    self.clear_bits_at(new_head, BoardBit::SnakeHead as u8 | BoardBit::SnakeIdx as u8);
                 }
-            } else if is_bit_set(new_sqr, BoardBit::SnakeBody) || is_bit_set(new_sqr, BoardBit::SnakeTail) {
+            } else if any_bits_set(new_sqr, BoardBit::SnakeBody as u8 | BoardBit::SnakeTail as u8) {
                 if self.snakes[new_snake_idx].eliminated {
-                    self.set_at(new_head, 1, BoardBit::SnakeHead);
-                    self.set_at(new_head, 0, BoardBit::SnakeBody);
-                    self.set_at(new_head, 0, BoardBit::SnakeTail);
-                    self.set_at_raw(new_head, idx as u8, BoardBit::SnakeIdx);
+                    self.set_at(new_head, BoardBit::SnakeHead);
+                    self.clear_bits_at(new_head, BoardBit::SnakeBody as u8 | BoardBit::SnakeTail as u8);
+                    self.set_snake_num(new_head, idx as u8);
                 }
             } else {
                 if is_bit_set(new_sqr, BoardBit::Food) {
                     self.num_food -= 1;
-                    self.set_at(new_head, 0, BoardBit::Food);
+                    self.clear_at(new_head, BoardBit::Food);
                 }
 
-                self.set_at(new_head, 1, BoardBit::SnakeHead);
-                self.set_at_raw(new_head, idx as u8, BoardBit::SnakeIdx);
+                self.set_at(new_head, BoardBit::SnakeHead);
+                self.set_snake_num(new_head, idx as u8);
             }
         }
 
@@ -359,8 +356,8 @@ impl Board {
             if !self.snakes[idx].eliminated {
                 // If snake head is not set properly and snake has not yet been eliminated for other reasons
                 // then snake was eliminated by a collision
-                if self.at(self.snake_head(idx), BoardBit::SnakeHead) == 1 {
-                    let other_idx = self.at_raw(self.snake_head(idx), BoardBit::SnakeIdx);
+                if is_bit_set(self.at(self.snake_head(idx)), BoardBit::SnakeHead) {
+                    let other_idx = self.snake_num(self.snake_head(idx));
                     if other_idx as usize != idx {
                         self.snakes[idx].health = 0;
                         self.snakes[idx].eliminated = true;
@@ -382,12 +379,15 @@ impl Board {
                     continue;
                 }
 
-                let snake_idx = self.at_raw(coord, BoardBit::SnakeIdx) as usize;
+                let snake_idx = self.snake_num(coord) as usize;
                 if snake_idx == idx {
-                    self.set_at(coord, 0, BoardBit::SnakeHead);
-                    self.set_at(coord, 0, BoardBit::SnakeBody);
-                    self.set_at(coord, 0, BoardBit::SnakeTail);
-                    self.set_at_raw(coord, 0, BoardBit::SnakeIdx);
+                    self.clear_bits_at(
+                        coord,
+                        BoardBit::SnakeHead as u8
+                            | BoardBit::SnakeBody as u8
+                            | BoardBit::SnakeTail as u8
+                            | BoardBit::SnakeIdx as u8,
+                    );
                 }
             }
         }
@@ -426,9 +426,15 @@ impl Board {
                 'coord_loop: for y in 0..self.height {
                     let coord = Coord::new(x as i8, y as i8);
 
-                    let square = self.at_raw(coord, BoardBit::Food);
+                    let square = self.at(coord);
 
-                    if square != 0 && square != (1 << BoardBit::Hazard as u8) {
+                    if any_bits_set(
+                        square,
+                        BoardBit::SnakeHead as u8
+                            | BoardBit::SnakeBody as u8
+                            | BoardBit::SnakeTail as u8
+                            | BoardBit::Food as u8,
+                    ) {
                         continue;
                     };
 
@@ -457,7 +463,7 @@ impl Board {
                 self.num_food += num_spawn as i32;
 
                 for coord in food_buff.iter().take(num_spawn) {
-                    self.set_at(*coord, 1, BoardBit::Food);
+                    self.set_at(*coord, BoardBit::Food);
                 }
             }
         }
@@ -507,7 +513,7 @@ impl Board {
                 Coord::new(index as i8, z as i8)
             };
 
-            self.set_at(curr_coord, 1, BoardBit::Hazard);
+            self.set_at(curr_coord, BoardBit::Hazard);
         }
     }
 

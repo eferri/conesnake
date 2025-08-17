@@ -17,10 +17,10 @@ pub fn basic_str_test() {
     let snake = test_snake(&[ApiCoord::new(3, 4), ApiCoord::new(4, 4), ApiCoord::new(4, 3)], 87);
     board.add_api_snake(&game, &snake).unwrap();
 
-    board.set_at(Coord::new(5, 6), 1, BoardBit::Food);
+    board.set_at(Coord::new(5, 6), BoardBit::Food);
     board.num_food += 1;
 
-    board.set_at(Coord::new(1, 3), 1, BoardBit::Hazard);
+    board.set_at(Coord::new(1, 3), BoardBit::Hazard);
 
     let board_string = board.to_string();
     let parsed_board = Board::from_str(board_string.as_str(), &game).unwrap();
@@ -35,7 +35,7 @@ pub fn multiple_snake_str_test() {
     let mut board = Board::new(11, 11);
     board.turn = 4;
 
-    board.set_at(Coord::new(10, 7), 1, BoardBit::Food);
+    board.set_at(Coord::new(10, 7), BoardBit::Food);
     board.num_food += 1;
 
     let snake_0 = test_snake(&[ApiCoord::new(3, 4), ApiCoord::new(2, 4)], 87);
@@ -90,9 +90,9 @@ pub fn hazard_str_test() {
         100,
     );
 
-    board.set_at(Coord::new(3, 4), 1, BoardBit::Hazard);
-    board.set_at(Coord::new(4, 4), 1, BoardBit::Hazard);
-    board.set_at(Coord::new(4, 2), 1, BoardBit::Hazard);
+    board.set_at(Coord::new(3, 4), BoardBit::Hazard);
+    board.set_at(Coord::new(4, 4), BoardBit::Hazard);
+    board.set_at(Coord::new(4, 2), BoardBit::Hazard);
 
     board.add_api_snake(&game, &snake).unwrap();
 
@@ -469,4 +469,12 @@ pub fn gen_board_food_test() {
     board_food.gen_board(Move::Right as u16, &game, &mut food_buff, &mut rng);
 
     assert!(board_food.num_food > 0);
+}
+
+#[test]
+pub fn set_snake_num_test() {
+    let mut board = Board::new(4, 4);
+    board.set_at_idx(2, BoardBit::FoodHazard);
+    board.set_snake_num_idx(2, 3);
+    assert_eq!(board.snake_num_idx(2), 3)
 }

@@ -4,17 +4,6 @@ use crate::game::{Game, Map};
 use std::collections::HashMap;
 use std::fmt;
 
-pub const EMPTY: u8 = 0;
-pub const FOOD: u8 = 1 << BoardBit::Food as u8;
-pub const HAZARD: u8 = 1 << BoardBit::Hazard as u8;
-pub const SNAKE_HEAD: u8 = 1 << BoardBit::SnakeHead as u8;
-pub const SNAKE_BODY: u8 = 1 << BoardBit::SnakeBody as u8;
-pub const SNAKE_TAIL: u8 = 1 << BoardBit::SnakeTail as u8;
-pub const FOOD_HAZARD: u8 = FOOD + HAZARD;
-pub const SNAKE_HEAD_HAZARD: u8 = SNAKE_HEAD + HAZARD;
-pub const SNAKE_BODY_HAZARD: u8 = SNAKE_BODY + HAZARD;
-pub const SNAKE_TAIL_HAZARD: u8 = SNAKE_TAIL + HAZARD;
-
 impl Board {
     // Assumes snake is not just a head (first turn)
     fn set_snake_idxs(&mut self, board_chars: &[char], tail_idx: usize, rules: Rules) -> u8 {
@@ -27,9 +16,9 @@ impl Board {
 
         while snake_len < self.height * self.width {
             let next_mv = match util::char_to_square(board_chars[self.idx_from_coord(curr_coord)]) {
-                (SNAKE_TAIL | SNAKE_TAIL_HAZARD, _, _, Some(mv)) => mv,
-                (SNAKE_BODY | SNAKE_BODY_HAZARD, _, _, Some(mv)) => mv,
-                (SNAKE_HEAD | SNAKE_HEAD_HAZARD, idx, _, None) => {
+                (BoardBit::SnakeTail | BoardBit::SnakeTailHazard, _, _, Some(mv)) => mv,
+                (BoardBit::SnakeBody | BoardBit::SnakeBodyHazard, _, _, Some(mv)) => mv,
+                (BoardBit::SnakeHead | BoardBit::SnakeHeadHazard, idx, _, None) => {
                     snake_idx = idx;
                     found = true;
                     break;
@@ -49,14 +38,13 @@ impl Board {
         curr_coord = tail_coord;
         loop {
             let (sqr, _, num_stacked, mv_opt) = util::char_to_square(board_chars[self.idx_from_coord(curr_coord)]);
-            assert!(
-                is_bit_set(sqr, BoardBit::SnakeHead)
-                    || is_bit_set(sqr, BoardBit::SnakeBody)
-                    || is_bit_set(sqr, BoardBit::SnakeTail)
-            );
+            assert!(any_bits_set(
+                sqr as u8,
+                BoardBit::SnakeHead as u8 | BoardBit::SnakeBody as u8 | BoardBit::SnakeTail as u8
+            ));
 
-            self.set_at_raw(curr_coord, sqr, BoardBit::Food);
-            self.set_at_raw(curr_coord, snake_idx, BoardBit::SnakeIdx);
+            self.set_at(curr_coord, sqr);
+            self.set_snake_num(curr_coord, snake_idx);
 
             for _ in 0..=num_stacked {
                 self.snakes[snake_idx as usize].push_back(curr_coord);
@@ -65,7 +53,7 @@ impl Board {
             let next_mv = match mv_opt {
                 Some(mv) => mv,
                 None => {
-                    assert!(is_bit_set(sqr, BoardBit::SnakeHead));
+                    assert!(is_bit_set(sqr as u8, BoardBit::SnakeHead));
                     break;
                 }
             };
@@ -95,7 +83,7 @@ impl Board {
         // Fill board from board_arr
         #[allow(clippy::needless_range_loop)]
         for idx in 0..self.len() as usize {
-            let square = self.at_idx_raw(idx, BoardBit::Food);
+            let square = self.at_idx(idx);
             char_array[idx] = util::square_to_char(square, 0, 0, None);
         }
 
@@ -117,8 +105,7 @@ impl Board {
                     assert!(secondary_mv.is_none());
 
                     let prev_coord_idx = self.idx_from_coord(prev_coord);
-                    char_array[prev_coord_idx] =
-                        util::square_to_char(self.at_raw(prev_coord, BoardBit::Food), 0, num_stacked, mv);
+                    char_array[prev_coord_idx] = util::square_to_char(self.at(prev_coord), 0, num_stacked, mv);
                     num_stacked = 0;
                 }
                 prev_coord = coord;
@@ -127,7 +114,7 @@ impl Board {
             // Set head
             let head_coord = self.snake_head(s_idx);
             let head_idx = self.idx_from_coord(head_coord);
-            char_array[head_idx] = util::square_to_char(self.at_raw(head_coord, BoardBit::Food), s_idx as u8, 0, None);
+            char_array[head_idx] = util::square_to_char(self.at(head_coord), s_idx as u8, 0, None);
         }
 
         for y in (0..self.height).rev() {
@@ -205,9 +192,9 @@ impl Board {
         // Populate board matrix
         for (idx, char) in chars_vec.iter().enumerate() {
             let (board_square, ..) = util::char_to_square(*char);
-            board.set_at_idx_raw(idx, board_square, BoardBit::Food);
+            board.set_at_idx(idx, board_square);
 
-            if is_bit_set(board_square, BoardBit::Food) {
+            if is_bit_set(board_square as u8, BoardBit::Food) {
                 board.num_food += 1;
             }
         }
@@ -219,11 +206,11 @@ impl Board {
         for (square_idx, char) in chars_vec.iter().enumerate() {
             let (board_square, idx, _, mv_opt) = util::char_to_square(*char);
 
-            if is_bit_set(board_square, BoardBit::SnakeHead) {
+            if is_bit_set(board_square as u8, BoardBit::SnakeHead) {
                 assert!(mv_opt.is_none());
-                board.set_at_idx_raw(square_idx, idx, BoardBit::SnakeIdx);
+                board.set_snake_num_idx(square_idx, idx);
                 found_heads.insert(idx, square_idx);
-            } else if is_bit_set(board_square, BoardBit::SnakeTail) {
+            } else if is_bit_set(board_square as u8, BoardBit::SnakeTail) {
                 let indexed_snake = board.set_snake_idxs(&chars_vec, square_idx, game.ruleset);
                 found_tails.insert(indexed_snake, square_idx);
             }
@@ -284,12 +271,7 @@ impl fmt::Debug for Board {
         writeln!(f, "snake_arr:").unwrap();
         for y in (0..self.height).rev() {
             for x in 0..self.width {
-                write!(
-                    f,
-                    "{} ",
-                    self.at_idx_raw((x + y * self.width) as usize, BoardBit::SnakeIdx)
-                )
-                .unwrap();
+                write!(f, "{} ", self.snake_num_idx((x + y * self.width) as usize)).unwrap();
             }
             if y != 0 {
                 writeln!(f).unwrap();
