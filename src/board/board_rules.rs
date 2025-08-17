@@ -174,7 +174,7 @@ impl Board {
     // Battlesnake rules implementation
     //
     #[inline(always)]
-    pub fn gen_board(&mut self, moves: u16, game: &Game, food_buff: &mut [Coord], rng: &mut impl Rand) {
+    pub fn gen_board(&mut self, moves: u16, game: &Game, food_buff: &mut [usize], rng: &mut impl Rand) {
         // Note: this is not done till later in rules
         self.turn += 1;
 
@@ -233,6 +233,9 @@ impl Board {
 
             let old_sqr = self.at(old_tail);
             let new_sqr = self.at(new_tail);
+
+            // Clear head adjacent squares
+            self.snake_head_adj(old_head, false);
 
             if is_bit_set(old_sqr, BoardBit::SnakeTail) && is_bit_set(new_sqr, BoardBit::SnakeBody) {
                 self.clear_bits_at(old_tail, BoardBit::SnakeTail as u8 | BoardBit::SnakeIdx as u8);
@@ -394,12 +397,12 @@ impl Board {
     }
 
     #[inline(never)]
-    pub fn update_board_asm(&mut self, game: &Game, food_buff: &mut [Coord], rng: &mut FastRand) {
+    pub fn update_board_asm(&mut self, game: &Game, food_buff: &mut [usize], rng: &mut FastRand) {
         self.update_board(game, food_buff, rng);
     }
 
     #[inline(always)]
-    fn update_board(&mut self, game: &Game, food_buff: &mut [Coord], rng: &mut impl Rand) {
+    fn update_board(&mut self, game: &Game, food_buff: &mut [usize], rng: &mut impl Rand) {
         let map = game.api.map;
         let rules = game.ruleset;
 
@@ -421,38 +424,41 @@ impl Board {
 
         let mut num_unnocupied = 0;
 
+        for idx in 0..self.num_snakes() as usize {
+            if self.snakes[idx].alive() {
+                let head = self.snake_head(idx);
+                self.snake_head_adj(head, true);
+            }
+        }
+
         if num_spawn > 0 {
-            for x in 0..self.width {
-                'coord_loop: for y in 0..self.height {
-                    let coord = Coord::new(x as i8, y as i8);
+            // Iterate over height dimension to match rules
+            let mut coord_idx = 0;
+            let mut y = 0;
+            let mut x = 0;
 
-                    let square = self.at(coord);
+            for _ in 0..self.len() as usize {
+                let square = self.at_idx(coord_idx);
 
-                    if any_bits_set(
-                        square,
-                        BoardBit::SnakeHead as u8
-                            | BoardBit::SnakeBody as u8
-                            | BoardBit::SnakeTail as u8
-                            | BoardBit::Food as u8,
-                    ) {
-                        continue;
-                    };
-
-                    // Potential Bug: GetUnoccupiedPoints excludes squares that may be moved to
-                    for idx in 0..self.num_snakes() as usize {
-                        if !self.snakes[idx].alive() {
-                            continue;
-                        }
-
-                        // Bug: maps don't consider possibility of wrapping.
-                        // Use standard ruleset here to match this behavior
-                        if self.next_to(self.snake_head(idx), coord, Rules::Standard) {
-                            continue 'coord_loop;
-                        }
-                    }
-
-                    food_buff[num_unnocupied] = coord;
+                if !any_bits_set(
+                    square,
+                    BoardBit::SnakeHead as u8
+                        | BoardBit::SnakeBody as u8
+                        | BoardBit::SnakeTail as u8
+                        | BoardBit::SnakeHeadAdj as u8
+                        | BoardBit::Food as u8,
+                ) {
+                    food_buff[num_unnocupied] = coord_idx;
                     num_unnocupied += 1;
+                };
+
+                coord_idx += self.width as usize;
+                y += 1;
+
+                if y == self.height {
+                    y = 0;
+                    x += 1;
+                    coord_idx = x
                 }
             }
 
@@ -462,8 +468,8 @@ impl Board {
 
                 self.num_food += num_spawn as i32;
 
-                for coord in food_buff.iter().take(num_spawn) {
-                    self.set_at(*coord, BoardBit::Food);
+                for idx in food_buff.iter().take(num_spawn) {
+                    self.set_at_idx(*idx, BoardBit::Food);
                 }
             }
         }

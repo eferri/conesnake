@@ -5,7 +5,7 @@ use crate::game::Game;
 use crate::game::Rules;
 use crate::pool::ThreadPool;
 use crate::rand::Rand;
-use crate::util::{Coord, Error, Move};
+use crate::util::{Error, Move};
 
 use log::{error, info, warn};
 
@@ -42,7 +42,7 @@ pub struct ThreadContext<R: Rand> {
 
     rng: R,
 
-    food_buff: [Coord; MAX_BOARD_SIZE],
+    food_buff: [usize; MAX_BOARD_SIZE],
     play_scores: [f64; MAX_SNAKES],
 }
 
@@ -88,7 +88,7 @@ impl<R: Rand> ThreadContext<R> {
         ThreadContext {
             rng: R::new(),
             board: Board::new(0, 0),
-            food_buff: [Coord::new(0, 0); MAX_BOARD_SIZE],
+            food_buff: [0; MAX_BOARD_SIZE],
 
             play_scores: [Default::default(); MAX_SNAKES],
         }

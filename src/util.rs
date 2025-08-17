@@ -178,7 +178,8 @@ impl Display for Error {
 }
 
 pub fn square_to_char(sqr: u8, idx: u8, num_stacked: i32, mv: Option<Move>) -> char {
-    let sqr_enum = BoardBit::from_repr(sqr & !(BoardBit::SnakeIdx as u8)).unwrap();
+    let clear_bits = BoardBit::SnakeIdx as u8 | BoardBit::SnakeHeadAdj as u8;
+    let sqr_enum = BoardBit::from_repr(sqr & !clear_bits).unwrap();
 
     match (sqr_enum, num_stacked, mv) {
         (BoardBit::Empty, ..) => '-',

@@ -113,11 +113,12 @@ report:
 .PHONY: stat
 stat:
 	docker compose run --rm snake bash -c '\
-		cargo build --release \
+		PROFILE_PATH="$$($(PROFILE_EXE))" \
 		&& perf stat \
 			-e task-clock,cycles,instructions,branches,branch-misses \
-			-e cache-references,cache-misses \
-			./target-snake/release/$(PROFILE_EXE)'
+			-e cache-references,cache-misses,stalled-cycles-frontend \
+			-e page-faults \
+			"$$PROFILE_PATH" --bench $(PROFILE_BENCH)'
 
 # Performance
 

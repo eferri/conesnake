@@ -232,6 +232,12 @@ impl Board {
             }
         }
 
+        for i in 0..board.num_snakes() as usize {
+            if board.snakes[i].alive() {
+                board.snake_head_adj(board.snake_head(i), true);
+            }
+        }
+
         // Set royale min/max markers
         if let Map::Royale = game.api.map {
             board.set_royale();

@@ -1,7 +1,7 @@
 use crate::api::{ApiCoord, BattleState, BoardApi, SnakeApi};
 use crate::config::{MAX_BOARD_SIZE, MAX_SNAKES};
 use crate::game::{Game, Map, Rules};
-use crate::util::{self, MOVE_INCR};
+use crate::util::{self, MOVE_INCR, MOVES};
 use crate::util::{Coord, Error, Move};
 
 use std::cmp::{Ordering, max, min, min_by};
@@ -96,15 +96,16 @@ pub enum BoardBit {
     SnakeHead = 0b00000100,
     SnakeBody = 0b00001000,
     SnakeTail = 0b00010000,
+    SnakeHeadAdj = 0b00100000,
     // Multi bit flags
-    SnakeIdx = 0b11100000,
+    SnakeIdx = 0b11000000,
     FoodHazard = 0b00000011,
     SnakeHeadHazard = 0b00000110,
     SnakeBodyHazard = 0b00001010,
     SnakeTailHazard = 0b00010010,
 }
 
-pub const SNAKE_IDX_POS: u8 = 5;
+pub const SNAKE_IDX_POS: u8 = 6;
 
 pub fn is_bit_set(sqr: u8, bits: BoardBit) -> bool {
     (sqr & bits as u8) == bits as u8
@@ -462,7 +463,25 @@ impl Board {
 
             prev_coord = Some(coord);
         }
+
+        self.snake_head_adj(self.snake_head(snake_idx as usize), true);
+
         Ok(())
+    }
+
+    pub fn snake_head_adj(&mut self, head: Coord, set: bool) {
+        for mv in MOVES {
+            // Bug: maps don't consider possibility of wrapping.
+            // Use standard ruleset here to match this behavior
+            let dest = self.move_to_coord(head, mv, Rules::Standard);
+            if self.on_board(dest) {
+                if set {
+                    self.set_at(dest, BoardBit::SnakeHeadAdj)
+                } else {
+                    self.clear_at(dest, BoardBit::SnakeHeadAdj)
+                }
+            }
+        }
     }
 
     pub fn snake_head(&self, snake_idx: usize) -> Coord {
