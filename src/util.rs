@@ -12,13 +12,26 @@ use std::io;
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub struct Coord {
     pub val: u8,
+    pub idx: u8,
 }
 
 impl Coord {
-    pub fn new(x: i8, y: i8) -> Self {
-        let mut crd = Coord { val: 0 };
+    pub fn new(x: i8, y: i8, width: i32) -> Self {
+        let idx = (x as i32 + (y as i32 * width)) as u8;
+        let mut crd = Coord { val: 0, idx };
+
         crd.set_x(x);
         crd.set_y(y);
+
+        crd
+    }
+
+    pub fn new_idx(x: i8, y: i8, idx: u8) -> Self {
+        let mut crd = Coord { val: 0, idx };
+
+        crd.set_x(x);
+        crd.set_y(y);
+
         crd
     }
 
@@ -30,12 +43,16 @@ impl Coord {
         (self.val >> 4) as i8
     }
 
-    pub fn set_x(&mut self, x_val: i8) {
+    pub fn idx(&self) -> usize {
+        self.idx as usize
+    }
+
+    fn set_x(&mut self, x_val: i8) {
         self.val &= 0xf0;
         self.val |= (x_val as u8) & 0xf;
     }
 
-    pub fn set_y(&mut self, y_val: i8) {
+    fn set_y(&mut self, y_val: i8) {
         self.val &= 0x0f;
         self.val |= ((y_val as u8) & 0xf) << 4;
     }

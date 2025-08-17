@@ -34,7 +34,7 @@ impl Snake {
             len: 0,
             head_ptr: 0,
             tail_ptr: 0,
-            body: [Coord::new(0, 0); MAX_BOARD_SIZE],
+            body: [Coord::new_idx(0, 0, 0); MAX_BOARD_SIZE],
         }
     }
 
@@ -190,12 +190,12 @@ impl Board {
 
         let mut board = Board::new(req.board.width, req.board.height);
         for coord in req.board.food.iter() {
-            board.set_at(coord.to_internal(), BoardBit::Food);
+            board.set_at(coord.to_internal(req.board.width), BoardBit::Food);
             board.num_food += 1;
         }
 
         for coord in req.board.hazards.iter() {
-            board.set_at(coord.to_internal(), BoardBit::Hazard);
+            board.set_at(coord.to_internal(req.board.width), BoardBit::Hazard);
         }
 
         board.turn = req.turn;
@@ -347,9 +347,9 @@ impl Board {
 
                 for z in 0..iter_dim {
                     let coord = if iter_dim == self.height {
-                        Coord::new(side_val as i8, z as i8)
+                        Coord::new(side_val as i8, z as i8, self.width)
                     } else {
-                        Coord::new(z as i8, side_val as i8)
+                        Coord::new(z as i8, side_val as i8, self.width)
                     };
 
                     if !is_bit_set(self.at(coord), BoardBit::Hazard) {
@@ -395,7 +395,7 @@ impl Board {
 
     fn add_snake(&mut self, body: &[ApiCoord], health: i32) {
         for (i, crd) in body.iter().enumerate() {
-            self.snakes[self.num_snakes as usize].body[i] = crd.to_internal();
+            self.snakes[self.num_snakes as usize].body[i] = crd.to_internal(self.width);
         }
 
         self.snakes[self.num_snakes as usize].len = body.len() as i32;
@@ -497,7 +497,7 @@ impl Board {
     }
 
     pub fn at(&self, loc: Coord) -> u8 {
-        self.at_idx(self.idx_from_coord(loc))
+        self.at_idx(loc.idx())
     }
 
     pub fn at_idx(&self, idx: usize) -> u8 {
@@ -505,30 +505,27 @@ impl Board {
     }
 
     pub fn snake_num(&self, loc: Coord) -> u8 {
-        let idx = self.idx_from_coord(loc);
-        self.snake_num_idx(idx)
+        self.snake_num_idx(loc.idx())
     }
 
     pub fn snake_num_idx(&self, idx: usize) -> u8 {
         self.at_idx(idx) >> SNAKE_IDX_POS
     }
 
-    fn idx_from_coord(&self, loc: Coord) -> usize {
-        (loc.x() as i32 + (loc.y() as i32) * self.width) as usize
-    }
-
     pub fn coord_from_idx(&self, idx: usize) -> Coord {
-        Coord::new((idx as i32 % self.width) as i8, (idx as i32 / self.width) as i8)
+        Coord::new_idx(
+            (idx as i32 % self.width) as i8,
+            (idx as i32 / self.width) as i8,
+            idx as u8,
+        )
     }
 
     pub fn set_at(&mut self, loc: Coord, bit: BoardBit) {
-        let idx = self.idx_from_coord(loc);
-        self.set_at_idx(idx, bit);
+        self.set_at_idx(loc.idx(), bit);
     }
 
     pub fn set_bits_at(&mut self, loc: Coord, bits: u8) {
-        let idx = self.idx_from_coord(loc);
-        self.set_bits_at_idx(idx, bits);
+        self.set_bits_at_idx(loc.idx(), bits);
     }
 
     pub fn set_at_idx(&mut self, idx: usize, bit: BoardBit) {
@@ -540,13 +537,11 @@ impl Board {
     }
 
     pub fn clear_at(&mut self, loc: Coord, bit: BoardBit) {
-        let idx = self.idx_from_coord(loc);
-        self.clear_at_idx(idx, bit);
+        self.clear_at_idx(loc.idx(), bit);
     }
 
     pub fn clear_bits_at(&mut self, loc: Coord, bits: u8) {
-        let idx = self.idx_from_coord(loc);
-        self.clear_bits_at_idx(idx, bits);
+        self.clear_bits_at_idx(loc.idx(), bits);
     }
 
     pub fn clear_at_idx(&mut self, idx: usize, bit: BoardBit) {
@@ -558,8 +553,7 @@ impl Board {
     }
 
     pub fn set_snake_num(&mut self, loc: Coord, snake_idx: u8) {
-        let idx = self.idx_from_coord(loc);
-        self.set_snake_num_idx(idx, snake_idx);
+        self.set_snake_num_idx(loc.idx(), snake_idx);
     }
 
     pub fn set_snake_num_idx(&mut self, idx: usize, snake_idx: u8) {
@@ -577,13 +571,14 @@ impl Board {
         let new_x = head.x() + mv_incr as i8;
         let new_y = head.y() + (mv_incr >> 8) as i8;
 
-        let mut square = Coord::new(new_x, new_y);
-        if let Rules::Wrapped = rules {
-            square.set_x(new_x.rem_euclid(self.width as i8));
-            square.set_y(new_y.rem_euclid(self.height as i8));
+        match rules {
+            Rules::Wrapped => Coord::new(
+                new_x.rem_euclid(self.width as i8),
+                new_y.rem_euclid(self.height as i8),
+                self.width,
+            ),
+            _ => Coord::new(new_x, new_y, self.width),
         }
-
-        square
     }
 
     pub fn coord_to_move(&self, orig: Coord, dest: Coord, rules: Rules) -> (Option<Move>, Option<Move>) {

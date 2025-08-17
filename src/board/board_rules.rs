@@ -514,9 +514,9 @@ impl Board {
 
         for z in 0..dim {
             let curr_coord = if dim == self.width {
-                Coord::new(z as i8, index as i8)
+                Coord::new(z as i8, index as i8, self.width)
             } else {
-                Coord::new(index as i8, z as i8)
+                Coord::new(index as i8, z as i8, self.width)
             };
 
             self.set_at(curr_coord, BoardBit::Hazard);

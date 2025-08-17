@@ -15,7 +15,7 @@ impl Board {
         let mut curr_coord = tail_coord;
 
         while snake_len < self.height * self.width {
-            let next_mv = match util::char_to_square(board_chars[self.idx_from_coord(curr_coord)]) {
+            let next_mv = match util::char_to_square(board_chars[curr_coord.idx()]) {
                 (BoardBit::SnakeTail | BoardBit::SnakeTailHazard, _, _, Some(mv)) => mv,
                 (BoardBit::SnakeBody | BoardBit::SnakeBodyHazard, _, _, Some(mv)) => mv,
                 (BoardBit::SnakeHead | BoardBit::SnakeHeadHazard, idx, _, None) => {
@@ -37,7 +37,7 @@ impl Board {
         // Set index in snake squares, add body segments
         curr_coord = tail_coord;
         loop {
-            let (sqr, _, num_stacked, mv_opt) = util::char_to_square(board_chars[self.idx_from_coord(curr_coord)]);
+            let (sqr, _, num_stacked, mv_opt) = util::char_to_square(board_chars[curr_coord.idx()]);
             assert!(any_bits_set(
                 sqr as u8,
                 BoardBit::SnakeHead as u8 | BoardBit::SnakeBody as u8 | BoardBit::SnakeTail as u8
@@ -104,7 +104,7 @@ impl Board {
                     assert!(mv.is_some());
                     assert!(secondary_mv.is_none());
 
-                    let prev_coord_idx = self.idx_from_coord(prev_coord);
+                    let prev_coord_idx = prev_coord.idx();
                     char_array[prev_coord_idx] = util::square_to_char(self.at(prev_coord), 0, num_stacked, mv);
                     num_stacked = 0;
                 }
@@ -113,7 +113,7 @@ impl Board {
 
             // Set head
             let head_coord = self.snake_head(s_idx);
-            let head_idx = self.idx_from_coord(head_coord);
+            let head_idx = head_coord.idx();
             char_array[head_idx] = util::square_to_char(self.at(head_coord), s_idx as u8, 0, None);
         }
 
