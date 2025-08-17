@@ -28,10 +28,10 @@ resource "google_artifact_registry_repository" "conesnake" {
   cleanup_policy_dry_run = false
 
   cleanup_policies {
-    id     = "keep-two"
+    id     = "keep-one"
     action = "KEEP"
-    most_recent_versions {
-      keep_count = 2
+    condition {
+      tag_state = "TAGGED"
     }
   }
 
