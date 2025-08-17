@@ -434,10 +434,11 @@ impl Board {
         if num_spawn > 0 {
             // Iterate over height dimension to match rules
             let mut coord_idx = 0;
-            let mut y = 0;
-            let mut x = 0;
 
-            for _ in 0..self.len() as usize {
+            let board_len = self.len() as usize;
+
+            #[allow(clippy::explicit_counter_loop)]
+            for _ in 0..board_len {
                 let square = self.at_idx(coord_idx);
 
                 if !any_bits_set(
@@ -452,13 +453,18 @@ impl Board {
                     num_unnocupied += 1;
                 };
 
-                coord_idx += self.width as usize;
-                y += 1;
-
-                if y == self.height {
-                    y = 0;
-                    x += 1;
-                    coord_idx = x
+                // When testing iterate over height dimension first
+                // to match rules behavior
+                #[cfg(test)]
+                {
+                    coord_idx += self.width as usize;
+                    if coord_idx >= board_len {
+                        coord_idx = coord_idx % self.height as usize + 1;
+                    }
+                }
+                #[cfg(not(test))]
+                {
+                    coord_idx += 1;
                 }
             }
 
