@@ -9,7 +9,6 @@ use crate::util::{Error, Move};
 
 use log::{error, info, warn};
 
-#[cfg(feature = "simd")]
 use std::simd::{StdFloat, f64x4, mask64x4, num::SimdFloat};
 
 use std::sync::{Arc, Barrier, atomic::AtomicBool, atomic::AtomicI64, atomic::Ordering};
@@ -207,7 +206,6 @@ impl Node {
         }
     }
 
-    #[cfg(feature = "simd")]
     pub fn duct_scores_simd(&self, cfg: &Config, game: &Game, mvs: u16) -> f64x4 {
         let mut op_mask = mask64x4::splat(false);
 
@@ -243,32 +241,6 @@ impl Node {
         );
 
         op_mask.select((scores / games) + uct_score, results)
-    }
-
-    pub fn duct_score_wrapper(&self, cfg: &Config, game: &Game, moves: u16) -> f64 {
-        #[cfg(not(feature = "simd"))]
-        {
-            let mut score = 0.0;
-            for snake_idx in 0..self.board.num_snakes() {
-                if !self.board.snakes[snake_idx].alive() {
-                    results[snake_idx] = 0.0;
-                    continue;
-                }
-
-                let mv = Move::extract(moves, snake_idx as u32);
-                let mv_duct_score = self.duct_score(cfg, game, snake_idx as usize, mv);
-
-                score += mv_duct_score;
-            }
-            return score;
-        }
-
-        #[cfg(feature = "simd")]
-        {
-            let duct_scores = self.duct_scores_simd(cfg, game, moves);
-
-            duct_scores.reduce_sum()
-        }
     }
 }
 
@@ -459,7 +431,8 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                 .iter()
                 .enumerate()
             {
-                let duct_score = node_guard.duct_score_wrapper(&ctx.config, game, *child_moves);
+                let duct_score_vec = node_guard.duct_scores_simd(&ctx.config, game, *child_moves);
+                let duct_score = duct_score_vec.reduce_sum();
 
                 if duct_score > max_score || max_idx_opt.is_none() {
                     max_score = duct_score;

@@ -1,13 +1,11 @@
 use rand::{Rng, SeedableRng, rngs::SmallRng, seq::SliceRandom};
 
-#[cfg(feature = "simd")]
 use std::simd::i32x4;
 
 pub trait Rand: Send + Sync + 'static {
     fn new() -> Self;
     fn int_n(&mut self, n: i32) -> i32;
     fn range(&mut self, min: i32, max: i32) -> i32;
-    #[cfg(feature = "simd")]
     fn range_simd(&mut self, min: i32, max: i32) -> i32x4;
     fn shuffle<A>(&mut self, arr: &mut [A], n: usize);
     fn sample_n(&mut self, arr: &mut [u32], length: u32, amount: u32);
@@ -31,7 +29,6 @@ impl Rand for FastRand {
         self.rng.random_range(min..(max + 1))
     }
 
-    #[cfg(feature = "simd")]
     fn range_simd(&mut self, min: i32, max: i32) -> i32x4 {
         self.rng.random_range(i32x4::splat(min)..(i32x4::splat(max + 1)))
     }
@@ -69,7 +66,6 @@ impl Rand for MaxRand {
         max
     }
 
-    #[cfg(feature = "simd")]
     fn range_simd(&mut self, _min: i32, max: i32) -> i32x4 {
         i32x4::splat(max)
     }

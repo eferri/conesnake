@@ -2,15 +2,15 @@ use super::*;
 
 use core::arch::x86_64::{_mm256_castps_si256, _mm256_castsi256_ps, _mm256_permutevar_ps};
 use std::simd::{
-    cmp::SimdPartialOrd, i16x8, mask16x8, mask32x4, num::SimdInt, num::SimdUint, simd_swizzle, u16x4, u16x8, u32x8,
-    usizex4,
+    cmp::SimdPartialOrd, i16x8, mask8x8, mask16x8, mask32x4, mask32x8, num::SimdInt, num::SimdUint, simd_swizzle, u8x8,
+    u16x8, u32x8,
 };
 
 pub type CoordVec = u16x8;
-type IndexVec = usizex4;
-type BoardSquareVec = u16x4;
-#[cfg(false)]
-type MoveVec = u16x4;
+pub type IndexVec = u32x8;
+pub type IndexMask = mask32x8;
+pub type BoardVec = u8x8;
+pub type BoardMask = mask8x8;
 
 type SnakeMask = mask32x4;
 
@@ -27,71 +27,6 @@ impl Board {
         unsafe { _mm256_castps_si256(_mm256_permutevar_ps(_mm256_castsi256_ps(vec.into()), idx.into())) }.into()
     }
 
-    #[cfg(false)]
-    pub fn gen_move_simd(&self, game: &Game, rng: &mut impl Rand) -> MoveVec {
-        let valid_moves = u8x16::splat(0);
-
-        let mut mv_mask = u8x16::from_array([]);
-
-        for mv_idx in 0..4 {
-            let mv = Move::from_idx(mv_idx);
-            let valid_mvs = self.valid_move_simd(game, mv);
-        }
-
-        if num_valid > 0 {
-            let mv_idx = rng.range(0, num_valid - 1);
-            valid_moves[mv_idx as usize]
-        } else {
-            Move::Left
-        }
-    }
-
-    pub fn valid_move_simd(&self, game: &Game, mv: Move) -> SnakeMask {
-        let heads = self.snake_head_simd();
-        let squares = self.move_to_coord_simd(heads, mv, game.ruleset);
-        let on_board_mask = self.on_board_simd(squares);
-
-        let sqrs = self.at_simd(squares);
-
-        let mut mask = SnakeMask::splat(false);
-
-        for snake_idx in 0..4 {
-            let valid = match BoardSquare::from_raw(sqrs[snake_idx]) {
-                BoardSquare::Empty | BoardSquare::Food | BoardSquare::FoodHazard => true,
-                BoardSquare::Hazard => {
-                    (self.snakes[snake_idx].health - game.api.ruleset.settings.hazard_damage_per_turn) > 0
-                }
-                BoardSquare::SnakeHead(_)
-                | BoardSquare::SnakeHeadHazard(_)
-                | BoardSquare::SnakeBody(_)
-                | BoardSquare::SnakeBodyHazard(_) => false,
-                BoardSquare::SnakeTail(i) => {
-                    let idx = i as usize;
-                    self.snake_tail(idx) != self.snakes[idx].at_tail_offset(-1)
-                }
-                BoardSquare::SnakeTailHazard(i) => {
-                    let idx = i as usize;
-
-                    (self.snakes[snake_idx].health - game.api.ruleset.settings.hazard_damage_per_turn) > 0
-                        && self.snake_tail(idx) != self.snakes[idx].at_tail_offset(-1)
-                }
-            };
-
-            mask.set(snake_idx, valid);
-        }
-
-        mask & on_board_mask
-    }
-
-    pub fn snake_head_idx_simd(&self) -> IndexVec {
-        IndexVec::from_array([
-            self.idx_from_coord(self.snakes[0].body[self.snakes[0].head_ptr as usize]),
-            self.idx_from_coord(self.snakes[1].body[self.snakes[1].head_ptr as usize]),
-            self.idx_from_coord(self.snakes[2].body[self.snakes[2].head_ptr as usize]),
-            self.idx_from_coord(self.snakes[3].body[self.snakes[3].head_ptr as usize]),
-        ])
-    }
-
     pub fn snake_head_simd(&self) -> CoordVec {
         CoordVec::from_array([
             self.snakes[0].body[self.snakes[0].head_ptr as usize].x() as u16,
@@ -105,16 +40,9 @@ impl Board {
         ])
     }
 
-    pub fn at_simd(&self, coords: CoordVec) -> BoardSquareVec {
-        let idxs_simd = self.idx_from_coord_simd(coords);
-        BoardSquareVec::gather_or_default(&self.board_arr, idxs_simd)
-    }
-
-    pub fn idx_from_coord_simd(&self, coords: CoordVec) -> IndexVec {
-        let locs_x = simd_swizzle!(coords, X_INDEX).cast::<usize>();
-        let locs_y = simd_swizzle!(coords, Y_INDEX).cast::<usize>();
-
-        (locs_x + (locs_y * IndexVec::splat(self.width as usize))).cast()
+    pub fn at_idx_simd(&self, idx: usize, len: usize) -> BoardVec {
+        let end = std::cmp::min(len, idx + BoardVec::LEN);
+        BoardVec::load_or_default(&self.board_arr[idx..end])
     }
 
     pub fn on_board_simd(&self, squares: CoordVec) -> SnakeMask {

@@ -13,9 +13,6 @@ async fn main() {
 
     info!("Args:\n{args:#?}");
 
-    #[cfg(feature = "simd")]
-    info!("using simd");
-
     let server = Server::new(args);
     server.run().await;
 }

@@ -108,7 +108,7 @@ RUN python3 -m venv /home/conesnake/.venv \
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_init.sh \
     && chmod +x ./rustup_init.sh \
-    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-08-09
+    && ./rustup_init.sh -y -v --default-toolchain=nightly-2025-08-31
 
 # Rust development tools
 RUN rustup component add rust-src rustfmt clippy \

@@ -469,6 +469,7 @@ impl Board {
         Ok(())
     }
 
+    // Inlining this seems to hurt performance
     pub fn snake_head_adj(&mut self, head: Coord, set: bool) {
         for mv in MOVES {
             // Bug: maps don't consider possibility of wrapping.
@@ -647,8 +648,6 @@ impl Board {
 pub mod board_rules;
 pub mod board_str;
 
-#[cfg(false)]
-#[cfg(feature = "simd")]
 pub mod board_simd;
 
 #[cfg(test)]

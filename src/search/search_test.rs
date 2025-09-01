@@ -9,7 +9,6 @@ use crate::util::Move;
 use approx::assert_relative_eq;
 use pretty_assertions::assert_eq;
 
-#[cfg(feature = "simd")]
 use std::simd::num::SimdFloat;
 
 use std::sync::{Arc, atomic::Ordering};
@@ -345,27 +344,24 @@ fn arcade_maze_search_test() {
         assert!(best_move == Move::Down || best_move == Move::Up);
 
         // Ensure simd duct score produces same result as non-simd version
-        #[cfg(feature = "simd")]
-        {
-            let root_guard = ctx.node_space[0].read().unwrap();
+        let root_guard = ctx.node_space[0].read().unwrap();
 
-            for child_moves in root_guard.child_moves[0..root_guard.num_children as usize].iter() {
-                let mut duct_sum = 0.0;
+        for child_moves in root_guard.child_moves[0..root_guard.num_children as usize].iter() {
+            let mut duct_sum = 0.0;
 
-                for snake_idx in 0..root_guard.board.num_snakes() as usize {
-                    if !root_guard.board.snakes[snake_idx].alive() {
-                        continue;
-                    }
-                    let mv = Move::extract(*child_moves, snake_idx as u32);
-                    duct_sum += root_guard.duct_score(&ctx.config, &game, snake_idx, mv)
+            for snake_idx in 0..root_guard.board.num_snakes() as usize {
+                if !root_guard.board.snakes[snake_idx].alive() {
+                    continue;
                 }
-
-                let duct_sum_simd = root_guard
-                    .duct_scores_simd(&ctx.config, &game, *child_moves)
-                    .reduce_sum();
-
-                assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-5);
+                let mv = Move::extract(*child_moves, snake_idx as u32);
+                duct_sum += root_guard.duct_score(&ctx.config, &game, snake_idx, mv)
             }
+
+            let duct_sum_simd = root_guard
+                .duct_scores_simd(&ctx.config, &game, *child_moves)
+                .reduce_sum();
+
+            assert_relative_eq!(duct_sum, duct_sum_simd as f64, epsilon = 1e-5);
         }
     }
 }
