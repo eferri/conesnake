@@ -52,6 +52,11 @@ resource "google_artifact_registry_repository" "conesnake" {
 
 # Network
 
+resource "google_compute_project_default_network_tier" "network_tier" {
+  project      = var.project
+  network_tier = "STANDARD"
+}
+
 resource "google_compute_network" "vpc_network" {
   name                    = "my-vpc-network"
   auto_create_subnetworks = false
