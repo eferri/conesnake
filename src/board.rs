@@ -190,12 +190,12 @@ impl Board {
 
         let mut board = Board::new(req.board.width, req.board.height);
         for coord in req.board.food.iter() {
-            board.set_at(coord.to_internal(req.board.width), BoardBit::Food);
+            board.set_at(coord.to_internal(req.board.height), BoardBit::Food);
             board.num_food += 1;
         }
 
         for coord in req.board.hazards.iter() {
-            board.set_at(coord.to_internal(req.board.width), BoardBit::Hazard);
+            board.set_at(coord.to_internal(req.board.height), BoardBit::Hazard);
         }
 
         board.turn = req.turn;
@@ -347,9 +347,9 @@ impl Board {
 
                 for z in 0..iter_dim {
                     let coord = if iter_dim == self.height {
-                        Coord::new(side_val as i8, z as i8, self.width)
+                        Coord::new(side_val as i8, z as i8, self.height)
                     } else {
-                        Coord::new(z as i8, side_val as i8, self.width)
+                        Coord::new(z as i8, side_val as i8, self.height)
                     };
 
                     if !is_bit_set(self.at(coord), BoardBit::Hazard) {
@@ -395,7 +395,7 @@ impl Board {
 
     fn add_snake(&mut self, body: &[ApiCoord], health: i32) {
         for (i, crd) in body.iter().enumerate() {
-            self.snakes[self.num_snakes as usize].body[i] = crd.to_internal(self.width);
+            self.snakes[self.num_snakes as usize].body[i] = crd.to_internal(self.height);
         }
 
         self.snakes[self.num_snakes as usize].len = body.len() as i32;
@@ -514,8 +514,8 @@ impl Board {
 
     pub fn coord_from_idx(&self, idx: usize) -> Coord {
         Coord::new_idx(
-            (idx as i32 % self.width) as i8,
-            (idx as i32 / self.width) as i8,
+            (idx as i32 / self.height) as i8,
+            (idx as i32 % self.height) as i8,
             idx as u8,
         )
     }
@@ -575,9 +575,9 @@ impl Board {
             Rules::Wrapped => Coord::new(
                 new_x.rem_euclid(self.width as i8),
                 new_y.rem_euclid(self.height as i8),
-                self.width,
+                self.height,
             ),
-            _ => Coord::new(new_x, new_y, self.width),
+            _ => Coord::new(new_x, new_y, self.height),
         }
     }
 
@@ -647,8 +647,6 @@ impl Board {
 pub mod board_rules;
 pub mod board_str;
 
-#[cfg(false)]
-#[cfg(feature = "simd")]
 pub mod board_simd;
 
 #[cfg(test)]

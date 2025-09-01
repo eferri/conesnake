@@ -41,7 +41,7 @@ pub struct ThreadContext<R: Rand> {
 
     rng: R,
 
-    food_buff: [usize; MAX_BOARD_SIZE],
+    food_buff: [u32; MAX_BOARD_SIZE],
     play_scores: [f64; MAX_SNAKES],
 }
 

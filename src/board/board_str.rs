@@ -6,16 +6,15 @@ use std::fmt;
 
 impl Board {
     // Assumes snake is not just a head (first turn)
-    fn set_snake_idxs(&mut self, board_chars: &[char], tail_idx: usize, rules: Rules) -> u8 {
+    fn set_snake_idxs(&mut self, board_chars: &[char], tail_coord: Coord, rules: Rules) -> u8 {
         let mut found = false;
         let mut snake_idx = 0;
         let mut snake_len = 0;
-        let tail_coord = self.coord_from_idx(tail_idx);
 
         let mut curr_coord = tail_coord;
 
         while snake_len < self.height * self.width {
-            let next_mv = match util::char_to_square(board_chars[curr_coord.idx()]) {
+            let next_mv = match util::char_to_square(board_chars[curr_coord.char_idx(self.width)]) {
                 (BoardBit::SnakeTail | BoardBit::SnakeTailHazard, _, _, Some(mv)) => mv,
                 (BoardBit::SnakeBody | BoardBit::SnakeBodyHazard, _, _, Some(mv)) => mv,
                 (BoardBit::SnakeHead | BoardBit::SnakeHeadHazard, idx, _, None) => {
@@ -31,13 +30,13 @@ impl Board {
         }
 
         if !found {
-            panic!("Could not find snake given tail_idx {tail_idx}");
+            panic!("Could not find snake given tail_coord {tail_coord}");
         }
 
         // Set index in snake squares, add body segments
         curr_coord = tail_coord;
         loop {
-            let (sqr, _, num_stacked, mv_opt) = util::char_to_square(board_chars[curr_coord.idx()]);
+            let (sqr, _, num_stacked, mv_opt) = util::char_to_square(board_chars[curr_coord.char_idx(self.width)]);
             assert!(any_bits_set(
                 sqr as u8,
                 BoardBit::SnakeHead as u8 | BoardBit::SnakeBody as u8 | BoardBit::SnakeTail as u8
@@ -81,10 +80,12 @@ impl Board {
         let mut char_array = vec!['-'; self.len() as usize];
 
         // Fill board from board_arr
-        #[allow(clippy::needless_range_loop)]
-        for idx in 0..self.len() as usize {
-            let square = self.at_idx(idx);
-            char_array[idx] = util::square_to_char(square, 0, 0, None);
+        for y in 0..self.height {
+            for x in 0..self.width {
+                // Internal layout is height-first, manually iterate width-first
+                let square = self.at(Coord::new(x as i8, y as i8, self.height));
+                char_array[(x + y * self.width) as usize] = util::square_to_char(square, 0, 0, None);
+            }
         }
 
         // Fill snake moves from snakes
@@ -104,7 +105,7 @@ impl Board {
                     assert!(mv.is_some());
                     assert!(secondary_mv.is_none());
 
-                    let prev_coord_idx = prev_coord.idx();
+                    let prev_coord_idx = prev_coord.char_idx(self.width);
                     char_array[prev_coord_idx] = util::square_to_char(self.at(prev_coord), 0, num_stacked, mv);
                     num_stacked = 0;
                 }
@@ -113,7 +114,7 @@ impl Board {
 
             // Set head
             let head_coord = self.snake_head(s_idx);
-            let head_idx = head_coord.idx();
+            let head_idx = head_coord.char_idx(self.width);
             char_array[head_idx] = util::square_to_char(self.at(head_coord), s_idx as u8, 0, None);
         }
 
@@ -190,9 +191,13 @@ impl Board {
         let chars_vec: Vec<char> = lines_vec.into_iter().flat_map(|line| line.into_iter()).collect();
 
         // Populate board matrix
-        for (idx, char) in chars_vec.iter().enumerate() {
+        for (char_idx, char) in chars_vec.iter().enumerate() {
+            // Internal layout is height first, so manually iterate width-first here
             let (board_square, ..) = util::char_to_square(*char);
-            board.set_at_idx(idx, board_square);
+            let x = char_idx as i32 % board.width;
+            let y = char_idx as i32 / board.width;
+            let coord = Coord::new(x as i8, y as i8, board.height);
+            board.set_at(coord, board_square);
 
             if is_bit_set(board_square as u8, BoardBit::Food) {
                 board.num_food += 1;
@@ -205,14 +210,17 @@ impl Board {
         // Populate board stats and snake indices
         for (square_idx, char) in chars_vec.iter().enumerate() {
             let (board_square, idx, _, mv_opt) = util::char_to_square(*char);
+            let x = square_idx as i32 % board.width;
+            let y = square_idx as i32 / board.width;
+            let coord = Coord::new(x as i8, y as i8, board.height);
 
             if is_bit_set(board_square as u8, BoardBit::SnakeHead) {
                 assert!(mv_opt.is_none());
-                board.set_snake_num_idx(square_idx, idx);
-                found_heads.insert(idx, square_idx);
+                board.set_snake_num(coord, idx);
+                found_heads.insert(idx, coord);
             } else if is_bit_set(board_square as u8, BoardBit::SnakeTail) {
-                let indexed_snake = board.set_snake_idxs(&chars_vec, square_idx, game.ruleset);
-                found_tails.insert(indexed_snake, square_idx);
+                let indexed_snake = board.set_snake_idxs(&chars_vec, coord, game.ruleset);
+                found_tails.insert(indexed_snake, coord);
             }
         }
 
@@ -226,8 +234,7 @@ impl Board {
             if board.snakes[i].alive() && found_heads.contains_key(&(i as u8)) && !found_tails.contains_key(&(i as u8))
             {
                 for _ in 0..3 {
-                    let head = board.coord_from_idx(*found_heads.get(&(i as u8)).unwrap());
-                    board.snakes[i].push_back(head);
+                    board.snakes[i].push_back(*found_heads.get(&(i as u8)).unwrap());
                 }
             }
         }
@@ -277,7 +284,7 @@ impl fmt::Debug for Board {
         writeln!(f, "snake_arr:").unwrap();
         for y in (0..self.height).rev() {
             for x in 0..self.width {
-                write!(f, "{} ", self.snake_num_idx((x + y * self.width) as usize)).unwrap();
+                write!(f, "{} ", self.snake_num(Coord::new(x as i8, y as i8, self.height))).unwrap();
             }
             if y != 0 {
                 writeln!(f).unwrap();

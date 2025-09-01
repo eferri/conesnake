@@ -58,8 +58,8 @@ impl ApiCoord {
         ApiCoord { x, y }
     }
 
-    pub fn to_internal(&self, width: i32) -> Coord {
-        Coord::new(self.x, self.y, width)
+    pub fn to_internal(&self, height: i32) -> Coord {
+        Coord::new(self.x, self.y, height)
     }
 }
 

@@ -1,9 +1,12 @@
 use super::*;
 
+// use crate::board::board_simd::{BoardVec, INDEXES, IndexVec, any_bits_set_simd};
+
 use crate::game::{Game, Map};
 use crate::rand::{FastRand, Rand};
 
 use std::cmp::max;
+// use std::simd::cmp::SimdPartialOrd;
 
 impl Board {
     // generate a random valid move for a snake
@@ -174,7 +177,7 @@ impl Board {
     // Battlesnake rules implementation
     //
     #[inline(always)]
-    pub fn gen_board(&mut self, moves: u16, game: &Game, food_buff: &mut [usize], rng: &mut impl Rand) {
+    pub fn gen_board(&mut self, moves: u16, game: &Game, food_buff: &mut [u32], rng: &mut impl Rand) {
         // Note: this is not done till later in rules
         self.turn += 1;
 
@@ -397,12 +400,12 @@ impl Board {
     }
 
     #[inline(never)]
-    pub fn update_board_asm(&mut self, game: &Game, food_buff: &mut [usize], rng: &mut FastRand) {
+    pub fn update_board_asm(&mut self, game: &Game, food_buff: &mut [u32], rng: &mut FastRand) {
         self.update_board(game, food_buff, rng);
     }
 
     #[inline(always)]
-    fn update_board(&mut self, game: &Game, food_buff: &mut [usize], rng: &mut impl Rand) {
+    fn update_board(&mut self, game: &Game, food_buff: &mut [u32], rng: &mut impl Rand) {
         let map = game.api.map;
         let rules = game.ruleset;
 
@@ -422,8 +425,6 @@ impl Board {
             num_spawn = 1;
         }
 
-        let mut num_unnocupied = 0;
-
         for idx in 0..self.num_snakes() as usize {
             if self.snakes[idx].alive() {
                 let head = self.snake_head(idx);
@@ -432,39 +433,24 @@ impl Board {
         }
 
         if num_spawn > 0 {
-            // Iterate over height dimension to match rules
-            let mut coord_idx = 0;
-
+            let mut num_unnocupied = 0;
             let board_len = self.len() as usize;
 
-            #[allow(clippy::explicit_counter_loop)]
-            for _ in 0..board_len {
-                let square = self.at_idx(coord_idx);
+            for idx in 0..board_len {
+                let sqr = self.at_idx(idx);
 
-                if !any_bits_set(
-                    square,
+                let occupied = any_bits_set(
+                    sqr,
                     BoardBit::SnakeHead as u8
                         | BoardBit::SnakeBody as u8
                         | BoardBit::SnakeTail as u8
                         | BoardBit::SnakeHeadAdj as u8
                         | BoardBit::Food as u8,
-                ) {
-                    food_buff[num_unnocupied] = coord_idx;
-                    num_unnocupied += 1;
-                };
+                );
 
-                // When testing iterate over height dimension first
-                // to match rules behavior
-                #[cfg(test)]
-                {
-                    coord_idx += self.width as usize;
-                    if coord_idx >= board_len {
-                        coord_idx = coord_idx % self.height as usize + 1;
-                    }
-                }
-                #[cfg(not(test))]
-                {
-                    coord_idx += 1;
+                if !occupied {
+                    food_buff[num_unnocupied] = idx as u32;
+                    num_unnocupied += 1;
                 }
             }
 
@@ -475,7 +461,7 @@ impl Board {
                 self.num_food += num_spawn as i32;
 
                 for idx in food_buff.iter().take(num_spawn) {
-                    self.set_at_idx(*idx, BoardBit::Food);
+                    self.set_at_idx(*idx as usize, BoardBit::Food);
                 }
             }
         }
@@ -520,9 +506,9 @@ impl Board {
 
         for z in 0..dim {
             let curr_coord = if dim == self.width {
-                Coord::new(z as i8, index as i8, self.width)
+                Coord::new(z as i8, index as i8, self.height)
             } else {
-                Coord::new(index as i8, z as i8, self.width)
+                Coord::new(index as i8, z as i8, self.height)
             };
 
             self.set_at(curr_coord, BoardBit::Hazard);

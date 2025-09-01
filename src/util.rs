@@ -11,13 +11,13 @@ use std::io;
 // API structs
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub struct Coord {
-    pub val: u8,
-    pub idx: u8,
+    val: u8,
+    idx: u8,
 }
 
 impl Coord {
-    pub fn new(x: i8, y: i8, width: i32) -> Self {
-        let idx = (x as i32 + (y as i32 * width)) as u8;
+    pub fn new(x: i8, y: i8, height: i32) -> Self {
+        let idx = (y as i32 + (x as i32 * height)) as u8;
         let mut crd = Coord { val: 0, idx };
 
         crd.set_x(x);
@@ -45,6 +45,10 @@ impl Coord {
 
     pub fn idx(&self) -> usize {
         self.idx as usize
+    }
+
+    pub fn char_idx(&self, width: i32) -> usize {
+        (self.x() as i32 + (self.y() as i32 * width)) as usize
     }
 
     fn set_x(&mut self, x_val: i8) {
