@@ -35,9 +35,6 @@ const BOARD: &str = "
     - - - - - - - - - - -";
 
 fn print_info(cfg: &Config) {
-    #[cfg(feature = "simd")]
-    info!("using simd");
-
     if cfg.compare {
         info!("compare is true!")
     }
