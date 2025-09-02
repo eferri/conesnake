@@ -272,6 +272,7 @@ impl Board {
             if !self.on_board(dest) {
                 self.snakes[idx].health = 0;
                 self.snakes[idx].eliminated = true;
+                self.snakes[idx].clear_head = false;
                 continue;
             }
 
@@ -364,23 +365,20 @@ impl Board {
                     if other_idx as usize != idx {
                         self.snakes[idx].health = 0;
                         self.snakes[idx].eliminated = true;
+                        self.snakes[idx].clear_head = false;
+                    } else {
+                        continue;
                     }
                 } else {
                     self.snakes[idx].health = 0;
                     self.snakes[idx].eliminated = true;
+                    self.snakes[idx].clear_head = false;
                 }
             }
 
-            if !self.snakes[idx].eliminated {
-                continue;
-            }
-
-            for body_idx in 0..self.snakes[idx].len {
+            let start_iter = if self.snakes[idx].clear_head { 0 } else { 1 };
+            for body_idx in start_iter..self.snakes[idx].len {
                 let coord = self.snakes[idx].at_head_offset(body_idx);
-
-                if !self.on_board(coord) {
-                    continue;
-                }
 
                 let snake_idx = self.snake_num(coord) as usize;
                 if snake_idx == idx {

@@ -10,10 +10,11 @@ use std::{fmt::Write, str};
 use serde::{Deserialize, Serialize};
 use strum_macros::FromRepr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Eq)]
 pub struct Snake {
     pub health: i32,
     pub eliminated: bool,
+    pub clear_head: bool,
     pub len: i32,
     pub tail_ptr: i32,
     pub head_ptr: i32,
@@ -26,11 +27,23 @@ impl Default for Snake {
     }
 }
 
+impl PartialEq for Snake {
+    fn eq(&self, other: &Self) -> bool {
+        self.health == other.health
+            && self.eliminated == other.eliminated
+            && self.len == other.len
+            && self.head_ptr == other.head_ptr
+            && self.tail_ptr == other.tail_ptr
+            && self.body == other.body
+    }
+}
+
 impl Snake {
     pub fn new() -> Self {
         Self {
             health: 0,
             eliminated: false,
+            clear_head: true,
             len: 0,
             head_ptr: 0,
             tail_ptr: 0,
@@ -297,6 +310,7 @@ impl Board {
 
             snake.health = other_snake.health;
             snake.eliminated = other_snake.eliminated;
+            snake.clear_head = other_snake.clear_head;
 
             snake.len = other_snake.len;
             snake.head_ptr = 0;

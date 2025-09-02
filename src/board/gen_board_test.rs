@@ -143,7 +143,7 @@ fn gen_board_ref_test() {
             "turn: 10 health: 45 health: 42 health: 42
             - - - - - -
             - - b > > 1
-            v E 0 - - -
+            v e 0 - - -
             v - ^ - - -
             v - ^ < < a
             2 - - - - -",
