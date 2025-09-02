@@ -26,7 +26,7 @@ impl Board {
                 _ => panic!("Snake body {curr_coord} had unexpected form {self}"),
             };
 
-            curr_coord = self.move_to_coord(curr_coord, next_mv, rules);
+            curr_coord = self.move_to_coord(curr_coord, next_mv.idx(), rules);
             snake_len += 1;
         }
 
@@ -58,7 +58,7 @@ impl Board {
                 }
             };
 
-            curr_coord = self.move_to_coord(curr_coord, next_mv, rules);
+            curr_coord = self.move_to_coord(curr_coord, next_mv.idx(), rules);
         }
 
         let snake_len = self.snakes[snake_idx as usize].len as usize;
@@ -234,7 +234,7 @@ impl Board {
 
         for i in 0..board.num_snakes() as usize {
             if board.snakes[i].alive() {
-                board.snake_head_adj(board.snake_head(i), true);
+                board.set_snake_head_adj(board.snake_head(i));
             }
         }
 

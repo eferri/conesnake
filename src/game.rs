@@ -108,7 +108,7 @@ impl Game {
         }
 
         for mv_idx in 0..4 {
-            if !board.valid_move(self, snake_idx, Move::from_idx(mv_idx)) {
+            if !board.valid_move(self, snake_idx, mv_idx) {
                 continue;
             }
 

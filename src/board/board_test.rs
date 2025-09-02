@@ -180,19 +180,19 @@ pub fn move_to_coord_test() {
     let test_coord = Coord::new(4, 3, board.width);
 
     assert_eq!(
-        board.move_to_coord(test_coord, Move::Left, game.ruleset),
+        board.move_to_coord(test_coord, Move::Left.idx(), game.ruleset),
         Coord::new(3, 3, board.width)
     );
     assert_eq!(
-        board.move_to_coord(test_coord, Move::Right, game.ruleset),
+        board.move_to_coord(test_coord, Move::Right.idx(), game.ruleset),
         Coord::new(5, 3, board.width)
     );
     assert_eq!(
-        board.move_to_coord(test_coord, Move::Up, game.ruleset),
+        board.move_to_coord(test_coord, Move::Up.idx(), game.ruleset),
         Coord::new(4, 4, board.width)
     );
     assert_eq!(
-        board.move_to_coord(test_coord, Move::Down, game.ruleset),
+        board.move_to_coord(test_coord, Move::Down.idx(), game.ruleset),
         Coord::new(4, 2, board.width)
     );
 }
@@ -205,19 +205,19 @@ pub fn move_to_coord_wrapped_test() {
     let test_coord = Coord::new(0, 5, board.width);
 
     assert_eq!(
-        board.move_to_coord(test_coord, Move::Left, game.ruleset),
+        board.move_to_coord(test_coord, Move::Left.idx(), game.ruleset),
         Coord::new(5, 5, board.width)
     );
     assert_eq!(
-        board.move_to_coord(test_coord, Move::Right, game.ruleset),
+        board.move_to_coord(test_coord, Move::Right.idx(), game.ruleset),
         Coord::new(1, 5, board.width)
     );
     assert_eq!(
-        board.move_to_coord(test_coord, Move::Up, game.ruleset),
+        board.move_to_coord(test_coord, Move::Up.idx(), game.ruleset),
         Coord::new(0, 0, board.width)
     );
     assert_eq!(
-        board.move_to_coord(test_coord, Move::Down, game.ruleset),
+        board.move_to_coord(test_coord, Move::Down.idx(), game.ruleset),
         Coord::new(0, 4, board.width)
     );
 }
@@ -390,21 +390,21 @@ pub fn move_test() {
     let head_a_1 = Coord::new(0, 3, board_a.width);
     let head_b_0 = Coord::new(2, 3, board_b.width);
 
-    assert!(board_a.on_board(board_a.move_to_coord(head_a_1, Move::Right, game.ruleset)));
-    assert!(!board_a.on_board(board_a.move_to_coord(head_a_1, Move::Left, game.ruleset)));
-    assert!(board_b.on_board(board_b.move_to_coord(head_b_0, Move::Up, game.ruleset)));
+    assert!(board_a.on_board(board_a.move_to_coord(head_a_1, Move::Right.idx(), game.ruleset)));
+    assert!(!board_a.on_board(board_a.move_to_coord(head_a_1, Move::Left.idx(), game.ruleset)));
+    assert!(board_b.on_board(board_b.move_to_coord(head_b_0, Move::Up.idx(), game.ruleset)));
 
-    assert!(!board_a.valid_move(&game, 0, Move::Left));
-    assert!(board_a.valid_move(&game, 0, Move::Right));
-    assert!(board_a.valid_move(&game, 0, Move::Up));
+    assert!(!board_a.valid_move(&game, 0, Move::Left.idx()));
+    assert!(board_a.valid_move(&game, 0, Move::Right.idx()));
+    assert!(board_a.valid_move(&game, 0, Move::Up.idx()));
 
-    assert!(!board_a.valid_move(&game, 1, Move::Left));
-    assert!(!board_a.valid_move(&game, 1, Move::Right));
-    assert!(board_a.valid_move(&game, 1, Move::Up));
-    assert!(!board_a.valid_move(&game, 1, Move::Down));
+    assert!(!board_a.valid_move(&game, 1, Move::Left.idx()));
+    assert!(!board_a.valid_move(&game, 1, Move::Right.idx()));
+    assert!(board_a.valid_move(&game, 1, Move::Up.idx()));
+    assert!(!board_a.valid_move(&game, 1, Move::Down.idx()));
 
-    assert!(board_b.valid_move(&game, 0, Move::Up));
-    assert!(board_b.valid_move(&game, 1, Move::Right));
+    assert!(board_b.valid_move(&game, 0, Move::Up.idx()));
+    assert!(board_b.valid_move(&game, 1, Move::Right.idx()));
 }
 
 #[test]
@@ -416,18 +416,18 @@ pub fn tail_test() {
     game.api.ruleset.settings.hazard_damage_per_turn = 10;
     let mut board_hazard = Board::from_str(BOARD_TAIL_HAZARD, &game).unwrap();
 
-    assert!(board_tail.valid_move(&game, 0, Move::Up));
+    assert!(board_tail.valid_move(&game, 0, Move::Up.idx()));
 
     // Stacked, shouldn't be able to move into tail
-    assert!(!board_tail.valid_move(&game, 0, Move::Left));
+    assert!(!board_tail.valid_move(&game, 0, Move::Left.idx()));
 
-    assert!(board_hazard.valid_move(&game, 0, Move::Up));
-    assert!(!board_hazard.valid_move(&game, 0, Move::Left));
+    assert!(board_hazard.valid_move(&game, 0, Move::Up.idx()));
+    assert!(!board_hazard.valid_move(&game, 0, Move::Left.idx()));
 
     game.api.ruleset.settings.hazard_damage_per_turn = 80;
     board_hazard = Board::from_str(BOARD_TAIL_HAZARD, &game).unwrap();
-    assert!(!board_hazard.valid_move(&game, 0, Move::Up));
-    assert!(!board_hazard.valid_move(&game, 0, Move::Left));
+    assert!(!board_hazard.valid_move(&game, 0, Move::Up.idx()));
+    assert!(!board_hazard.valid_move(&game, 0, Move::Left.idx()));
 }
 
 #[test]

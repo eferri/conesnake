@@ -101,12 +101,12 @@ impl Move {
     }
 
     // Extract the move index from snake at index snake_idx,
-    pub fn extract_idx(moves: u16, snake_idx: u32) -> u16 {
-        (moves & (0x3 << (2 * snake_idx))) >> (2 * snake_idx)
+    pub fn extract_idx(moves: u16, snake_idx: u32) -> usize {
+        ((moves & (0x3 << (2 * snake_idx))) >> (2 * snake_idx)) as usize
     }
 
     pub fn extract(moves: u16, snake_idx: u32) -> Self {
-        Self::from_idx(Self::extract_idx(moves, snake_idx) as usize)
+        Self::from_idx(Self::extract_idx(moves, snake_idx))
     }
 
     pub fn set_move(moves: u16, snake_idx: u32, mv: Self) -> u16 {

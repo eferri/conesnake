@@ -2,27 +2,27 @@ use super::*;
 
 use crate::game::{Game, Map};
 use crate::rand::{FastRand, Rand};
+use crate::util::MOVES;
 
 use std::cmp::max;
 
 impl Board {
     // generate a random valid move for a snake
     pub fn gen_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
-        let mut valid_moves = [Move::Left; 4];
+        let mut valid_moves = [0; 4];
         let mut num_valid = 0;
 
         for mv_idx in 0..4 {
-            let mv = Move::from_idx(mv_idx);
-            let is_valid = self.valid_move(game, snake_idx, mv);
+            let is_valid = self.valid_move(game, snake_idx, mv_idx);
             if is_valid {
-                valid_moves[num_valid as usize] = mv;
+                valid_moves[num_valid as usize] = mv_idx;
                 num_valid += 1;
             }
         }
 
         if num_valid > 0 {
             let mv_idx = rng.range(0, num_valid - 1);
-            valid_moves[mv_idx as usize]
+            MOVES[valid_moves[mv_idx as usize]]
         } else {
             Move::Left
         }
@@ -31,11 +31,11 @@ impl Board {
     pub fn gen_strong_move(&self, game: &Game, snake_idx: usize, rng: &mut impl Rand) -> Move {
         let mut best_move = None;
 
-        let mut valid_moves = [Move::Left; 4];
+        let mut valid_moves = [0; 4];
 
-        let mut neutral_moves = [Move::Left; 4];
-        let mut good_moves = [Move::Left; 4];
-        let mut bad_moves = [Move::Left; 4];
+        let mut neutral_moves = [0; 4];
+        let mut good_moves = [0; 4];
+        let mut bad_moves = [0; 4];
 
         let mut num_valid = 0;
 
@@ -44,22 +44,21 @@ impl Board {
         let mut num_bad = 0;
 
         for mv_idx in 0..4 {
-            let mv = Move::from_idx(mv_idx);
-            let is_valid = self.valid_move(game, snake_idx, mv);
+            let is_valid = self.valid_move(game, snake_idx, mv_idx);
             if is_valid {
-                valid_moves[num_valid as usize] = mv;
+                valid_moves[num_valid as usize] = mv_idx;
                 num_valid += 1;
-                match self.head_on_col(game, snake_idx, mv) {
+                match self.head_on_col(game, snake_idx, Move::from_idx(mv_idx)) {
                     HeadOnCol::PossibleElimination => {
-                        good_moves[num_good as usize] = mv;
+                        good_moves[num_good as usize] = mv_idx;
                         num_good += 1;
                     }
                     HeadOnCol::None => {
-                        neutral_moves[num_neutral as usize] = mv;
+                        neutral_moves[num_neutral as usize] = mv_idx;
                         num_neutral += 1;
                     }
                     HeadOnCol::PossibleCollision => {
-                        bad_moves[num_bad as usize] = mv;
+                        bad_moves[num_bad as usize] = mv_idx;
                         num_bad += 1;
                     }
                 }
@@ -83,13 +82,13 @@ impl Board {
             best_move = Some(bad_moves[mv_idx as usize]);
         }
 
-        best_move.unwrap_or(Move::Left)
+        Move::from_idx(best_move.unwrap_or(0))
     }
 
     #[inline(always)]
-    pub fn valid_move(&self, game: &Game, snake_idx: usize, mv: Move) -> bool {
+    pub fn valid_move(&self, game: &Game, snake_idx: usize, mv_idx: usize) -> bool {
         let head = self.snake_head(snake_idx);
-        let coord = self.move_to_coord(head, mv, game.ruleset);
+        let coord = self.move_to_coord(head, mv_idx, game.ruleset);
         if !self.on_board(coord) {
             return false;
         }
@@ -113,19 +112,19 @@ impl Board {
 
     #[inline(always)]
     pub fn is_trapped(&self, game: &Game, snake_idx: usize) -> bool {
-        !self.valid_move(game, snake_idx, Move::Left)
-            && !self.valid_move(game, snake_idx, Move::Right)
-            && !self.valid_move(game, snake_idx, Move::Up)
-            && !self.valid_move(game, snake_idx, Move::Down)
+        !self.valid_move(game, snake_idx, Move::Left.idx())
+            && !self.valid_move(game, snake_idx, Move::Right.idx())
+            && !self.valid_move(game, snake_idx, Move::Up.idx())
+            && !self.valid_move(game, snake_idx, Move::Down.idx())
     }
 
     // Assumption: move is valid
     #[inline(always)]
     pub fn head_on_col(&self, game: &Game, snake_idx: usize, mv: Move) -> HeadOnCol {
         let snake_head = self.snake_head(snake_idx);
-        let dest_square = self.move_to_coord(snake_head, mv, game.ruleset);
+        let dest_square = self.move_to_coord(snake_head, mv.idx(), game.ruleset);
         for mv_idx in 0..4 {
-            let adj_coord = self.move_to_coord(dest_square, Move::from_idx(mv_idx), game.ruleset);
+            let adj_coord = self.move_to_coord(dest_square, mv_idx, game.ruleset);
 
             if !self.on_board(adj_coord) {
                 continue;
@@ -221,7 +220,7 @@ impl Board {
             if !snake.alive() {
                 continue;
             }
-            let mv = Move::extract(moves, idx as u32);
+            let mv = Move::extract_idx(moves, idx as u32);
 
             let old_head = self.snake_head(idx);
             let new_head = self.move_to_coord(old_head, mv, game.ruleset);
@@ -234,8 +233,7 @@ impl Board {
             let old_sqr = self.at(old_tail);
             let new_sqr = self.at(new_tail);
 
-            // Clear head adjacent squares
-            self.snake_head_adj(old_head, false);
+            self.clear_snake_head_adj(old_head);
 
             if is_bit_set(old_sqr, BoardBit::SnakeTail) && is_bit_set(new_sqr, BoardBit::SnakeBody) {
                 self.clear_bits_at(old_tail, BoardBit::SnakeTail as u8 | BoardBit::SnakeIdx as u8);
@@ -310,7 +308,7 @@ impl Board {
                 continue;
             }
 
-            let mv = Move::extract(moves, idx as u32);
+            let mv = Move::extract_idx(moves, idx as u32);
 
             // Update old head, even for eliminated snakes
             let old_head = self.snakes[idx].at_head_offset(1);
@@ -425,7 +423,7 @@ impl Board {
         for idx in 0..self.num_snakes() as usize {
             if self.snakes[idx].alive() {
                 let head = self.snake_head(idx);
-                self.snake_head_adj(head, true);
+                self.set_snake_head_adj(head);
             }
         }
 

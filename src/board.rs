@@ -1,7 +1,7 @@
 use crate::api::{ApiCoord, BattleState, BoardApi, SnakeApi};
 use crate::config::{MAX_BOARD_SIZE, MAX_SNAKES};
 use crate::game::{Game, Map, Rules};
-use crate::util::{self, MOVE_INCR, MOVES};
+use crate::util::{self, MOVE_INCR};
 use crate::util::{Coord, Error, Move};
 
 use std::cmp::{Ordering, max, min, min_by};
@@ -478,23 +478,30 @@ impl Board {
             prev_coord = Some(coord);
         }
 
-        self.snake_head_adj(self.snake_head(snake_idx as usize), true);
+        self.set_snake_head_adj(self.snake_head(snake_idx as usize));
 
         Ok(())
     }
 
     // Inlining this seems to hurt performance
-    pub fn snake_head_adj(&mut self, head: Coord, set: bool) {
-        for mv in MOVES {
+    pub fn set_snake_head_adj(&mut self, head: Coord) {
+        for mv_idx in 0..4 {
             // Bug: maps don't consider possibility of wrapping.
             // Use standard ruleset here to match this behavior
-            let dest = self.move_to_coord(head, mv, Rules::Standard);
+            let dest = self.move_to_coord(head, mv_idx, Rules::Standard);
             if self.on_board(dest) {
-                if set {
-                    self.set_at(dest, BoardBit::SnakeHeadAdj)
-                } else {
-                    self.clear_at(dest, BoardBit::SnakeHeadAdj)
-                }
+                self.set_at(dest, BoardBit::SnakeHeadAdj)
+            }
+        }
+    }
+
+    pub fn clear_snake_head_adj(&mut self, head: Coord) {
+        for mv_idx in 0..4 {
+            // Bug: maps don't consider possibility of wrapping.
+            // Use standard ruleset here to match this behavior
+            let dest = self.move_to_coord(head, mv_idx, Rules::Standard);
+            if self.on_board(dest) {
+                self.clear_at(dest, BoardBit::SnakeHeadAdj)
             }
         }
     }
@@ -580,8 +587,8 @@ impl Board {
         !(square.x() < 0 || square.x() as i32 >= self.width || square.y() < 0 || square.y() as i32 >= self.height)
     }
 
-    pub fn move_to_coord(&self, head: Coord, mv: Move, rules: Rules) -> Coord {
-        let mv_incr = MOVE_INCR[mv.idx()];
+    pub fn move_to_coord(&self, head: Coord, mv_idx: usize, rules: Rules) -> Coord {
+        let mv_incr = MOVE_INCR[mv_idx];
 
         let new_x = head.x() + mv_incr as i8;
         let new_y = head.y() + (mv_incr >> 8) as i8;

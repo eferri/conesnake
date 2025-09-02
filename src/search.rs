@@ -219,8 +219,8 @@ impl Node {
                 continue;
             }
 
-            let mv = Move::extract(mvs, snake_idx as u32);
-            let mcts_scores = &self.cache[snake_idx][mv.idx()];
+            let mv_idx = Move::extract_idx(mvs, snake_idx as u32);
+            let mcts_scores = &self.cache[snake_idx][mv_idx];
 
             if mcts_scores.games == 0 || (self.games as i64) == 0 {
                 results[snake_idx] = f64::MAX
@@ -526,9 +526,9 @@ fn search_worker<R: Rand>(ctx: Arc<SearchContext<R>>, id: usize) {
                 let snake_score = thread_state_guard.play_scores[snake_idx];
 
                 // Update cached score and game count of each snake-move for this node
-                let snake_mv = Move::extract(moves, snake_idx as u32);
+                let snake_mv_idx = Move::extract_idx(moves, snake_idx as u32);
 
-                let cache = &mut node_guard.cache[snake_idx][snake_mv.idx()];
+                let cache = &mut node_guard.cache[snake_idx][snake_mv_idx];
 
                 cache.score += snake_score;
                 cache.games += 1;
@@ -601,7 +601,7 @@ fn expand_node<R: Rand>(
                 continue;
             }
 
-            let snake_mv_idx = Move::extract_idx(node.num_move_perms as u16, alive_index) as usize;
+            let snake_mv_idx = Move::extract_idx(node.num_move_perms as u16, alive_index);
             let snake_move = Move::from_idx(snake_mv_idx);
 
             // If this node is pruned, continue
@@ -612,7 +612,7 @@ fn expand_node<R: Rand>(
             if node.cache[s][snake_mv_idx].pruned {
                 node.num_move_perms += 1;
                 continue 'expand_loop;
-            } else if (!node.board.valid_move(game, s, snake_move) && !node.board.is_trapped(game, s))
+            } else if (!node.board.valid_move(game, s, snake_move.idx()) && !node.board.is_trapped(game, s))
                 || (node.board.is_trapped(game, s) && snake_move != Move::Left)
             {
                 node.cache[s][snake_mv_idx].pruned = true;
