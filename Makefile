@@ -1,7 +1,8 @@
 # -------------------- local development --------------------
 
-.PHONY: build-all
-build-all: debug-build release-build relay-build profile-build rules
+.PHONY: build debug-build
+build debug-build: rules
+	docker compose run --rm snake cargo build --all-targets
 
 # Docker
 
@@ -23,9 +24,8 @@ root-shell:
 
 # Build
 
-.PHONY: build debug-build
-build debug-build:
-	docker compose run --rm snake cargo build --all-targets
+.PHONY: build-all
+build-all: debug-build release-build relay-build profile-build rules
 
 .PHONY: release-build
 release-build:

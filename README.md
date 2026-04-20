@@ -1,14 +1,15 @@
 # conesnake
-A tree search-based battlesnake.
+A multithreaded monte-carlo tree search based [battlesnake](https://play.battlesnake.com/) written in rust.
 
 ## Developing
 1. Prerequisites: docker and docker-compose
 
-1. Build the docker containers and run a game locally:
+1. Build the docker containers, application and run a game locally:
     ```
     git submodule update --init --recursive
     cp example.env .env
     docker compose build
+    make
     docker compose up
     ```
 
